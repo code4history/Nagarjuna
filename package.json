@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "opencc": "^1.1.3"
+  }
+}

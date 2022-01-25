@@ -7,14 +7,16 @@
     {"id": 5, "devanagari": "वाँः", "siddham": "𑖪𑖯𑖼𑖾","transcription": "vāṃḥ", "markup": "<@vaamh>", "kana": "バーンク", "image": null},
     {"id": 6, "devanagari": "ह्रीः", "siddham": "𑖮𑖿𑖨𑖱𑖾", "transcription": "hrīḥ", "markup": "<@hriih>", "kana": "キリーク", "image": "https://upload.wikimedia.org/wikipedia/commons/6/69/.Bonji-hr%C4%AB%E1%B8%A5.svg"},
     {"id": 7, "devanagari": "स", "siddham": "𑖭", "transcription": "sa", "markup": "<@sa>", "kana": "ソ", "image": "https://upload.wikimedia.org/wikipedia/commons/8/81/BonjiSa.png"},
-    {"id": 8, "devanagari": "म", "siddham": "𑖦", "transcription": "ma", "markup": "<@ma>", "kana": "マ", "image": "https://upload.wikimedia.org/wikipedia/commons/1/1b/BonjiMa.png"}
+    {"id": 8, "devanagari": "म", "siddham": "𑖦", "transcription": "ma", "markup": "<@ma>", "kana": "マ", "image": "https://upload.wikimedia.org/wikipedia/commons/1/1b/BonjiMa.png"},
+    {"id": 9, "devanagari": "श्री", "siddham": "𑖫𑖿𑖨𑖱", "transcription": "śrī", "markup": "<@srii>", "kana": "シリー", "image": "https://upload.wikimedia.org/wikipedia/commons/5/50/BonjiSri.png"}
   ],
   "yidams": [
     {"id": 1, "yidam": "胎蔵界大日如来"},
     {"id": 2, "yidam": "金剛界大日如来"},
     {"id": 3, "yidam": "阿弥陀如来"},
     {"id": 4, "yidam": "弁財天"},
-    {"id": 5, "yidam": "大黒天"}
+    {"id": 5, "yidam": "大黒天"},
+    {"id": 6, "yidam": "吉祥天"}
   ],
   "sources": [
     {"id": 1, "source": "Wikipedia 日本語版「種子 (密教)」"},
@@ -29,7 +31,8 @@
     {"char":5, "yidam":2 , "sources": [3], "memo": null},
     {"char":6, "yidam":3 , "sources": [1, 2, 3], "memo": null},
     {"char":7, "yidam":4 , "sources": [3], "memo": null},
-    {"char":8, "yidam":5 , "sources": [3], "memo": null}
+    {"char":8, "yidam":5 , "sources": [3], "memo": null},
+    {"char":9, "yidam":6 , "sources": [1, 2, 3], "memo": null}
   ]
 }
 

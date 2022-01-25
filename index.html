@@ -78,6 +78,7 @@
           <th>Devanagari based font</th>
           <th>Siddham based font</th>
           <th>Transcription</th>
+          <th>Mark up (Candidate)</th>
           <th>Kana</th>
           <th>Image</th>
           <th>Yidam</th>
@@ -113,6 +114,7 @@
             htmlLine = htmlLine + `<td>Ap Deva Sanskrit: <span class="apsanskrit">${line.devanagari}</span><br>Ap Deva Siddham: <span class="apsiddham">${line.devanagari}</span></td>`
             htmlLine = htmlLine + `<td>Mk Siddham: <span class="mksiddham">${line.siddham}</span><br>Noto Sans Siddham: <span class="siddham">${line.siddham}</span></td>`
             htmlLine = htmlLine + `<td>${line.transcription}</td>`
+            htmlLine = htmlLine + `<td>${line.markup.replace("<","&lt;").replace(">","&gt;")}</td>`
             htmlLine = htmlLine + `<td>${line.kana}</td>`
             htmlLine = htmlLine + `<td>${line.image ? `<img class="siddham_img" src="${line.image}"></td>` : ""}`
             htmlLine = htmlLine + `<td>${line.yidam}</td>`

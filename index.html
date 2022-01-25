@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+    <title>Bijakshara</title>
+    <style type="text/css">
+      th,td {
+        border: solid 1px;
+      }
+      table {
+        border-collapse: collapse;
+        font-size: x-large;
+      }
+      @font-face {
+        font-family: "Ap Deva Sanskrit";
+        src: url("./fonts/ApDevaSanskrit.woff2") format('woff2'),
+        url("./fonts/ApDevaSanskrit.woff") format('woff');
+      }
+      .apsanskrit {
+        font-family: "Ap Deva Sanskrit";
+        font-size: xxx-large;
+      }
+      @font-face {
+        font-family: "Ap Deva Siddham";
+        src: url("./fonts/ApDevaSiddham.woff2") format('woff2'),
+        url("./fonts/ApDevaSiddham.woff") format('woff');
+      }
+      .apsiddham {
+        font-family: "Ap Deva Siddham";
+        font-size: xxx-large;
+      }
+      @font-face {
+        font-family: "Mk Siddham";
+        src: url("./fonts/MuktamsiddhamG.woff2") format('woff2'),
+        url("./fonts/MuktamsiddhamG.woff") format('woff');
+      }
+      .mksiddham {
+        font-family: "Mk Siddham";
+        font-size: xxx-large;
+      }
+      @font-face {
+        font-family: "Noto Sans Siddham";
+        src: url("./fonts/noto-sans-siddham-v13-siddham-regular.woff2") format('woff2'),
+          url("./fonts/noto-sans-siddham-v13-siddham-regular.woff") format('woff');
+      }
+      .siddham {
+        font-family: "Noto Sans Siddham";
+        font-size: xxx-large;
+      }
+      html,
+      body {
+        height: 100%;
+        padding: 0;
+        margin: 0;
+      }
+      .siddham_img {
+        max-height: 100px;
+      }
+    </style>
+  </head>
+  <body>
+    <!--h1 class="display-3"><span class="genkai">春海</span>: 年号推定フォーム<br>
+      <span class="siddham">𑖀𑖽𑖀𑖼𑖀𑖲𑖾𑖤𑗜𑖤 b𑖮𑖿𑖦𑖿𑖦𑖯𑖼 b𑖮𑖿𑖮𑖳𑖼 b𑖫𑖿𑖨𑖱</span><br>
+      <span class="apsiddham">अंवंअँआःअुःबुबूबयं𑖀𑖽𑖀𑖼𑖤𑗜𑖤 b𑖮𑖿𑖦𑖿𑖦𑖯𑖼 b𑖮𑖿𑖮𑖳𑖼 b𑖫𑖿𑖨𑖱</span><br>
+      अंवंअँआःअुःबुबूबयं bस्त्वं bह्म्मां bह्हूं bश्री<br>
+      <span class="apsanskrit">अंवंअँआःअुःबुबूबयं bस्त्वं bह्म्मां bह्हूं bश्री</span><br>
+      <span class="apsiddham">अंवंअँआःअुःबुबूबयं bस्त्वं bह्म्मां bह्हूं bश्री</span><br>
+      <span class="mksiddham">𑖀𑖽𑖀𑖼𑖤𑗜 b𑖮𑖿𑖦𑖿𑖦𑖯𑖼 b𑖮𑖿𑖮𑖳𑖼 b𑖫𑖿𑖨𑖱</span><br>𑖀𑖼</h1-->
+    <table>
+      <tbody id="tablebody">
+        <tr>
+          <th>ID</th>
+          <th>Devanagari based font</th>
+          <th>Siddham based font</th>
+          <th>Transcription</th>
+          <th>Kana</th>
+          <th>Image</th>
+          <th>Yidam</th>
+          <th>Sources</th>
+          <th>Memo</th>
+        </tr>
+      </tbody>
+    </table>
+    <script>
+      const jsonFile = "./bijakshara.json"
+      window.addEventListener('load', () => {
+        const table = document.getElementById("tablebody")
+        fetch(jsonFile)
+        .then(async (data) => data.json())
+        .then((json) => {
+          const chars = json.characters
+          const yidams = json.yidams
+          const sources = json.sources
+          const sets = json.refs.map((ref) => {
+            const char = chars.filter((item) => item.id === ref.char)[0]
+            const yidam = yidams.filter((item) => item.id === ref.yidam)[0]
+            const srcs = ref.sources.map((src) => sources.filter((item) => item.id === src)[0].source)
+            const set = Object.assign(
+              Object.assign({
+                memo: ref.memo,
+                sources: srcs
+              }, char), yidam)
+            return set
+          })
+
+          sets.forEach((line, index) => {
+            let htmlLine = `<tr><td>${index + 1}</td>`
+            htmlLine = htmlLine + `<td>Ap Deva Sanskrit: <span class="apsanskrit">${line.devanagari}</span><br>Ap Deva Siddham: <span class="apsiddham">${line.devanagari}</span></td>`
+            htmlLine = htmlLine + `<td>Mk Siddham: <span class="mksiddham">${line.siddham}</span><br>Noto Sans Siddham: <span class="siddham">${line.siddham}</span></td>`
+            htmlLine = htmlLine + `<td>${line.transcription}</td>`
+            htmlLine = htmlLine + `<td>${line.kana}</td>`
+            htmlLine = htmlLine + `<td>${line.image ? `<img class="siddham_img" src="${line.image}"></td>` : ""}`
+            htmlLine = htmlLine + `<td>${line.yidam}</td>`
+            htmlLine = htmlLine + `<td>${line.sources.join("<br>")}</td>`
+            htmlLine = htmlLine + `<td>${line.memo ? line.memo : ""}</td></tr>`
+            const div = document.createElement('tbody')
+            div.innerHTML = htmlLine
+            const tr = div.firstChild
+            table.appendChild(tr)
+          })
+        })
+
+
+
+
+      })
+    </script>
+  </body>
+</html>

@@ -1,5 +1,5 @@
-const jp_src = require("../bijakshara_jp.json");
-const cn_src = require("../bijakshara_cn.json");
+const jp_src = require("../data_src/bijakshara_jp.json");
+const cn_src = require("../data_src/bijakshara_cn.json");
 const OpenCC = require("opencc");
 const t2jp = new OpenCC("t2jp.json");
 const s2t = new OpenCC("s2t.json");

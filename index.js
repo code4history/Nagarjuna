@@ -66,6 +66,8 @@ extractor(options, false);
 // Hentai Kana
 options = {
   export_hentai_kana: true,
+  export_siddham: false,
+  export_deva: false,
   filename: "hentai_kana"
 };
 
@@ -75,6 +77,8 @@ extractor(options, false);
 // Itaiji
 options = {
   export_itaiji: true,
+  export_siddham: false,
+  export_deva: false,
   filename: "kanji_itaiji"
 };
 
@@ -84,6 +88,8 @@ extractor(options, false);
 // Kumimoji
 options = {
   export_kumimoji: true,
+  export_siddham: false,
+  export_deva: false,
   filename: "kumimoji"
 };
 

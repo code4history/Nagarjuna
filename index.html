@@ -97,7 +97,8 @@
           const chars = json.characters
           const yidams = json.yidams
           const sources = json.sources
-          const sets = json.refs.map((ref) => {
+          const refs = json.refs
+          const sets = refs.map((ref) => {
             const char = chars.filter((item) => item.id === ref.char)[0]
             const yidam = yidams.filter((item) => item.id === ref.yidam)[0]
             const srcs = ref.sources.map((src) => sources.filter((item) => item.id === src)[0].source)
@@ -106,6 +107,11 @@
                 memo: ref.memo,
                 sources: srcs
               }, char), yidam)
+            if (ref.override) {
+              Object.keys(ref.override).forEach((key) => {
+                set[key] = ref.override[key]
+              })
+            }
             return set
           })
 

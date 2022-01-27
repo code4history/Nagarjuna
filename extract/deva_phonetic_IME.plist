@@ -10,93 +10,39 @@
 	</dict>
 	<dict>
 		<key>phrase</key>
-		<string>आः</string>
+		<string>आ</string>
 		<key>shortcut</key>
-		<string>あーく</string>
+		<string>あー</string>
 	</dict>
 	<dict>
 		<key>phrase</key>
-		<string>आँः</string>
+		<string>आुँः</string>
 		<key>shortcut</key>
 		<string>あーんく</string>
 	</dict>
 	<dict>
 		<key>phrase</key>
-		<string>वँ</string>
+		<string>अः</string>
 		<key>shortcut</key>
-		<string>ばん</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>वाँः</string>
-		<key>shortcut</key>
-		<string>ばーんく</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>ह्रीः</string>
-		<key>shortcut</key>
-		<string>きりーく</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>स</string>
-		<key>shortcut</key>
-		<string>そ</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>म</string>
-		<key>shortcut</key>
-		<string>ま</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>श्री</string>
-		<key>shortcut</key>
-		<string>しりー</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>गः</string>
-		<key>shortcut</key>
-		<string>ぎゃく</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>गःगः</string>
-		<key>shortcut</key>
-		<string>ぎゃくぎゃく</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>भः</string>
-		<key>shortcut</key>
-		<string>ばく</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>स</string>
-		<key>shortcut</key>
-		<string>さ</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>सः</string>
-		<key>shortcut</key>
-		<string>さく</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>मँ</string>
-		<key>shortcut</key>
-		<string>まん</string>
+		<string>あく</string>
 	</dict>
 	<dict>
 		<key>phrase</key>
 		<string>अँ</string>
 		<key>shortcut</key>
 		<string>あん</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>अुः</string>
+		<key>shortcut</key>
+		<string>あーく</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>भः</string>
+		<key>shortcut</key>
+		<string>ばく</string>
 	</dict>
 	<dict>
 		<key>phrase</key>
@@ -112,9 +58,153 @@
 	</dict>
 	<dict>
 		<key>phrase</key>
-		<string>यु</string>
+		<string>धृ</string>
 		<key>shortcut</key>
-		<string>ゆ</string>
+		<string>ぢり</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>गः</string>
+		<key>shortcut</key>
+		<string>ぎゃく</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>गःगः</string>
+		<key>shortcut</key>
+		<string>ぎゃくぎゃく</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>ह</string>
+		<key>shortcut</key>
+		<string>か</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>हाँ</string>
+		<key>shortcut</key>
+		<string>かーん</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>ह्म्माँ</string>
+		<key>shortcut</key>
+		<string>かんまーん</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>ह्रीः</string>
+		<key>shortcut</key>
+		<string>きりーく</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>हुं</string>
+		<key>shortcut</key>
+		<string>うん</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>हूं</string>
+		<key>shortcut</key>
+		<string>うーん</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>हूं</string>
+		<key>shortcut</key>
+		<string>うーん</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>इ</string>
+		<key>shortcut</key>
+		<string>い</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>इ</string>
+		<key>shortcut</key>
+		<string>いー</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>इ</string>
+		<key>shortcut</key>
+		<string>い</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>ई</string>
+		<key>shortcut</key>
+		<string>いー</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>क</string>
+		<key>shortcut</key>
+		<string>きゃ</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>म</string>
+		<key>shortcut</key>
+		<string>ま</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>मँ</string>
+		<key>shortcut</key>
+		<string>まん</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>मो</string>
+		<key>shortcut</key>
+		<string>もう</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>रै</string>
+		<key>shortcut</key>
+		<string>らい</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>स</string>
+		<key>shortcut</key>
+		<string>さ</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>सः</string>
+		<key>shortcut</key>
+		<string>さく</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>श्री</string>
+		<key>shortcut</key>
+		<string>しりー</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>सु</string>
+		<key>shortcut</key>
+		<string>そ</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>त्राः</string>
+		<key>shortcut</key>
+		<string>たらーく</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>वाँः</string>
+		<key>shortcut</key>
+		<string>ばーんく</string>
 	</dict>
 	<dict>
 		<key>phrase</key>
@@ -124,9 +214,9 @@
 	</dict>
 	<dict>
 		<key>phrase</key>
-		<string>धृ</string>
+		<string>वँ</string>
 		<key>shortcut</key>
-		<string>ぢり</string>
+		<string>ばん</string>
 	</dict>
 	<dict>
 		<key>phrase</key>
@@ -136,21 +226,9 @@
 	</dict>
 	<dict>
 		<key>phrase</key>
-		<string>अः</string>
+		<string>यु</string>
 		<key>shortcut</key>
-		<string>あく</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>हुं</string>
-		<key>shortcut</key>
-		<string>うーん</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>त्राः</string>
-		<key>shortcut</key>
-		<string>たらーく</string>
+		<string>ゆ</string>
 	</dict>
 </array>
 </plist>

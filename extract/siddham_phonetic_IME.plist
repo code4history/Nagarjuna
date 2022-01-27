@@ -10,9 +10,9 @@
 	</dict>
 	<dict>
 		<key>phrase</key>
-		<string>𑖁𑖲𑖾</string>
+		<string>𑖁</string>
 		<key>shortcut</key>
-		<string>あーく</string>
+		<string>あー</string>
 	</dict>
 	<dict>
 		<key>phrase</key>
@@ -22,81 +22,27 @@
 	</dict>
 	<dict>
 		<key>phrase</key>
-		<string>𑖪𑖼</string>
+		<string>𑖀𑖾</string>
 		<key>shortcut</key>
-		<string>ばん</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>𑖪𑖯𑖼𑖾</string>
-		<key>shortcut</key>
-		<string>ばーんく</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>𑖮𑖿𑖨𑖱𑖾</string>
-		<key>shortcut</key>
-		<string>きりーく</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>𑖭</string>
-		<key>shortcut</key>
-		<string>そ</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>𑖦</string>
-		<key>shortcut</key>
-		<string>ま</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>𑖫𑖿𑖨𑖱</string>
-		<key>shortcut</key>
-		<string>しりー</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>𑖐𑖾</string>
-		<key>shortcut</key>
-		<string>ぎゃく</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>𑖐𑖾𑖐𑖾</string>
-		<key>shortcut</key>
-		<string>ぎゃくぎゃく</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>𑖥𑖾</string>
-		<key>shortcut</key>
-		<string>ばく</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>𑖭</string>
-		<key>shortcut</key>
-		<string>さ</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>𑖭𑖾</string>
-		<key>shortcut</key>
-		<string>さく</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>𑖦𑖼</string>
-		<key>shortcut</key>
-		<string>まん</string>
+		<string>あく</string>
 	</dict>
 	<dict>
 		<key>phrase</key>
 		<string>𑖀𑖼</string>
 		<key>shortcut</key>
 		<string>あん</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖀𑖲𑖾</string>
+		<key>shortcut</key>
+		<string>あーく</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖥𑖾</string>
+		<key>shortcut</key>
+		<string>ばく</string>
 	</dict>
 	<dict>
 		<key>phrase</key>
@@ -112,33 +58,57 @@
 	</dict>
 	<dict>
 		<key>phrase</key>
-		<string>𑖧𑖲</string>
-		<key>shortcut</key>
-		<string>ゆ</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
-		<string>𑖪𑖹</string>
-		<key>shortcut</key>
-		<string>べい</string>
-	</dict>
-	<dict>
-		<key>phrase</key>
 		<string>𑖠𑖴</string>
 		<key>shortcut</key>
 		<string>ぢり</string>
 	</dict>
 	<dict>
 		<key>phrase</key>
-		<string>𑖪𑖰</string>
+		<string>𑖐𑖾</string>
 		<key>shortcut</key>
-		<string>び</string>
+		<string>ぎゃく</string>
 	</dict>
 	<dict>
 		<key>phrase</key>
-		<string>𑖀𑖾</string>
+		<string>𑖐𑖾𑖐𑖾</string>
 		<key>shortcut</key>
-		<string>あく</string>
+		<string>ぎゃくぎゃく</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖮</string>
+		<key>shortcut</key>
+		<string>か</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖮𑖯𑖼</string>
+		<key>shortcut</key>
+		<string>かーん</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖮𑖿𑖦𑖿𑖦𑖯𑖼</string>
+		<key>shortcut</key>
+		<string>かんまーん</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖮𑖿𑖨𑖱𑖾</string>
+		<key>shortcut</key>
+		<string>きりーく</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖮𑗜𑖽</string>
+		<key>shortcut</key>
+		<string>うん</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖮𑗝𑖽</string>
+		<key>shortcut</key>
+		<string>うーん</string>
 	</dict>
 	<dict>
 		<key>phrase</key>
@@ -148,9 +118,117 @@
 	</dict>
 	<dict>
 		<key>phrase</key>
+		<string>𑗘</string>
+		<key>shortcut</key>
+		<string>い</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑗙</string>
+		<key>shortcut</key>
+		<string>いー</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖂</string>
+		<key>shortcut</key>
+		<string>い</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖃</string>
+		<key>shortcut</key>
+		<string>いー</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖎</string>
+		<key>shortcut</key>
+		<string>きゃ</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖦</string>
+		<key>shortcut</key>
+		<string>ま</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖦𑖼</string>
+		<key>shortcut</key>
+		<string>まん</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖦𑖺</string>
+		<key>shortcut</key>
+		<string>もう</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖨𑖹</string>
+		<key>shortcut</key>
+		<string>らい</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖭</string>
+		<key>shortcut</key>
+		<string>さ</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖭𑖾</string>
+		<key>shortcut</key>
+		<string>さく</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖫𑖿𑖨𑖱</string>
+		<key>shortcut</key>
+		<string>しりー</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖭𑗜</string>
+		<key>shortcut</key>
+		<string>そ</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
 		<string>𑖝𑖿𑖨𑖯𑖾</string>
 		<key>shortcut</key>
 		<string>たらーく</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖪𑖯𑖼𑖾</string>
+		<key>shortcut</key>
+		<string>ばーんく</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖪𑖹</string>
+		<key>shortcut</key>
+		<string>べい</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖪𑖼</string>
+		<key>shortcut</key>
+		<string>ばん</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖪𑖰</string>
+		<key>shortcut</key>
+		<string>び</string>
+	</dict>
+	<dict>
+		<key>phrase</key>
+		<string>𑖧𑖲</string>
+		<key>shortcut</key>
+		<string>ゆ</string>
 	</dict>
 </array>
 </plist>

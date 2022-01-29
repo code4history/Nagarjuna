@@ -44,7 +44,7 @@ const checker = async (text, expected, fromScript, toScript) => {
   }
 };
 
-const doMain = async () => {
+const doMain = async (skipSort) => {
   // Test roundtrip
   let text = '';
   await Promise.all(chars.map(async (line) => {
@@ -68,6 +68,7 @@ const doMain = async () => {
   fs.writeFileSync('./tools/roundtrip_result.txt', text);
 
   // Sort bijakshara data
+  if (skipSort) process.exit();
 
   const charSorted = chars.sort((a, b) => {
     return a.markup > b.markup ? 1 : a.markup < b.markup ? -1 : 0;
@@ -173,4 +174,4 @@ ${
   fs.writeFileSync('src/bijakshara.json', formatter(bijakshara));
 };
 
-doMain();
+doMain(false);

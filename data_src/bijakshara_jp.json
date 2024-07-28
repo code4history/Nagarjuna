@@ -1,5 +1,5 @@
 [
-{"devanagari": "अ", "transcription": "a", "roman_transcription": "a", "kana_transcription": "ア", "chuten_transcription": "ア", "yidam": "大日如来（胎蔵界） 宝幢如来 日光菩薩 大元帥明王 火天 日天", "siddham_image": "BonjiA.png"},
+{"devanagari": "अ", "transcription": "a", "roman_transcription": "a", "kana_transcription": "ア", "chuten_transcription": "ア", "yidam": "大日如来（胎蔵界） 宝幢如来 日光菩薩 大元帥明王 火天 日天 五輪塔(地輪)", "siddham_image": "BonjiA.png"},
 {"devanagari": "अं", "transcription": "aṃ", "roman_transcription": "am", "kana_transcription": "アン", "chuten_transcription": "アン", "yidam": "無量寿如来（胎蔵界阿弥陀如来） 普賢菩薩", "siddham_image": "BonjiAm.png"},
 {"devanagari": "अः", "transcription": "aḥ", "roman_transcription": "ah", "kana_transcription": "アハ", "chuten_transcription": "アク", "yidam": "天鼓雷音如来 不空成就如来 金剛薩埵（金剛界）", "siddham_image": "BonjiAh.png"},
 {"devanagari": "आ", "transcription": "ā", "roman_transcription": "aa", "kana_transcription": "アー", "chuten_transcription": "アー", "yidam": "開敷華王如来", "siddham_image": "BonjiAa.png"},
@@ -26,7 +26,7 @@
 {"devanagari": "यं", "transcription": "yaṃ", "roman_transcription": "yam", "kana_transcription": "ヤン", "chuten_transcription": "エン", "yidam": "閻魔天", "siddham_image": "BonjiYam.png"},
 {"devanagari": "यु", "transcription": "yu", "roman_transcription": "yu", "kana_transcription": "ユ", "chuten_transcription": "ユ", "yidam": "弥勒菩薩", "siddham_image": "BonjiYu.png"},
 {"devanagari": "युः", "transcription": "yuḥ", "roman_transcription": "yuh", "kana_transcription": "ユフ", "chuten_transcription": "ヨク", "yidam": "普賢延命菩薩", "siddham_image": "BonjiYuh.png"},
-{"devanagari": "व", "transcription": "va", "roman_transcription": "va", "kana_transcription": "ヴァ", "chuten_transcription": "バ", "yidam": "水天", "siddham_image": "BonjiVa.png"},
+{"devanagari": "व", "transcription": "va", "roman_transcription": "va", "kana_transcription": "ヴァ", "chuten_transcription": "バ", "yidam": "水天 五輪塔(水輪)", "siddham_image": "BonjiVa.png"},
 {"devanagari": "वं", "transcription": "vaṃ", "roman_transcription": "vam", "kana_transcription": "ヴァン", "chuten_transcription": "バン", "yidam": "大日如来（金剛界）", "siddham_image": "BonjiVam.png"},
 {"devanagari": "वा", "transcription": "vā", "roman_transcription": "vaa", "kana_transcription": "ヴァー", "chuten_transcription": "バー", "yidam": "風天", "siddham_image": "BonjiVaa.png"},
 {"devanagari": "वि", "transcription": "vi", "roman_transcription": "vi", "kana_transcription": "ヴィ", "chuten_transcription": "ビ", "yidam": "増長天 広目天", "siddham_image": "BonjiVi.png"},
@@ -36,7 +36,7 @@
 {"devanagari": "सः", "transcription": "saḥ", "roman_transcription": "sah", "kana_transcription": "サハ", "chuten_transcription": "サク", "yidam": "勢至菩薩", "siddham_image": "BonjiSah.png"},
 {"devanagari": "सु", "transcription": "su", "roman_transcription": "su", "kana_transcription": "ス", "chuten_transcription": "ソ", "yidam": "妙見菩薩", "siddham_image": "BonjiSu.png"},
 {"devanagari": "स्त्वं", "transcription": "stvaṃ", "roman_transcription": "stvam", "kana_transcription": "ストヴァン", "chuten_transcription": "サトバン", "yidam": "五秘密菩薩", "siddham_image": "BonjiStvam.png"},
-{"devanagari": "ह", "transcription": "ha", "roman_transcription": "ha", "kana_transcription": "ハ", "chuten_transcription": "カ", "yidam": "地蔵菩薩", "siddham_image": "BonjiHa.png"},
+{"devanagari": "ह", "transcription": "ha", "roman_transcription": "ha", "kana_transcription": "ハ", "chuten_transcription": "カ", "yidam": "地蔵菩薩 五輪塔(風輪)", "siddham_image": "BonjiHa.png"},
 {"devanagari": "हं", "transcription": "haṃ", "roman_transcription": "ham", "kana_transcription": "ハン", "chuten_transcription": "カン", "yidam": "馬頭観音 荼枳尼天", "siddham_image": "Bonji-Ham.png"},
 {"devanagari": "हां", "transcription": "hāṃ", "roman_transcription": "haam", "kana_transcription": "ハーン", "chuten_transcription": "カーン", "yidam": "不動明王", "siddham_image": "BonjiHaam.png"},
 {"devanagari": "हुं", "transcription": "huṃ", "roman_transcription": "hum", "kana_transcription": "フン", "chuten_transcription": "ウン", "yidam": "軍荼利明王", "siddham_image": "BonjiHum2.png"},
@@ -45,5 +45,7 @@
 {"devanagari": "ह्रीः", "transcription": "hrīḥ", "roman_transcription": "hriih", "kana_transcription": "フリーヒ", "chuten_transcription": "キリーク", "yidam": "阿弥陀如来 千手観音 如意輪観音 大威徳明王", "siddham_image": ".Bonji-hrīḥ.svg"},
 {"devanagari": "ह्रूं", "transcription": "hrūṃ", "roman_transcription": "hruum", "kana_transcription": "フルーン", "chuten_transcription": "コローン", "yidam": "尊勝仏頂", "siddham_image": "BonjiHruum.png"},
 {"devanagari": "ह्हूं", "transcription": "hhūṃ", "roman_transcription": "hhuum", "kana_transcription": "ッフーン", "chuten_transcription": "ウーン", "yidam": "愛染明王", "siddham_image": "BonjiHhuum.png"},
-{"devanagari": "ह्म्मां", "transcription": "hmmāṃ", "roman_transcription": "hmmaam", "kana_transcription": "フンマーン", "chuten_transcription": "カンマーン", "yidam": "不動明王", "siddham_image": "BonjiHaammaam.png"}
+{"devanagari": "ह्म्मां", "transcription": "hmmāṃ", "roman_transcription": "hmmaam", "kana_transcription": "フンマーン", "chuten_transcription": "カンマーン", "yidam": "不動明王", "siddham_image": "BonjiHaammaam.png"},
+{"devanagari": "र", "transcription": "ra", "roman_transcription": "ra", "kana_transcription": "ラ", "chuten_transcription": "ラ", "yidam": "五輪塔(火輪)", "siddham_image": "Siddham_r.svg"},
+{"devanagari": "ख", "transcription": "kha", "roman_transcription": "kha", "kana_transcription": "キャ", "chuten_transcription": "キャ", "yidam": "五輪塔(空輪)", "siddham_image": "Siddham_kh.svg"}
 ]

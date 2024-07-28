@@ -11,7 +11,7 @@ const main = () => {
     });
     return line;
   })).then((arr) => {
-    //console.log(arr);
+    console.log(arr);
   });
 
   jp_src.forEach((line) => {

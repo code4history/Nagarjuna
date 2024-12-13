@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { IMEType } from '../src/lib/ime/types';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,6 +12,36 @@ interface RawEntry {
   type: string;
   description: string;
 }
+
+interface DictionaryFileConfig {
+  filename: string;
+  type: IMEType;
+  requirements?: IMEType[];
+}
+
+const DICTIONARY_FILES: DictionaryFileConfig[] = [
+  {
+    filename: 'hentai_kana_IME.txt',
+    type: 'hentaigana'
+  },
+  {
+    filename: 'kanji_itaiji_IME.txt',
+    type: 'itaiji'
+  },
+  {
+    filename: 'kumimoji_IME.txt',
+    type: 'itaiji'
+  },
+  {
+    filename: 'siddham_phonetic_IME.txt',
+    type: 'siddham'
+  },
+  {
+    filename: 'siddham_buddha_IME.txt',
+    type: 'siddham',
+    requirements: ['buddha_name']
+  }
+];
 
 function parseDictionaryFile(filePath: string): RawEntry[] {
   const content = fs.readFileSync(filePath, 'utf-8');
@@ -23,27 +54,27 @@ function parseDictionaryFile(filePath: string): RawEntry[] {
     });
 }
 
-function generateTypeScriptCode(
-  hentaigana: RawEntry[],
-  siddham: RawEntry[],
-  itaiji: RawEntry[],
-  kumimoji: RawEntry[]
-): string {
-  const entries = [
-    ...hentaigana.map(e => ({ ...e, imeType: 'hentaigana' })),
-    ...siddham.map(e => ({ ...e, imeType: 'siddham' })),
-    ...itaiji.map(e => ({ ...e, imeType: 'itaiji' })),
-    ...kumimoji.map(e => ({ ...e, imeType: 'itaiji' }))
-  ];
+function shouldIncludeEntry(config: DictionaryFileConfig, entry: RawEntry): boolean {
+  // requirementsがない場合は常に含める
+  if (!config.requirements) return true;
+
+  // requirementsがある場合は、エントリーの種類に応じて判断
+  // ここでは単純化のため、常にtrueを返していますが、
+  // 必要に応じて追加のロジックを実装できます
+  return true;
+}
+
+function generateTypeScriptCode(entries: RawEntry[]): string {
+  const processedEntries = entries.map(entry => ({
+    reading: entry.reading,
+    char: entry.character,
+    type: entry.type
+  }));
 
   return `// このファイルは自動生成されています。直接編集しないでください。
 import { IMEEntry } from '../lib/ime/types';
 
-export const dictionary: IMEEntry[] = ${JSON.stringify(entries.map(e => ({
-    reading: e.reading,
-    char: e.character,
-    type: e.imeType
-  })), null, 2)};
+export const dictionary: IMEEntry[] = ${JSON.stringify(processedEntries, null, 2)};
 `;
 }
 
@@ -52,14 +83,23 @@ const rootDir = path.resolve(__dirname, '..');
 const dataDir = path.join(rootDir, 'data');
 const outputDir = path.join(rootDir, 'src', 'data');
 
-// データファイルの読み込み
-const hentaigana = parseDictionaryFile(path.join(dataDir, 'hentaigana.txt'));
-const siddham = parseDictionaryFile(path.join(dataDir, 'siddham.txt'));
-const itaiji = parseDictionaryFile(path.join(dataDir, 'itaiji.txt'));
-const kumimoji = parseDictionaryFile(path.join(dataDir, 'kumimoji.txt'));
+// メイン処理
+const entries: RawEntry[] = [];
 
-// TypeScriptコードの生成
-const code = generateTypeScriptCode(hentaigana, siddham, itaiji, kumimoji);
+for (const config of DICTIONARY_FILES) {
+  const filePath = path.join(dataDir, config.filename);
+  const fileEntries = parseDictionaryFile(filePath);
+  
+  // 要件に合致するエントリーのみを追加
+  fileEntries
+    .filter(entry => shouldIncludeEntry(config, entry))
+    .forEach(entry => {
+      entries.push({
+        ...entry,
+        type: config.type
+      });
+    });
+}
 
 // 出力ディレクトリが存在しない場合は作成
 if (!fs.existsSync(outputDir)) {
@@ -67,5 +107,6 @@ if (!fs.existsSync(outputDir)) {
 }
 
 // ファイルの出力
+const code = generateTypeScriptCode(entries);
 fs.writeFileSync(path.join(outputDir, 'dictionary.ts'), code);
 console.log('Dictionary file has been generated successfully.');

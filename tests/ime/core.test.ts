@@ -59,4 +59,16 @@ describe('IMECore', () => {
     expect(ime.search('')).toHaveLength(0);
     expect(ime.searchExact('')).toHaveLength(0);
   });
+
+  it('should handle partial matches correctly', () => {
+    ime.setDictionary([
+      { reading: 'とき', char: '旹', type: 'itaiji' },
+      { reading: 'ときどき', char: '時々', type: 'itaiji' }
+    ]);
+
+    const results = ime.search('とき');
+    expect(results).toHaveLength(2);
+    expect(results.map(r => r.char)).toContain('旹');
+    expect(results.map(r => r.char)).toContain('時々');
+  });
 });

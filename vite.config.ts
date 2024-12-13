@@ -16,5 +16,6 @@ export default defineConfig({
     alias: {
       '@': resolve(__dirname, './src')
     }
-  }
+  },
+  assetsInclude: ['**/*.woff', '**/*.woff2']
 });

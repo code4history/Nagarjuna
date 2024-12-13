@@ -25,6 +25,7 @@ export class IMECore {
 
     return this.dictionary
       .filter(entry => {
+        // ここでenabledTypesのチェックが問題かもしれない
         if (!this.options.enabledTypes[entry.type]) return false;
         return entry.reading.startsWith(reading);
       })

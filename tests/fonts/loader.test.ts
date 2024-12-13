@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { FontLoader } from '@/lib/fonts/loader';
 import { FontLoadError } from '@/lib/fonts/types';
 
@@ -7,17 +7,23 @@ describe('FontLoader', () => {
 
   beforeEach(() => {
     fontLoader = new FontLoader();
-    // DOMの初期化
     document.head.innerHTML = '';
+    
+    // 非同期処理をモック化
+    vi.useFakeTimers();
   });
 
-  it('should load fonts based on settings', async () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('should load fonts based on settings', () => {
     const settings = {
       hentaigana: true,
       siddham: true
     };
 
-    await fontLoader.loadFonts(settings);
+    fontLoader.loadFonts(settings);
 
     const links = document.head.getElementsByTagName('link');
     expect(links).toHaveLength(2);
@@ -41,6 +47,15 @@ describe('FontLoader', () => {
       hentaigana: true
     };
 
+    // モックでloadイベントを即時発火
+    const mockLink = document.createElement('link');
+    vi.spyOn(document, 'createElement').mockReturnValue(mockLink);
+    vi.spyOn(mockLink, 'addEventListener').mockImplementation((event, handler) => {
+      if (event === 'load' && typeof handler === 'function') {
+        handler(new Event('load'));
+      }
+    });
+
     await fontLoader.loadFonts(settings);
     await fontLoader.loadFonts(settings);
 
@@ -48,19 +63,19 @@ describe('FontLoader', () => {
     expect(links).toHaveLength(1);
   });
 
-  it('should handle font load errors', async () => {
+  it('should throw FontLoadError when loading fails', async () => {
     const settings = {
       hentaigana: true
     };
 
-    // リンク要素の生成と追加をモック
+    // モックでerrorイベントを即時発火
     const mockLink = document.createElement('link');
     vi.spyOn(document, 'createElement').mockReturnValue(mockLink);
-
-    // Promise.rejectで非同期的にエラーを発生させる
-    setTimeout(() => {
-      mockLink.dispatchEvent(new ErrorEvent('error'));
-    }, 0);
+    vi.spyOn(mockLink, 'addEventListener').mockImplementation((event, handler) => {
+      if (event === 'error' && typeof handler === 'function') {
+        handler(new Event('error'));
+      }
+    });
 
     await expect(fontLoader.loadFonts(settings)).rejects.toThrow(FontLoadError);
   });

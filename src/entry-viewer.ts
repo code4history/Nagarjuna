@@ -1,2 +1,2 @@
-export * from './lib/fonts/loader';
-export * from './lib/fonts/types';
+export { FontLoader } from './lib/fonts/loader';
+export type { FontSettings } from './lib/fonts/types';

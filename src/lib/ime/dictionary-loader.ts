@@ -1,4 +1,4 @@
-import { IMEEntry } from './types';
+import { IMEEntry } from './internal-types';
 
 interface RawDictionaryEntry {
   reading: string;    // 読み
@@ -29,7 +29,8 @@ export class DictionaryLoader {
     return entries.map(entry => ({
       reading: entry.reading,
       char: entry.character,
-      type: 'hentaigana' as const
+      type: 'hentaigana' as const,
+      isBuddhaName: false
     }));
   }
 
@@ -37,7 +38,8 @@ export class DictionaryLoader {
     return entries.map(entry => ({
       reading: entry.reading,
       char: entry.character,
-      type: 'siddham' as const
+      type: 'siddham' as const,
+      isBuddhaName: false
     }));
   }
 
@@ -45,7 +47,8 @@ export class DictionaryLoader {
     return entries.map(entry => ({
       reading: entry.reading,
       char: entry.character,
-      type: 'itaiji' as const
+      type: 'itaiji' as const,
+      isBuddhaName: false
     }));
   }
 
@@ -53,7 +56,8 @@ export class DictionaryLoader {
     return entries.map(entry => ({
       reading: entry.reading,
       char: entry.character,
-      type: 'itaiji' as const  // 組み文字も異体字として扱う
+      type: 'itaiji' as const,
+      isBuddhaName: false
     }));
   }
 }

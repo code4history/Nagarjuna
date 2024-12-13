@@ -15,6 +15,7 @@ export interface IMEUIProps {
   // コールバック
   onClose?: () => void;
   onChange?: (value: string) => void;
+  onUpdateOptions?: (options: IMEUIProps['options']) => void;
 }
   
 export interface IMEUIState {

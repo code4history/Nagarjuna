@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { IMECore } from '@/lib/ime/core';
-import { IMEEntry, IMEError } from '@/lib/ime/types';
+import { IMEEntry, IMEError } from '@/lib/ime/internal-types';
 
 describe('IMECore', () => {
   let ime: IMECore;
   const testDictionary: IMEEntry[] = [
-    { reading: 'あ', char: '𛀂', type: 'hentaigana' },
-    { reading: 'あ', char: '𛀃', type: 'hentaigana' },
-    { reading: 'あ', char: '𑖀', type: 'siddham' },
-    { reading: 'とき', char: '旹', type: 'itaiji' }
+    { reading: 'あ', char: '𛀂', type: 'hentaigana', isBuddhaName: false },
+    { reading: 'あ', char: '𛀃', type: 'hentaigana', isBuddhaName: false },
+    { reading: 'あ', char: '𑖀', type: 'siddham', isBuddhaName: false },
+    { reading: 'とき', char: '旹', type: 'itaiji', isBuddhaName: false }
   ];
 
   beforeEach(() => {
@@ -62,8 +62,8 @@ describe('IMECore', () => {
 
   it('should handle partial matches correctly', () => {
     ime.setDictionary([
-      { reading: 'とき', char: '旹', type: 'itaiji' },
-      { reading: 'ときどき', char: '時々', type: 'itaiji' }
+      { reading: 'とき', char: '旹', type: 'itaiji', isBuddhaName: false },
+      { reading: 'ときどき', char: '時々', type: 'itaiji', isBuddhaName: false }
     ]);
 
     const results = ime.search('とき');

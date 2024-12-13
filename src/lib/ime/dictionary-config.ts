@@ -1,4 +1,4 @@
-import { IMEType } from "./types";
+import { IMEType } from "./internal-types";
 
 export interface DictionaryFileConfig {
   filename: string;

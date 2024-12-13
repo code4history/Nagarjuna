@@ -2,12 +2,14 @@ export type FontSystem = 'hentaigana' | 'siddham' | 'itaiji';
 
 // Google Fonts用の設定
 interface RemoteFontConfig {
+  type: 'remote';
   url: string;
   family: string;
 }
 
 // ローカルフォント用の設定
 interface LocalFontConfig {
+  type: 'local';
   style: string;
   family: string;
 }

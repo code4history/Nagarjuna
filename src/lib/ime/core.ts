@@ -1,4 +1,9 @@
-import { IMEEntry, IMEOptions, IMESearchResult, IMEError } from './types';
+import { IMEEntry, IMESearchResult, IMEError } from './internal-types';
+import { IMEOptions } from './types';
+
+interface NormalizedResult extends IMESearchResult {
+  fullReading?: string;
+}
 
 export class IMECore {
   private dictionary: IMEEntry[] = [];
@@ -23,10 +28,24 @@ export class IMECore {
       throw new IMEError('Reading must be hiragana');
     }
 
-    return this.dictionary
+    console.log('Current options:', this.options);
+
+    const results = this.dictionary
       .filter(entry => {
-        // ここでenabledTypesのチェックが問題かもしれない
-        if (!this.options.enabledTypes[entry.type]) return false;
+        console.log('Checking entry:', entry);
+        
+        // 基本的な文字体系のフィルター
+        if (!this.options.enabledTypes[entry.type as keyof IMEOptions['enabledTypes']]) {
+          console.log('Filtered out by type:', entry.type);
+          return false;
+        }
+
+        // 仏名のフィルター
+        if (entry.isBuddhaName && !this.options.enabledTypes.buddha_name) {
+          console.log('Filtered out buddha name:', entry.reading);
+          return false;
+        }
+
         return entry.reading.startsWith(reading);
       })
       .map(entry => ({
@@ -34,6 +53,27 @@ export class IMECore {
         reading: entry.reading,
         type: entry.type
       }));
+
+    console.log('Pre-normalized results:', results);
+
+    // 重複を排除（短い読みを優先）
+    const normalized = new Map<string, NormalizedResult>();
+    
+    results.forEach(result => {
+      const key = result.char;
+      const existing = normalized.get(key);
+      
+      if (!existing || existing.reading.length > result.reading.length) {
+        normalized.set(key, {
+          ...result,
+          fullReading: existing?.fullReading || result.reading
+        });
+      }
+    });
+
+    const finalResults = Array.from(normalized.values());
+    console.log('Final normalized results:', finalResults);
+    return finalResults;
   }
 
   searchExact(reading: string): IMESearchResult[] {
@@ -43,9 +83,18 @@ export class IMECore {
       throw new IMEError('Reading must be hiragana');
     }
 
-    return this.dictionary
+    const results = this.dictionary
       .filter(entry => {
-        if (!this.options.enabledTypes[entry.type]) return false;
+        // 基本的な文字体系のフィルター
+        if (!this.options.enabledTypes[entry.type as keyof IMEOptions['enabledTypes']]) {
+          return false;
+        }
+
+        // 仏名のフィルター
+        if (entry.isBuddhaName && !this.options.enabledTypes.buddha_name) {
+          return false;
+        }
+
         return entry.reading === reading;
       })
       .map(entry => ({
@@ -53,5 +102,22 @@ export class IMECore {
         reading: entry.reading,
         type: entry.type
       }));
+
+    // 重複を排除（短い読みを優先）
+    const normalized = new Map<string, NormalizedResult>();
+    
+    results.forEach(result => {
+      const key = result.char;
+      const existing = normalized.get(key);
+      
+      if (!existing || existing.reading.length > result.reading.length) {
+        normalized.set(key, {
+          ...result,
+          fullReading: existing?.fullReading || result.reading
+        });
+      }
+    });
+
+    return Array.from(normalized.values());
   }
 }

@@ -11,35 +11,40 @@ interface RawEntry {
   character: string;
   type: string;
   description: string;
+  isBuddhaName: boolean;
 }
 
 interface DictionaryFileConfig {
   filename: string;
   type: IMEType;
-  requirements?: IMEType[];
+  isBuddhaName: boolean;
 }
 
 const DICTIONARY_FILES: DictionaryFileConfig[] = [
   {
     filename: 'hentai_kana_IME.txt',
-    type: 'hentaigana'
+    type: 'hentaigana',
+    isBuddhaName: false
   },
   {
     filename: 'kanji_itaiji_IME.txt',
-    type: 'itaiji'
+    type: 'itaiji',
+    isBuddhaName: false
   },
   {
     filename: 'kumimoji_IME.txt',
-    type: 'itaiji'
+    type: 'itaiji',
+    isBuddhaName: false
   },
   {
     filename: 'siddham_phonetic_IME.txt',
-    type: 'siddham'
+    type: 'siddham',
+    isBuddhaName: false
   },
   {
     filename: 'siddham_buddha_IME.txt',
     type: 'siddham',
-    requirements: ['buddha_name']
+    isBuddhaName: true
   }
 ];
 
@@ -50,29 +55,26 @@ function parseDictionaryFile(filePath: string): RawEntry[] {
     .filter(line => line.trim())
     .map(line => {
       const [reading, character, type, description] = line.split('\t');
-      return { reading, character, type, description };
+      return { 
+        reading, 
+        character, 
+        type, 
+        description,
+        isBuddhaName: false  // デフォルト値を設定
+      };
     });
-}
-
-function shouldIncludeEntry(config: DictionaryFileConfig, entry: RawEntry): boolean {
-  // requirementsがない場合は常に含める
-  if (!config.requirements) return true;
-
-  // requirementsがある場合は、エントリーの種類に応じて判断
-  // ここでは単純化のため、常にtrueを返していますが、
-  // 必要に応じて追加のロジックを実装できます
-  return true;
 }
 
 function generateTypeScriptCode(entries: RawEntry[]): string {
   const processedEntries = entries.map(entry => ({
     reading: entry.reading,
     char: entry.character,
-    type: entry.type
+    type: entry.type,
+    isBuddhaName: entry.isBuddhaName
   }));
-
+  
   return `// このファイルは自動生成されています。直接編集しないでください。
-import { IMEEntry } from '../lib/ime/types';
+import { IMEEntry } from '../lib/ime/internal-types';
 
 export const dictionary: IMEEntry[] = ${JSON.stringify(processedEntries, null, 2)};
 `;
@@ -90,15 +92,13 @@ for (const config of DICTIONARY_FILES) {
   const filePath = path.join(dataDir, config.filename);
   const fileEntries = parseDictionaryFile(filePath);
   
-  // 要件に合致するエントリーのみを追加
-  fileEntries
-    .filter(entry => shouldIncludeEntry(config, entry))
-    .forEach(entry => {
-      entries.push({
-        ...entry,
-        type: config.type
-      });
+  fileEntries.forEach(entry => {
+    entries.push({
+      ...entry,
+      type: config.type,
+      isBuddhaName: config.isBuddhaName
     });
+  });
 }
 
 // 出力ディレクトリが存在しない場合は作成

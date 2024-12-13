@@ -72,29 +72,6 @@
     <label for="input2">入力テスト2（textarea）：</label>
     <textarea id="input2" class="ime-enabled" rows="4"></textarea>
   </div>
-
-  <script type="module">
-    import { IMEManager } from '../src/lib/ime/manager';
-
-    document.addEventListener('DOMContentLoaded', () => {
-      const manager = IMEManager.getInstance();
-      
-      // IMEを有効化する要素の設定
-      document.querySelectorAll('.ime-enabled').forEach(element => {
-        element.addEventListener('focus', () => {
-          const options = {
-            enabledTypes: {
-              hentaigana: document.getElementById('hentaigana').checked,
-              siddham: document.getElementById('siddham').checked,
-              itaiji: document.getElementById('itaiji').checked,
-              buddha_name: document.getElementById('buddha_name').checked
-            }
-          };
-          
-          manager.attach(element, { options });
-        });
-      });
-    });
-  </script>
+  <script type="module" src="./nagarjuna.demo.js"></script>
 </body>
 </html>

@@ -50,23 +50,19 @@ export class FontLoader {
   
   private async loadFont(system: FontSystem): Promise<void> {
     if (this.loadedFonts.has(system)) return;
-    
+
     const existingPromise = this.loadingPromises.get(system);
     if (existingPromise) return existingPromise;
-    
+
     const config = FONT_CONFIGS[system];
     let loadPromise: Promise<void>;
     
     if (config.type === 'local') {
       // ローカルフォントの場合
       loadPromise = new Promise<void>((resolve) => {
-        const style = this.styleElement ?? document.createElement('style');
-        if (!this.styleElement) {
-          this.styleElement = style;
-          document.head.appendChild(style);
+        if (this.styleElement) {
+          this.styleElement.textContent = (this.styleElement.textContent ?? '') + config.style;
         }
-        const currentContent = style.textContent ?? '';
-        style.textContent = currentContent + config.style;
         resolve();
       });
     } else {

@@ -1,15 +1,4 @@
-export type IMEType = 
-  | 'hentaigana' 
-  | 'siddham' 
-  | 'itaiji' 
-  | 'buddha_name';
-
-export interface IMEEntry {
-  reading: string;
-  char: string;
-  type: IMEType;
-}
-
+// 外部に公開する型定義
 export interface IMEOptions {
   enabledTypes: {
     hentaigana?: boolean;
@@ -18,16 +7,16 @@ export interface IMEOptions {
     buddha_name?: boolean;
   };
 }
-
-export interface IMESearchResult {
-  char: string;
-  reading: string;
-  type: IMEType;
+  
+export interface IMEAttachOptions {
+  options?: IMEOptions;
+  position?: 'bottom' | 'cursor';
+  onChange?: (value: string) => void;
 }
-
-export class IMEError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'IMEError';
-  }
+  
+// IMEManagerのパブリックインターフェース
+export interface IIMEManager {
+  attach(element: HTMLInputElement | HTMLTextAreaElement, options?: IMEAttachOptions): void;
+  detach(): void;
+  updateOptions(options: IMEOptions): void;
 }

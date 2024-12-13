@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { FontLoader } from '@/lib/fonts/loader';
 import { FontLoadError } from '@/lib/fonts/types';
 
@@ -8,27 +8,6 @@ describe('FontLoader', () => {
   beforeEach(() => {
     fontLoader = new FontLoader();
     document.head.innerHTML = '';
-    
-    // 非同期処理をモック化
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('should load fonts based on settings', () => {
-    const settings = {
-      hentaigana: true,
-      siddham: true
-    };
-
-    fontLoader.loadFonts(settings);
-
-    const links = document.head.getElementsByTagName('link');
-    expect(links).toHaveLength(2);
-    expect(links[0].href).toContain('notohentaigana.css');
-    expect(links[1].href).toContain('Noto+Sans+Siddham');
   });
 
   it('should generate correct font-family string', () => {
@@ -39,36 +18,50 @@ describe('FontLoader', () => {
     };
 
     const fontFamily = fontLoader.getFontFamilyString(settings);
-    expect(fontFamily).toBe('Noto Hentaigana, Noto Sans Siddham, serif');
+    expect(fontFamily).toBe('NINJAL Hentaigana, Noto Sans Siddham, serif');
   });
 
-  it('should not load same font twice', async () => {
+  it('should add font styles to document', async () => {  // asyncを追加
+    const settings = {
+      hentaigana: true,
+      siddham: false
+    };
+
+    await fontLoader.loadFonts(settings);  // awaitを追加
+
+    // style要素の確認を修正
+    const styleElement = fontLoader['styleElement']; // privateプロパティにアクセス
+    expect(styleElement).toBeTruthy();
+    expect(styleElement?.textContent).toContain('@font-face');
+    expect(styleElement?.textContent).toContain('NINJAL Hentaigana');
+  });
+
+  it('should not add same font style twice', async () => {
     const settings = {
       hentaigana: true
     };
 
-    // モックでloadイベントを即時発火
-    const mockLink = document.createElement('link');
-    vi.spyOn(document, 'createElement').mockReturnValue(mockLink);
-    vi.spyOn(mockLink, 'addEventListener').mockImplementation((event, handler) => {
-      if (event === 'load' && typeof handler === 'function') {
-        handler(new Event('load'));
-      }
-    });
-
+    // 1回目のロード
     await fontLoader.loadFonts(settings);
+    const isLoadedFirst = fontLoader.isFontLoaded('hentaigana');
+    
+    // 2回目のロード
     await fontLoader.loadFonts(settings);
+    const isLoadedSecond = fontLoader.isFontLoaded('hentaigana');
 
-    const links = document.head.getElementsByTagName('link');
-    expect(links).toHaveLength(1);
+    // フォントが読み込まれている状態が維持されていることを確認
+    expect(isLoadedFirst).toBe(true);
+    expect(isLoadedSecond).toBe(true);
+    
+    // loadedFontsのサイズが1のままであることを確認
+    expect(fontLoader['loadedFonts'].size).toBe(1);
   });
 
-  it('should throw FontLoadError when loading fails', async () => {
+  it('should handle font load errors', async () => {
     const settings = {
-      hentaigana: true
+      siddham: true
     };
 
-    // モックでerrorイベントを即時発火
     const mockLink = document.createElement('link');
     vi.spyOn(document, 'createElement').mockReturnValue(mockLink);
     vi.spyOn(mockLink, 'addEventListener').mockImplementation((event, handler) => {

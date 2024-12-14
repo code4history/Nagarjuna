@@ -26,7 +26,7 @@ npm install nagarjuna
 
 ### 動作デモ
 
-https://code4history.dev/nagarjuna/
+https://code4history.dev/Nagarjuna/
 
 ### 表示用途のみ（フォントローダー）
 

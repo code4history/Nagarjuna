@@ -26,7 +26,7 @@
     "dev": "npm run build:dictionary && vite",
     "build": "npm run build:dictionary && tsc && cross-env BUILD_MODE=package vite build",
     "build:dictionary": "tsx scripts/build-dictionary.ts",
-    "deploy": "npm run build:dictionary && tsc && cross-env BUILD_MODE=deploy vite build",
+    "deploy": "npm run build:dictionary && cp public/index.html index.html && tsc && vite build",
     "pretest": "npm run build:dictionary",
     "test": "vitest",
     "coverage": "vitest run --coverage"

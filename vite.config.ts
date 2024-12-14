@@ -10,7 +10,7 @@ const packageJson = JSON.parse(
 
 // npm package用のビルドの時のみ単一エントリーポイント
 const isPackageBuild = process.env.BUILD_MODE === 'package';
-console.log(`${process.env.BUILD_MODE}`);
+const isDeployBuild = process.env.BUILD_MODE === 'deploy';
 
 export default defineConfig({
   base: './',  // GitHub Pages用の相対パス設定
@@ -29,7 +29,7 @@ export default defineConfig({
         emptyOutDir: true,
         rollupOptions: {
           input: {
-            main: resolve(__dirname, 'index.html')
+            main: resolve(__dirname, `${isDeployBuild ? 'public/' : ''}index.html`)
           },
           output: {
             entryFileNames: 'assets/[name].[hash].js',

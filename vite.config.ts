@@ -10,32 +10,42 @@ const packageJson = JSON.parse(
 
 // npm package用のビルドの時のみ単一エントリーポイント
 const isPackageBuild = process.env.BUILD_MODE === 'package';
+console.log(`${process.env.BUILD_MODE}`);
 
 export default defineConfig({
-  build: {
-    lib: isPackageBuild
-      ? {
+  base: './',  // GitHub Pages用の相対パス設定
+  build: isPackageBuild
+    ? {
+        lib: {
           entry: {
-            'nagarjuna.ime': resolve(__dirname, 'src/entry-ime.ts'),
-            'nagarjuna.viewer': resolve(__dirname, 'src/entry-viewer.ts'),
-          },
-        }
-      : {
-        entry: {
-            'nagarjuna.ime': resolve(__dirname, 'src/entry-ime.ts'),
-            'nagarjuna.viewer': resolve(__dirname, 'src/entry-viewer.ts'),
-            'nagarjuna.demo': resolve(__dirname, 'src/demo.ts')
+            'index': resolve(__dirname, 'src/entry-viewer.ts'),
+            'ime': resolve(__dirname, 'src/entry-ime.ts'),
           },
           formats: ['es']
-        },
-  },
+        }
+      }
+    : {
+        outDir: 'dist',
+        emptyOutDir: true,
+        rollupOptions: {
+          input: {
+            main: resolve(__dirname, 'index.html')
+          },
+          output: {
+            entryFileNames: 'assets/[name].[hash].js',
+            chunkFileNames: 'assets/[name].[hash].js',
+            assetFileNames: 'assets/[name].[hash][extname]'
+          }
+        }
+      },
   plugins: [dts()],
   json: {
     stringify: true // JSONをstringifyして含める
   },
   server: {
     port: 8888,  // 既存のwebpack devServerと同じポート
-    open: true   // 起動時にブラウザを開く
+    open: true,
+    strictPort: true
   },
   publicDir: 'public',
   appType: 'spa',  // SPAとして扱う

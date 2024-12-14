@@ -1,10 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { IMEType } from '../src/lib/ime/types';
+import { IMEType } from '../src/lib/ime/internal-types';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+console.log(`isPackageBuild_Dic: ${process.env.BUILD_MODE}`);
 
 interface RawEntry {
   reading: string;

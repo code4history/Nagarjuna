@@ -1,5 +1,7 @@
 import { IMEManager } from './entry-ime';
 
+document.getElementById('version')!.textContent = import.meta.env.APP_VERSION;
+
 document.addEventListener('DOMContentLoaded', () => {
   IMEManager.resetInstance();
   const manager = IMEManager.getInstance();

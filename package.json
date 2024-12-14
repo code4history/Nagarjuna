@@ -1,7 +1,7 @@
 {
   "name": "nagarjuna",
-  "version": "0.1.1",
-  "license": "MIT",
+  "description": "Nagarjuna (龍樹): Tool for Bijakshara (種子), Hentai-kana (変体仮名), Itai-ji (異体字), Kumi-moji (組み文字)",
+  "version": "0.1.2",
   "type": "module",
   "private": false,
   "main": "./dist/index.js",
@@ -28,9 +28,28 @@
     "build:dictionary": "tsx scripts/build-dictionary.ts",
     "deploy": "npm run build:dictionary && cp public/index.html index.html && tsc && vite build",
     "pretest": "npm run build:dictionary",
-    "test": "vitest",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "coverage": "vitest run --coverage"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/code4history/Nagarjuna.git"
+  },
+  "keywords": [
+    "Bijakshara", 
+    "Hentai-kana", 
+    "Itai-ji", 
+    "Kumi-moji",
+    "IME"
+  ],
+  "readme": "README.md",
+  "author": "Code for History",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/code4history/Nagarjuna/issues"
+  },
+  "homepage": "https://github.com/code4history/Nagarjuna#readme",
   "devDependencies": {
     "@types/jsdom": "^21.1.7",
     "@types/node": "^20.11.16",

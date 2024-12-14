@@ -28,21 +28,16 @@ export class IMECore {
       throw new IMEError('Reading must be hiragana');
     }
 
-    console.log('Current options:', this.options);
-
     const results = this.dictionary
       .filter(entry => {
-        console.log('Checking entry:', entry);
         
         // 基本的な文字体系のフィルター
         if (!this.options.enabledTypes[entry.type as keyof IMEOptions['enabledTypes']]) {
-          console.log('Filtered out by type:', entry.type);
           return false;
         }
 
         // 仏名のフィルター
         if (entry.isBuddhaName && !this.options.enabledTypes.buddha_name) {
-          console.log('Filtered out buddha name:', entry.reading);
           return false;
         }
 
@@ -53,8 +48,6 @@ export class IMECore {
         reading: entry.reading,
         type: entry.type
       }));
-
-    console.log('Pre-normalized results:', results);
 
     // 重複を排除（短い読みを優先）
     const normalized = new Map<string, NormalizedResult>();
@@ -70,10 +63,8 @@ export class IMECore {
         });
       }
     });
-
-    const finalResults = Array.from(normalized.values());
-    console.log('Final normalized results:', finalResults);
-    return finalResults;
+ 
+    return Array.from(normalized.values());
   }
 
   searchExact(reading: string): IMESearchResult[] {

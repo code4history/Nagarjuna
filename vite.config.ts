@@ -17,8 +17,8 @@ export default defineConfig({
     ? {
         lib: {
           entry: {
-            'index': resolve(__dirname, 'src/entry-viewer.ts'),
-            'ime': resolve(__dirname, 'src/entry-ime.ts'),
+            'index': resolve(__dirname, 'src/index.ts'),
+            'ime': resolve(__dirname, 'src/ime.ts'),
           },
           formats: ['es']
         }
@@ -42,12 +42,11 @@ export default defineConfig({
     stringify: true // JSONをstringifyして含める
   },
   server: {
-    port: 8888,  // 既存のwebpack devServerと同じポート
     open: true,
     strictPort: true
   },
   publicDir: 'public',
-  appType: 'spa',  // SPAとして扱う
+  appType: 'spa',
   define: {
     'import.meta.env.APP_VERSION': JSON.stringify(packageJson.version)
   },
@@ -56,5 +55,5 @@ export default defineConfig({
       '@': resolve(__dirname, './src')
     }
   },
-  assetsInclude: ['**/*.woff', '**/*.woff2']
+  assetsInclude: ['assets/**/*']
 });

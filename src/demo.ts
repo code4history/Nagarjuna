@@ -1,4 +1,4 @@
-import { IMEManager } from './entry-ime';
+import { IMEManager } from './ime';
 
 document.getElementById('version')!.textContent = import.meta.env.APP_VERSION;
 

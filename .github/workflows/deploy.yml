@@ -2,28 +2,50 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches:
-      - main
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: write
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: '22'
+          cache: pnpm
 
-      - name: Install Dependencies
-        run: npm ci
+      - name: Install dependencies
+        run: |
+          cp ci/pnpm-workspace.ci.yaml pnpm-workspace.yaml
+          pnpm install --frozen-lockfile
+          pnpm run build:dictionary
 
-      - name: Build
-        run: npm run deploy
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Test
+        run: pnpm run test
+
+      - name: Package build
+        run: pnpm run build
+
+      - name: Pages build
+        run: pnpm run deploy
 
       - name: Deploy to GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

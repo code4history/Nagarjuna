@@ -25,11 +25,12 @@
     "README.md"
   ],
   "scripts": {
-    "dev": "npm run build:dictionary && vite",
-    "build": "npm run build:dictionary && tsc && cross-env BUILD_MODE=package vite build",
+    "dev": "pnpm run build:dictionary && vite",
+    "build": "pnpm run build:dictionary && tsc && cross-env BUILD_MODE=package vite build",
     "build:dictionary": "tsx scripts/build-dictionary.ts",
-    "deploy": "npm run build:dictionary && cp public/index.html index.html && tsc && vite build",
-    "pretest": "npm run build:dictionary",
+    "deploy": "pnpm run build:dictionary && cp public/index.html index.html && tsc && vite build",
+    "pretest": "pnpm run build:dictionary",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage"

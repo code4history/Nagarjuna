@@ -8,7 +8,6 @@ function emit(payload, exitCode) {
   process.stdout.write(`${JSON.stringify({ ...payload, exit_code: exitCode })}\n`);
   process.exitCode = exitCode;
 }
-
 function decodeUtf8(buffer) {
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
@@ -173,4 +172,3 @@ try {
 } catch (error) {
   emit({ error: error instanceof Error ? error.message : String(error) }, 2);
 }
-

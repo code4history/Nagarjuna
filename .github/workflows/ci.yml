@@ -1,0 +1,71 @@
+name: Nagarjuna CI
+
+# Cycle 2 m1-t5（設計 §6.2）で新設した。既存の deploy.yml（m1-t3 の確定契約）は変更しない。
+# step 構成は Chokei の ci.yml と同型である。
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - name: Activate CI-only workspace policy
+        run: cp ci/pnpm-workspace.ci.yaml pnpm-workspace.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      # src/data/dictionary.ts は生成物であり .gitignore されている。
+      # clean checkout では typecheck（tsc --noEmit）がこれを解決できず落ちる ∴ 先に生成する。
+      # build script は内部で build:dictionary を呼び、test は pretest が同じことを行うが、
+      # typecheck はどちらより前に走るためこの step が要る。
+      - name: Build dictionary
+        run: pnpm run build:dictionary
+      - name: Typecheck
+        run: pnpm run typecheck
+      - name: Test
+        run: pnpm run test
+      # @vitest/coverage-v8 は vitest の従属依存であり versions.json の6項目に収まらない。
+      # coverage を CI で走らせることで、major の追随漏れがここで落ちる（outer rule-0018）。
+      - name: Coverage
+        run: pnpm run coverage
+      - name: Build
+        run: pnpm run build
+      # ---- Cycle 2 m1-t5: CI artifact 契約（設計 §6.2 の P1〜P5）----
+      # upload と download を同一 job で行う。∴ どの runtime で作られた配布物かと
+      # どの runtime で検証したかが 1 対 1 で対応する（outer rule-0014）。
+      - name: Pack
+        run: pnpm pack --pack-destination ci-artifact
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cycle2-nagarjuna-package-node-${{ matrix.node }}
+          path: ci-artifact/
+      - name: Download package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: cycle2-nagarjuna-package-node-${{ matrix.node }}
+          path: ci-artifact-smoke/
+      - name: Artifact smoke
+        run: pnpm exec node ci/verify-artifact-smoke.mjs --artifact-dir=ci-artifact-smoke --report=ci-evidence/artifact-smoke-node-${{ matrix.node }}.txt
+      - name: Upload smoke report
+        uses: actions/upload-artifact@v4
+        with:
+          name: cycle2-nagarjuna-artifact-smoke-node-${{ matrix.node }}
+          path: ci-evidence/artifact-smoke-node-${{ matrix.node }}.txt

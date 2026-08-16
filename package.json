@@ -9,14 +9,14 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/nagarjuna.js",
-      "require": "./dist/nagarjuna.cjs",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/nagarjuna.cjs"
     },
     "./ime": {
+      "types": "./dist/ime.d.ts",
       "import": "./dist/nagarjuna-ime.js",
-      "require": "./dist/nagarjuna-ime.cjs",
-      "types": "./dist/ime.d.ts"
+      "require": "./dist/nagarjuna-ime.cjs"
     }
   },
   "files": [
@@ -26,7 +26,7 @@
   ],
   "scripts": {
     "dev": "pnpm run build:dictionary && vite",
-    "build": "pnpm run build:dictionary && tsc && cross-env BUILD_MODE=package vite build",
+    "build": "pnpm run build:dictionary && tsc --noEmit && cross-env BUILD_MODE=package vite build",
     "build:dictionary": "tsx scripts/build-dictionary.ts",
     "deploy": "pnpm run build:dictionary && cp public/index.html index.html && tsc && vite build",
     "pretest": "pnpm run build:dictionary",

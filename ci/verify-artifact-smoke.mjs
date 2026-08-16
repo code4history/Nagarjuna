@@ -17,6 +17,7 @@
  *   S3 package/README.md と package/README.ja.md がともに存在する
  *   S4 exports / main / module / types が指すファイルがすべて tarball 内に実在する
  *   S5 repo 固有 smoke（本ファイルで差し替わる唯一の部分）
+ *   S5d 配布物に Pages 専用資産（icons / fonts / index.html）・テスト由来 .d.ts・dist/src の入れ子が無い
  *   S6 結果を --report のパスへ書き出す
  */
 
@@ -40,6 +41,7 @@ const SMOKE_DRIVER_SOURCE = `
 import { createRequire } from "node:module";
 import fs from "node:fs";
 import path from "node:path";
+import url from "node:url";
 
 const require = createRequire(import.meta.url);
 const results = [];
@@ -76,27 +78,97 @@ push(
   esm ? Object.keys(esm).sort().join(",") : "ESM import に失敗",
 );
 
-// (c) ./ime subpath が ESM / CJS の双方で解決できる
+// (c) ./ime subpath — 解決＋静的照合（設計 v1.2 §6.6。実 import はしない）。
+// ./ime は読み込み時に window.customElements.define('ime-ui', …) を実行する
+// ブラウザ専用モジュールであり、Node で読むと必ず落ちる。設計 §6.3 の実測により
+// Node で読む正当な用途は 0 件である ∴ 上位契約と m1-t5 §6.3 の字句どおり
+// 「解決できること」＋「配布物が IMEManager を export すること」を検査する。
+
+// S5c-1: types / import / require の指し先が実在する（現行の判定をそのまま残す）
+let imeEntry = {};
 try {
   const manifest = JSON.parse(fs.readFileSync(path.join(pkgDir, "package.json"), "utf8"));
-  const entry = manifest.exports?.["./ime"] ?? {};
+  imeEntry = manifest.exports?.["./ime"] ?? {};
   const missing = ["types", "import", "require"].filter(
-    (condition) => !entry[condition] || !fs.existsSync(path.join(pkgDir, entry[condition])),
+    (condition) => !imeEntry[condition] || !fs.existsSync(path.join(pkgDir, imeEntry[condition])),
   );
-  push("S5c ./ime の types / import / require が実在する", missing.length === 0, JSON.stringify(entry));
+  push("S5c ./ime の types / import / require が実在する", missing.length === 0, JSON.stringify(imeEntry));
 } catch (error) {
   push("S5c ./ime の types / import / require が実在する", false, error.message);
 }
+
+// S5c-2: ESM 条件が .js へ、CJS 条件が .cjs へ解決し、いずれも staging 内であること。
+// 解決先が条件ごとに別のファイルへ着地する ∴ exports map の条件分岐そのものを検証している。
 try {
-  const imeEsm = await import("nagarjuna/ime");
-  const imeCjs = require("nagarjuna/ime");
+  const esmResolved = url.fileURLToPath(import.meta.resolve("nagarjuna/ime"));
+  const cjsResolved = require.resolve("nagarjuna/ime");
+  const prefix = process.cwd() + path.sep;
+  const inStaging = esmResolved.startsWith(prefix) && cjsResolved.startsWith(prefix);
+  const distJs = path.join("dist", "nagarjuna-ime.js");
+  const distCjs = path.join("dist", "nagarjuna-ime.cjs");
+  const shapeOk = esmResolved.endsWith(distJs) && cjsResolved.endsWith(distCjs);
   push(
-    "S5c ./ime が ESM / CJS の双方で解決し IMEManager を export する",
-    Boolean(imeEsm.IMEManager) && Boolean(imeCjs.IMEManager),
-    Object.keys(imeEsm).sort().join(","),
+    "S5c ./ime が ESM 条件で .js・CJS 条件で .cjs へ解決する（staging 内）",
+    inStaging && shapeOk,
+    esmResolved + " | " + cjsResolved,
   );
 } catch (error) {
-  push("S5c ./ime が ESM / CJS の双方で解決し IMEManager を export する", false, error.message);
+  push("S5c ./ime が ESM 条件で .js・CJS 条件で .cjs へ解決する（staging 内）", false, error.message);
+}
+
+// S5c-3: 配布物が IMEManager を export することを静的に照合する（Chokei の S5c と同手法）。
+// 正規表現リテラルを使わない — 本 driver はテンプレートリテラルであり、バックスラッシュが
+// テンプレートリテラルのエスケープとして先に消費されて別の文字になる（設計 §6.6.1 の罠）。
+try {
+  const dtsText = fs.readFileSync(path.join(pkgDir, "dist", "ime.d.ts"), "utf8");
+  const esmText = fs.readFileSync(path.join(pkgDir, "dist", "nagarjuna-ime.js"), "utf8");
+  const cjsText = fs.readFileSync(path.join(pkgDir, "dist", "nagarjuna-ime.cjs"), "utf8");
+  const dtsOk = dtsText.includes("IMEManager");
+  // 末尾の export 節だけを見る（export { o as IMEManager }; のような別名再 export に耐える）
+  let esmOk = false;
+  const spaced = esmText.lastIndexOf("export {");
+  const tight = esmText.lastIndexOf("export{");
+  const start = spaced > tight ? spaced : tight;
+  if (start >= 0) {
+    const end = esmText.indexOf("}", start);
+    if (end > start) esmOk = esmText.slice(start, end).includes("IMEManager");
+  }
+  const cjsOk = cjsText.includes("exports.IMEManager=") || cjsText.includes("exports.IMEManager =");
+  push(
+    "S5c 配布物が IMEManager を export する（.d.ts / ESM / CJS の静的照合）",
+    dtsOk && esmOk && cjsOk,
+    "dts=" + dtsOk + " esm=" + esmOk + " cjs=" + cjsOk,
+  );
+} catch (error) {
+  push("S5c 配布物が IMEManager を export する（.d.ts / ESM / CJS の静的照合）", false, error.message);
+}
+
+// (d) 恒久ガード: 配布物に Pages 専用資産 / テスト由来 .d.ts / dist/src の入れ子が無いこと。
+// 否定形の検査は「対象が空でも通る」空虚化の経路を持つ ∴ detail に dist エントリ総数を必ず出す。
+try {
+  const distDir = path.join(pkgDir, "dist");
+  const entries = [];
+  const walk = (dir) => {
+    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, item.name);
+      if (item.isDirectory()) walk(full);
+      else entries.push(path.relative(pkgDir, full).split(path.sep).join("/"));
+    }
+  };
+  walk(distDir);
+  const bannedPrefixes = ["dist/icons/", "dist/fonts/", "dist/src/", "dist/tests/"];
+  const intruders = entries
+    .filter((e) => e === "dist/index.html" || bannedPrefixes.some((p) => e.startsWith(p)))
+    .sort();
+  push(
+    "S5d 配布物に Pages 専用資産 / テスト由来 .d.ts / dist/src の入れ子が無い",
+    intruders.length === 0,
+    intruders.length === 0
+      ? "dist エントリ " + entries.length + " 件・混入 0 件"
+      : intruders.length + " 件混入: " + intruders.slice(0, 5).join(",") + " …",
+  );
+} catch (error) {
+  push("S5d 配布物に Pages 専用資産 / テスト由来 .d.ts / dist/src の入れ子が無い", false, error.message);
 }
 
 process.stdout.write(JSON.stringify(results));

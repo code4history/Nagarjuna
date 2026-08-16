@@ -38,7 +38,10 @@ export default defineConfig({
           }
         }
       },
-  plugins: [dts()],
+  // tsconfig の include は ["src","tests"] であり、dts プラグインの entry root が
+  // リポジトリルートになる ∴ 型定義が dist/src/ へ出て package.json の types と食い違う。
+  // 生成対象を src に限ることで dist/index.d.ts / dist/ime.d.ts が正しい位置に出る。
+  plugins: [dts({ include: ['src'] })],
   json: {
     stringify: true // JSONをstringifyして含める
   },
@@ -46,7 +49,10 @@ export default defineConfig({
     open: true,
     strictPort: true
   },
-  publicDir: 'public',
+  // publicDir は Pages（SPA）ビルドのための機構である。package ビルドの成果物は
+  // dist/*.{js,cjs,d.ts} だけであり、icons / index.html / demo 用書体は配布物に要らない。
+  // files: ["dist"] を絞り込むのではなく、dist にそもそも入れない側で直す。
+  publicDir: isPackageBuild ? false : 'public',
   appType: 'spa',
   define: {
     'import.meta.env.APP_VERSION': JSON.stringify(packageJson.version)

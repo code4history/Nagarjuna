@@ -1,3 +1,8 @@
 allowBuilds:
   esbuild: true
   fsevents: false
+
+# m1-t7 D-5: outer の overrides のうち当 repo に必要な部分集合のみを配る
+# （正本は scripts/m1-t3/overrides.json。全量コピーは verify:m1-t3:overrides を FAIL させる）
+overrides:
+  minimatch: "^9.0.7"

@@ -1,0 +1,14 @@
+# escape/ は outer（Maplats superproject）の pnpm workspace のメンバーではない、
+# 独立した補助ツールである（outer の pnpm-workspace.yaml の packages に Nagarjuna は
+# あるが Nagarjuna/escape は無い。Nagarjuna/package.json も workspaces を持たない）。
+#
+# 本ファイルを置く理由: pnpm は pnpm-workspace.yaml を求めて親ディレクトリを遡るため、
+# これが無いと escape/ で pnpm install しても outer の workspace root が掴まれ、
+# escape の依存は1つも入らないまま exit 0 で終わる（m1-t7 設計 §4.3.2 の実測）。
+# 本ファイルがあると探索がここで止まり、escape/pnpm-lock.yaml がこの階層の正本になる。
+#
+# 設定キーは意図的に置いていない（m1-t7 設計 §6.3）。
+#   - allowBuilds: opencc は prebuild 方式であり、pnpm 既定のビルド阻止のままで動作する
+#   - overrides / minimumReleaseAgeExclude: 前者は escape に利益が無く、後者は
+#     自組織パッケージ専用である（outer rule-0013）
+packages: []

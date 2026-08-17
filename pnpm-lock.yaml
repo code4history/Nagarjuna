@@ -30,7 +30,7 @@ importers:
         specifier: ^10.1.0
         version: 10.1.0
       eslint:
-        specifier: ^9.39.2
+        specifier: ^9.39.5
         version: 9.39.5(supports-color@8.1.1)
       jsdom:
         specifier: ^30.0.1

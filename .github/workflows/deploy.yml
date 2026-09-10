@@ -6,14 +6,17 @@ on:
   pull_request:
     branches: [master]
 
-permissions:
-  contents: write
-
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    # peaceiris/actions-gh-pages は同一リポジトリの gh-pages ブランチへ成果物を push する。
+    # この job でのみ必要なため、GITHUB_TOKEN の contents 書込み権限をここへ限定する。
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4

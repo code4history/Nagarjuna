@@ -7,6 +7,10 @@
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
+// 辞書（生成済み dictionary.ts）の動的 import を伴うテストは、vitest.config.ts の testTimeout: 1000 では
+// 高負荷時に偽の赤になる（実装レビュー Round 1 Minor-1）。legacy-manager.test.ts と同じく個別に 8000ms を与える。
+const DICTIONARY_TEST_TIMEOUT_MS = 8000;
+
 type ImeModule = typeof import('@/ime');
 
 async function loadIme(): Promise<ImeModule> {
@@ -51,7 +55,7 @@ describe('legacy <ime-ui> と NagaIME の同一ページ共存（AC6）', () => 
     naga.destroy();
     expect(define).not.toHaveBeenCalled();
     expect(window.customElements.get('ime-ui')).toBeUndefined();
-  });
+  }, DICTIONARY_TEST_TIMEOUT_MS);
 
   it('別要素へ同時に attach しても id 重複 0・Naga の class は naga- 接頭辞のみ・style の selector は .naga- 始まり', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -106,7 +110,7 @@ describe('legacy <ime-ui> と NagaIME の同一ページ共存（AC6）', () => 
     manager.detach();
     naga.destroy();
     naga2.destroy();
-  });
+  }, DICTIONARY_TEST_TIMEOUT_MS);
 
   it('legacy detach 後も Naga が開閉でき、Naga detach 後も <ime-ui> が attach / detach できる', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -138,7 +142,7 @@ describe('legacy <ime-ui> と NagaIME の同一ページ共存（AC6）', () => 
     expect(typeof ui.updatePosition).toBe('function');
     manager.detach();
     expect(document.body.querySelector('ime-ui')).toBeNull();
-  });
+  }, DICTIONARY_TEST_TIMEOUT_MS);
 
   describe('対象要素の style.fontFamily（§3.1・同一要素への二重 attach はサポート外だが相互破壊しない）', () => {
     it('legacy → Naga: Naga は既存の inline 値を変えず、detach しても legacy の値を残す', async () => {
@@ -157,7 +161,7 @@ describe('legacy <ime-ui> と NagaIME の同一ページ共存（AC6）', () => 
       naga.detach(input);
       expect(input.style.fontFamily).toBe(legacyValue);
       manager.detach();
-    });
+    }, DICTIONARY_TEST_TIMEOUT_MS);
 
     it('Naga → legacy: legacy は無条件に上書きし（1.0.0 の挙動）、Naga の detach は legacy の値を消さない', async () => {
       vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -185,7 +189,7 @@ describe('legacy <ime-ui> と NagaIME の同一ページ共存（AC6）', () => 
       naga.detach(input);
       expect(input.style.fontFamily).toBe(legacyValue);
       manager.detach();
-    });
+    }, DICTIONARY_TEST_TIMEOUT_MS);
 
     it('Naga 単独: attach で設定した値は detach で空へ戻り、利用者が途中で変えた値は残す', async () => {
       const { NagaIME } = await loadIme();
@@ -209,6 +213,6 @@ describe('legacy <ime-ui> と NagaIME の同一ページ共存（AC6）', () => 
       expect(c.style.fontFamily).toContain('User Changed');
       naga.destroy();
       expect(b.style.fontFamily).toContain('Custom Serif');
-    });
+    }, DICTIONARY_TEST_TIMEOUT_MS);
   });
 });

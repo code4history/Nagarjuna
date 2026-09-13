@@ -9,6 +9,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NagaIME } from '@/lib/ime/naga-ime';
 import { FontLoader } from '@/lib/fonts/loader';
 
+// 辞書（生成済み dictionary.ts）の動的 import を伴うテストは、vitest.config.ts の testTimeout: 1000 では
+// 高負荷時に偽の赤になる（実装レビュー Round 1 Minor-1）。legacy-manager.test.ts と同じく個別に 8000ms を与える。
+const DICTIONARY_TEST_TIMEOUT_MS = 8000;
+
 const DEPRECATION_PREFIX = '[nagarjuna] DEPRECATED:';
 
 function key(type: 'keydown', init: KeyboardEventInit): KeyboardEvent {
@@ -95,7 +99,7 @@ describe('NagaIME', () => {
     } finally {
       vi.unstubAllGlobals();
     }
-  });
+  }, DICTIONARY_TEST_TIMEOUT_MS);
 
   it('FontLoader で特殊文字フォントを読み、対象の inline fontFamily が空なら特殊フォントを足す（AC5）', () => {
     const load = vi.spyOn(FontLoader.prototype, 'loadFonts');
@@ -139,7 +143,7 @@ describe('NagaIME', () => {
     const cmdJ = key('keydown', { key: 'J', metaKey: true });
     field.dispatchEvent(cmdJ);
     await vi.waitFor(() => expect(ime.isOpen).toBe(false));
-  });
+  }, DICTIONARY_TEST_TIMEOUT_MS);
 
   it('閉じている間は通常入力の keydown / input を preventDefault しない（AC5）', () => {
     ime.attach(field);
@@ -199,7 +203,7 @@ describe('NagaIME', () => {
     search.dispatchEvent(enterAfter);
     expect(enterAfter.defaultPrevented).toBe(true);
     expect(field.value).toBe('ヿ');
-  });
+  }, DICTIONARY_TEST_TIMEOUT_MS);
 
   it('確定は setRangeText でキャレット位置へ 1 回挿入し、bubbles な input を 1 回発火する。連続入力のため開いたまま（AC5）', async () => {
     const wrapper = document.createElement('div');
@@ -244,7 +248,7 @@ describe('NagaIME', () => {
     expect(setRangeText).toHaveBeenCalledTimes(3);
     expect(bubbled).toHaveLength(3);
     wrapper.remove();
-  });
+  }, DICTIONARY_TEST_TIMEOUT_MS);
 
   it('↑↓ で選択を移動し Tab でも確定する', async () => {
     ime.attach(field);
@@ -262,7 +266,7 @@ describe('NagaIME', () => {
     const expected = selected.dataset.char;
     searchOf().dispatchEvent(key('keydown', { key: 'Tab' }));
     expect(field.value).toBe(expected);
-  });
+  }, DICTIONARY_TEST_TIMEOUT_MS);
 
   it('Esc で閉じて対象へフォーカスを戻す。× ボタンと外側クリックでも閉じる（AC5）', async () => {
     ime.attach(field);
@@ -284,7 +288,7 @@ describe('NagaIME', () => {
     outside.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
     expect(ime.isOpen).toBe(false);
     outside.remove();
-  });
+  }, DICTIONARY_TEST_TIMEOUT_MS);
 
   it('recent は新しい順に並び、localStorage に保存され、次の起動は最近タブから開く（AC5）', async () => {
     ime.attach(field);
@@ -314,7 +318,7 @@ describe('NagaIME', () => {
     await next.open(field);
     expect(itemsOf().map((el) => el.dataset.char)).toEqual(['ゟ', 'ヿ']);
     next.destroy();
-  });
+  }, DICTIONARY_TEST_TIMEOUT_MS);
 
   it('recentStorageKey: null では保存しない。壊れた保存値は無視する', async () => {
     localStorage.setItem('nagarjuna-naga-recents', '{broken');
@@ -331,7 +335,7 @@ describe('NagaIME', () => {
     await reader.open(field);
     expect((popupOf().querySelector('.naga-tab.naga-is-active') as HTMLElement).dataset.category).toBe('hentaigana');
     reader.destroy();
-  });
+  }, DICTIONARY_TEST_TIMEOUT_MS);
 
   it('候補の文字と説明は HTML として解釈しない', async () => {
     localStorage.setItem(
@@ -345,7 +349,7 @@ describe('NagaIME', () => {
     expect(popupOf().querySelector('b')).toBeNull();
     expect(itemsOf()[0].querySelector('.naga-char')!.textContent).toBe('<img src=x onerror=alert(1)>');
     local.destroy();
-  });
+  }, DICTIONARY_TEST_TIMEOUT_MS);
 
   it('detach / destroy で trigger・popup・class・listener を片付け、再 attach できる（AC5・AC6 cleanup）', async () => {
     ime.attach(field);
@@ -367,7 +371,7 @@ describe('NagaIME', () => {
     ime.attach(field);
     await ime.open(field);
     expect(ime.isOpen).toBe(true);
-  });
+  }, DICTIONARY_TEST_TIMEOUT_MS);
 
   it('セレクタ文字列で複数要素へ attach でき、各インスタンスの id と aria-controls は固有', async () => {
     field.classList.add('naga-target-x');
@@ -390,7 +394,7 @@ describe('NagaIME', () => {
     expect(ime.isOpen).toBe(true);
     second.destroy();
     other.remove();
-  });
+  }, DICTIONARY_TEST_TIMEOUT_MS);
 });
 
 describe('NagaIME だけの利用では非推奨警告を出さない（AC4 ③）', () => {
@@ -415,5 +419,5 @@ describe('NagaIME だけの利用では非推奨警告を出さない（AC4 ③�
     );
     expect(deprecations).toHaveLength(0);
     warn.mockRestore();
-  });
+  }, DICTIONARY_TEST_TIMEOUT_MS);
 });

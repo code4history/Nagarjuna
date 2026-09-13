@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { IMEType } from '../src/lib/ime/internal-types';
+import type { NagaCategoryId } from '../src/lib/ime/types';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,39 +21,47 @@ interface RawEntry {
   type: string;
   description: string;
   isBuddhaName: boolean;
+  category?: NagaCategoryId;
 }
 
 interface DictionaryFileConfig {
   filename: string;
   type: IMEType;
   isBuddhaName: boolean;
+  // NagaIME のタブ（legacy の type とは別に持つ。kumimoji と buddha を分けるため）
+  category: NagaCategoryId;
 }
 
 const DICTIONARY_FILES: DictionaryFileConfig[] = [
   {
     filename: 'hentai_kana_IME.txt',
     type: 'hentaigana',
-    isBuddhaName: false
+    isBuddhaName: false,
+    category: 'hentaigana'
   },
   {
     filename: 'kanji_itaiji_IME.txt',
     type: 'itaiji',
-    isBuddhaName: false
+    isBuddhaName: false,
+    category: 'itaiji'
   },
   {
     filename: 'kumimoji_IME.txt',
     type: 'itaiji',
-    isBuddhaName: false
+    isBuddhaName: false,
+    category: 'kumimoji'
   },
   {
     filename: 'siddham_phonetic_IME.txt',
     type: 'siddham',
-    isBuddhaName: false
+    isBuddhaName: false,
+    category: 'siddham'
   },
   {
     filename: 'siddham_buddha_IME.txt',
     type: 'siddham',
-    isBuddhaName: true
+    isBuddhaName: true,
+    category: 'buddha'
   }
 ];
 
@@ -80,7 +89,8 @@ function addDakutenVariations(entry: RawEntry): RawEntry[] {
     variations.push({
       ...entry,
       reading: getDakutenReading(entry.reading),
-      character: entry.character + DAKUTEN
+      character: entry.character + DAKUTEN,
+      description: withMark(entry.description, '濁点')
     });
   }
   
@@ -88,11 +98,17 @@ function addDakutenVariations(entry: RawEntry): RawEntry[] {
     variations.push({
       ...entry,
       reading: getHandakutenReading(entry.reading),
-      character: entry.character + HANDAKUTEN
+      character: entry.character + HANDAKUTEN,
+      description: withMark(entry.description, '半濁点')
     });
   }
   
   return variations;
+}
+
+// NagaIME の説明文検索・表示用。濁点・半濁点付きの派生であることを説明文に足す
+function withMark(description: string | undefined, mark: string): string {
+  return description ? `${description}（${mark}付き）` : `${mark}付き`;
 }
 
 function getDakutenReading(reading: string): string {
@@ -117,13 +133,16 @@ function generateTypeScriptCode(entries: RawEntry[]): string {
     reading: entry.reading,
     char: entry.character,
     type: entry.type,
-    isBuddhaName: entry.isBuddhaName
+    isBuddhaName: entry.isBuddhaName,
+    // 以下は NagaIME 用の追加 field（legacy の IMECore は読まない）
+    description: (entry.description ?? '').trim(),
+    category: entry.category
   }));
   
   return `// このファイルは自動生成されています。直接編集しないでください。
-import { IMEEntry } from '../lib/ime/internal-types';
+import { NagaDictionaryEntry } from '../lib/ime/internal-types';
 
-export const dictionary: IMEEntry[] = ${JSON.stringify(processedEntries, null, 2)};
+export const dictionary: NagaDictionaryEntry[] = ${JSON.stringify(processedEntries, null, 2)};
 `;
 }
 
@@ -143,7 +162,8 @@ for (const config of DICTIONARY_FILES) {
     const baseEntry = {
       ...entry,
       type: config.type,
-      isBuddhaName: config.isBuddhaName
+      isBuddhaName: config.isBuddhaName,
+      category: config.category
     };
 
     if (config.type === 'hentaigana') {

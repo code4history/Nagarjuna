@@ -19,7 +19,7 @@ This repository is a JavaScript library that makes those characters easier to ha
 - Siddham script (using Noto Sans Siddham)
 - Kanji variant forms (using Noto Sans JP)
 - Automatic font loading
-- Mobile-friendly IME
+- Mobile-friendly IME (`NagaIME`: an on-demand special-character picker, added in 1.1.0)
 
 ## Installation
 
@@ -31,7 +31,8 @@ pnpm add nagarjuna
 
 ### Live demo
 
-https://code4history.dev/Nagarjuna/
+- NagaIME: https://code4history.dev/Nagarjuna/naga.html
+- Legacy `IMEManager` (deprecated): https://code4history.dev/Nagarjuna/
 
 ### Display only (font loader)
 
@@ -58,9 +59,41 @@ element.style.fontFamily = fontLoader.getFontFamilyString({
 });
 ```
 
-### Using the IME
+### Using the IME (NagaIME)
 
-When you also need input:
+When you also need input, attach `NagaIME` to your input / textarea elements:
+
+```javascript
+import { NagaIME } from 'nagarjuna/ime';
+
+const ime = new NagaIME();
+
+// Attach to elements (a CSS selector, an element, or a list of elements)
+ime.attach('.naga-target');
+
+// React to inserted characters with the standard, bubbling `input` event
+document.querySelector('.naga-target').addEventListener('input', (event) => {
+  console.log(event.target.value);
+});
+
+// Detach from one element, or from all elements and clean up the DOM
+ime.detach(document.querySelector('.naga-target'));
+ime.destroy();
+```
+
+- Focusing a field shows only a small trigger button; normal typing is never intercepted.
+- Open the picker with the trigger button or **Ctrl+J / Cmd+J**. Search by reading (hiragana) or by description (e.g. `時` in the Itai-ji tab), pick with ↑↓ / Enter / Tab / click / 1–9, and close with Esc.
+- The character is inserted at the caret with `setRangeText()` and a bubbling `input` event is dispatched; the picker stays open for continuous input.
+- Tabs: Recent, Hentai-kana, Siddham, Buddha names, Itai-ji, Kumi-moji. Recently used characters are kept in `localStorage`.
+- The dictionary is bundled with the package (no network fetch). Fonts are loaded with `FontLoader`.
+- On narrow viewports (< 560px) the picker docks to the bottom of the screen.
+- Options (all optional): `categories`, `triggerLabel`, `shortcut`, `recentStorageKey` (`null` disables persistence), `recentMax`, `maxCandidates`, `dockBreakpoint`, `loadFonts`.
+
+Note: importing `nagarjuna/ime` also registers the legacy `<ime-ui>` custom element, even if you only use `NagaIME`. Attaching both `IMEManager` and `NagaIME` to the same input / textarea is not supported.
+
+### Legacy IME (IMEManager) — deprecated
+
+`IMEManager`, `IIMEManager`, `IMEOptions`, `IMEAttachOptions`, `onChange`, `updateOptions` and the legacy custom element `<ime-ui>` are **deprecated since 1.1.0**. They keep working unchanged in 1.1.0, will **still be kept in 2.0.0**, and are **scheduled for removal in 3.0.0**. Using `IMEManager` or `<ime-ui>` prints a deprecation warning once per process via `console.warn` (`[nagarjuna] DEPRECATED: …`); 1.1.0 has no option to suppress it. Please use `NagaIME` and the `input` event for new code.
 
 ```javascript
 import { IMEManager } from 'nagarjuna/ime';

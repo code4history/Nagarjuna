@@ -17,7 +17,7 @@
 - 悉曇文字（Noto Sans Siddham使用）
 - 漢字異体字（Noto Sans JP使用）
 - フォントの自動読み込み
-- モバイル対応IME機能
+- モバイル対応IME機能（`NagaIME`: 必要なときだけ開く特殊文字ピッカー。1.1.0 で追加）
 
 ## インストール
 
@@ -29,7 +29,8 @@ pnpm add nagarjuna
 
 ### 動作デモ
 
-https://code4history.dev/Nagarjuna/
+- NagaIME: https://code4history.dev/Nagarjuna/naga.html
+- 従来の `IMEManager`（非推奨）: https://code4history.dev/Nagarjuna/
 
 ### 表示用途のみ（フォントローダー）
 
@@ -56,9 +57,41 @@ element.style.fontFamily = fontLoader.getFontFamilyString({
 });
 ```
 
-### IME機能を使用
+### IME機能を使用（NagaIME）
 
-入力機能が必要な場合:
+入力機能が必要な場合は、input / textarea に `NagaIME` を取り付けます:
+
+```javascript
+import { NagaIME } from 'nagarjuna/ime';
+
+const ime = new NagaIME();
+
+// 取り付け（CSS セレクタ・要素・要素の列のいずれか）
+ime.attach('.naga-target');
+
+// 挿入は標準の bubbles な input イベントで受け取る
+document.querySelector('.naga-target').addEventListener('input', (event) => {
+  console.log(event.target.value);
+});
+
+// 1 要素だけ取り外す／すべて取り外して DOM を片付ける
+ime.detach(document.querySelector('.naga-target'));
+ime.destroy();
+```
+
+- 欄にフォーカスしても小さな起動ボタンが出るだけで、通常の入力には介入しません。
+- 起動ボタンまたは **Ctrl+J / Cmd+J** で開きます。読み（ひらがな）または説明文（例: 異体字タブで `時`）で検索し、↑↓ / Enter / Tab / クリック / 1〜9 で確定、Esc で閉じます。
+- 文字は `setRangeText()` でキャレット位置へ挿入し、bubbles な `input` イベントを発火します。確定後も開いたままなので連続入力できます。
+- タブ: 最近・変体仮名・悉曇・仏名・異体字・組文字。最近使った文字は `localStorage` に保存します。
+- 辞書は package に同梱されており、ネットワークから取得しません。書体は `FontLoader` で読み込みます。
+- 狭い画面（560px 未満）ではポップアップを画面下部へドッキングします。
+- オプション（すべて省略可）: `categories`・`triggerLabel`・`shortcut`・`recentStorageKey`（`null` で保存しない）・`recentMax`・`maxCandidates`・`dockBreakpoint`・`loadFonts`。
+
+注意: `nagarjuna/ime` を import すると、`NagaIME` だけを使う場合でも legacy の `<ime-ui>` custom element が登録されます。同一の input / textarea に `IMEManager` と `NagaIME` を同時に attach する使い方はサポートしません。
+
+### 従来の IME（IMEManager）— 非推奨
+
+`IMEManager`、`IIMEManager`、`IMEOptions`、`IMEAttachOptions`、`onChange`、`updateOptions`、および legacy custom element `<ime-ui>` は **1.1.0 で非推奨**になりました。1.1.0 では動作を変えずに維持し、**2.0.0 でも維持**し、**3.0.0 で削除予定**です。`IMEManager` または `<ime-ui>` を使用すると、同一プロセスで 1 回だけ `console.warn` に非推奨警告（`[nagarjuna] DEPRECATED: …`）を出力します。1.1.0 にこの警告の抑止オプションはありません。新規実装では `NagaIME` と `input` イベントを使用してください。
 
 ```javascript
 import { IMEManager } from 'nagarjuna/ime';

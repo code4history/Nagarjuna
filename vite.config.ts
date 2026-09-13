@@ -29,7 +29,9 @@ export default defineConfig({
         emptyOutDir: true,
         rollupOptions: {
           input: {
-            main: resolve(__dirname, 'index.html')
+            main: resolve(__dirname, 'index.html'),
+            // NagaIME の demo（oct26-m7-t1）。root に追跡ファイルとして置く（public/ だと変換されない）
+            naga: resolve(__dirname, 'naga.html')
           },
           output: {
             entryFileNames: 'assets/[name].[hash].js',

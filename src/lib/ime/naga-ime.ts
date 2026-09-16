@@ -66,6 +66,12 @@ const DOCK_POPUP_MAX_PX =
   DOCK_TABS_PX + DOCK_SEARCH_PX + DOCK_ROW_PX * DOCK_ROWS + DOCK_BORDER_PX + DOCK_SLACK_PX;
 /** 極端に小さい可視高（横持ち・分割表示）でも popup を潰さない下限。list が内側で scroll する。 */
 const DOCK_MIN_PX = 96;
+/** 帯の内側に取る余白（欄が帯の縁に貼り付かないようにする。(b) 設計 §4.2）。 */
+const DOCK_REVEAL_MARGIN_PX = 4;
+/** これ以下の差分では寄せない（往復・無限ループを起こさないための不感帯）。 */
+const DOCK_REVEAL_EPSILON_PX = 1;
+/** 内側スクロールコンテナを遡る上限段数（深い DOM で走り続けないため）。 */
+const DOCK_REVEAL_ANCESTOR_LIMIT = 8;
 
 /** タブの正式名称（PC・aria-label・title で常に使う）。 */
 function tabLabelOf(id: TabId): string {
@@ -696,10 +702,21 @@ export class NagaIME {
       // 高さは「使える高さ」から逆算する（設計 §3.2）。静的な vh には依らない。
       // ソフトキーボードが出ている間の残り可視高 = visualViewport.height。
       const vvAvail = vv ? vv.height : window.innerHeight;
-      const popupMax = Math.max(DOCK_MIN_PX, Math.min(DOCK_POPUP_MAX_PX, vvAvail - DOCK_CONTEXT_MIN_PX));
+      // gap も割り付けに織り込む。こうすると popup 上端より上に残る帯の実効値が
+      // ちょうど H_CTX になる（(b) 案1 の最小是正・処遇判断 §3.2-2）。
+      // 実測 216px の内訳: 39/168/8 → 48/160/8（合計は常に vvAvail）。
+      const popupMax = Math.max(
+        DOCK_MIN_PX,
+        Math.min(DOCK_POPUP_MAX_PX, vvAvail - DOCK_CONTEXT_MIN_PX - DOCK_GAP_PX),
+      );
       style.maxHeight = `${popupMax}px`;
       style.setProperty('--naga-dock-max', `${popupMax}px`);
       style.setProperty('--naga-dock-avail', `${vvAvail}px`);
+      // 入力中の欄を popup 上端より上の帯へ寄せる（(b) 案2）。
+      // 帯 = [vv.offsetTop, popup 上端の client Y]。実測 216px では [0, 48]。
+      const vvTop = vv ? vv.offsetTop : 0;
+      const vvBottom = vv ? vv.height + vv.offsetTop : window.innerHeight;
+      this.revealTargetInDock(vvTop, vvBottom - DOCK_GAP_PX - popupMax);
       return;
     }
 
@@ -709,6 +726,7 @@ export class NagaIME {
     if (style.maxHeight) style.maxHeight = '';
     style.removeProperty('--naga-dock-max');
     style.removeProperty('--naga-dock-avail');
+    pop.removeAttribute('data-naga-reveal');
     style.position = 'absolute';
     style.width = `${Math.min(360, vw - 16)}px`;
 
@@ -741,6 +759,99 @@ export class NagaIME {
     style.left = `${left}px`;
     style.bottom = 'auto';
     style.right = 'auto';
+  }
+
+  /**
+   * dock 中に「入力中の欄」を popup 上端より上の帯へ寄せる（(b) 案2）。
+   *
+   * 座標系はすべて client（ビューポート）座標に揃える。`measureCaret()` は
+   * ページ座標を返すため `window.scrollY` を引いて正規化する（設計レビュー Minor 1）。
+   * 引数の band は帯の上端・下端の client Y（実測 216px では 0 と 48）。
+   *
+   * 寄せの符号: 正 = ページを下方向へスクロール（= 内容が上へ動く = 欄が上がる）。
+   *
+   * 届かない場合（設計レビュー Minor 2）: 入れ子のスクロールコンテナを内側から
+   * 順に使い、残りを window に投げる。それでも帯に入らなければ **できる分だけ寄せた
+   * 状態で止め**、`data-naga-reveal="out-of-band"` を残して以上は何もしない
+   * （再試行しない・body の padding を書き換えない）。
+   */
+  private revealTargetInDock(bandTop: number, bandBottom: number): void {
+    const pop = this.popup;
+    const field = this.target;
+    if (!pop || !field || !this.openState) return;
+    const rect = field.getBoundingClientRect();
+    // レイアウトを持たない欄（0×0。hidden・display:none・未レイアウト）は寄せの対象にしない
+    if (rect.width === 0 && rect.height === 0) return;
+
+    const top = bandTop + DOCK_REVEAL_MARGIN_PX;
+    const limit = bandBottom - DOCK_REVEAL_MARGIN_PX;
+    if (limit <= top) {
+      // 帯が余白 2 つ分も無い病理域（vvAvail が極端に小さい）。現行踏襲で何もしない。
+      pop.setAttribute('data-naga-reveal', 'out-of-band');
+      return;
+    }
+
+    let delta = this.revealDeltaOf(this.measureFocusLine(field), top, limit);
+    if (Math.abs(delta) > DOCK_REVEAL_EPSILON_PX) {
+      // ① 内側のスクロールコンテナを内→外の順に使う（window では動かせない欄への手当て）
+      for (const box of this.scrollableAncestorsOf(field)) {
+        if (Math.abs(delta) <= DOCK_REVEAL_EPSILON_PX) break;
+        this.scrollBoxBy(box, this.measureFocusLine(field), delta);
+        delta = this.revealDeltaOf(this.measureFocusLine(field), top, limit);
+      }
+      // ② 残りはページごと動かす。文書端で足りない分はブラウザ側で頭打ちになる
+      if (Math.abs(delta) > DOCK_REVEAL_EPSILON_PX) window.scrollBy(0, delta);
+    }
+
+    const rest = this.revealDeltaOf(this.measureFocusLine(field), top, limit);
+    pop.setAttribute('data-naga-reveal', Math.abs(rest) <= DOCK_REVEAL_EPSILON_PX ? 'in-band' : 'out-of-band');
+  }
+
+  /** 帯 [top, limit] に対して寄せるべき量（正 = 欄を上げる）。帯内なら 0。 */
+  private revealDeltaOf(line: { top: number; bottom: number }, top: number, limit: number): number {
+    // 行が帯より高い場合は下端ではなく上端を合わせる（行の頭を残す）
+    if (line.bottom - line.top > limit - top) return line.top - top;
+    if (line.bottom > limit) return line.bottom - limit;
+    if (line.top < top) return line.top - top;
+    return 0;
+  }
+
+  /** 入力中の行の client 座標。単一行 input は欄の矩形、textarea はキャレット行。 */
+  private measureFocusLine(field: NagaTarget): { top: number; bottom: number } {
+    const rect = field.getBoundingClientRect();
+    if (!(field instanceof HTMLTextAreaElement)) return { top: rect.top, bottom: rect.bottom };
+    try {
+      const caret = this.measureCaret(field);
+      const h = caret.lineHeight;
+      // ページ座標 → client 座標（レビュー Minor 1）。欄の矩形の外へははみ出させない
+      const lineTop = Math.min(Math.max(caret.y - window.scrollY, rect.top), Math.max(rect.bottom - h, rect.top));
+      return { top: lineTop, bottom: lineTop + h };
+    } catch {
+      return { top: rect.top, bottom: rect.bottom };
+    }
+  }
+
+  /** 欄の祖先のうち実際にスクロールできる箱を内側から順に返す（body / html は window 側で扱う）。 */
+  private scrollableAncestorsOf(field: NagaTarget): HTMLElement[] {
+    const boxes: HTMLElement[] = [];
+    let el: HTMLElement | null = field.parentElement;
+    for (let i = 0; el && i < DOCK_REVEAL_ANCESTOR_LIMIT; i++, el = el.parentElement) {
+      if (el === document.body || el === document.documentElement) break;
+      const overflowY = getComputedStyle(el).overflowY;
+      const scrollable = overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay';
+      if (scrollable && el.scrollHeight > el.clientHeight) boxes.push(el);
+    }
+    return boxes;
+  }
+
+  /** 箱の中で行を delta だけ寄せる（行を箱の外へ追い出さない範囲に丸める）。 */
+  private scrollBoxBy(box: HTMLElement, line: { top: number; bottom: number }, delta: number): void {
+    const b = box.getBoundingClientRect();
+    const lo = Math.max(line.bottom - b.bottom, -box.scrollTop);
+    const hi = Math.min(line.top - b.top, box.scrollHeight - box.clientHeight - box.scrollTop);
+    if (lo > hi) return;
+    const applied = Math.min(Math.max(delta, lo), hi);
+    if (Math.abs(applied) > DOCK_REVEAL_EPSILON_PX) box.scrollTop += applied;
   }
 
   /** キャレット座標の計測（ミラー要素方式）。 */

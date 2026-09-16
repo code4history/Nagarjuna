@@ -9,6 +9,11 @@
  * 採用案は案 A（縦リスト圧縮＋タブ一文字表記。設計 §4・§8.2-2 の既定）。
  * 割り付け（設計 §3.3）: タブ 40 ＋ 読み 40 ＋ 候補 3 行 ×44 ＋ 境界 2 = 224px、
  * 本体入力欄の可視最小確保分 H_CTX = 48px、キーボード上端との間隔 8px。
+ *
+ * (b) 差し替え候補（b-fix-design §3.1）で、割り付けに gap も織り込むよう是正した：
+ * popupMax = clamp(96, vvAvail − H_CTX − gap, 224)。これで popup 上端より上に
+ * 残る帯の実効値がちょうど H_CTX になる（実測 216px: 39/168/8 → 48/160/8）。
+ * 併せて「入力中の欄をその帯へ寄せる」検査を AC11 として下に足してある。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NagaIME } from '@/lib/ime/naga-ime';
@@ -102,7 +107,7 @@ describe('NagaIME モバイル dock（AC10）', () => {
   });
 
   it(
-    'AC10-c: dock 時 bottom はキーボード上端＋8px、max-height は min(案上限, vvAvail − H_CTX)',
+    'AC10-c: dock 時 bottom はキーボード上端＋8px、max-height は min(案上限, vvAvail − H_CTX − gap)',
     async () => {
       stubViewport(PHONE_KEYBOARD);
       ime.attach(field);
@@ -113,7 +118,7 @@ describe('NagaIME モバイル dock（AC10）', () => {
       expect(pop.style.position).toBe('fixed');
       // H_kb = 844 − (480 + 0) = 364 → bottom = 372
       expect(pop.style.bottom).toBe(`${844 - 480 + DOCK_GAP}px`);
-      // min(224, 480 − 48) = 224
+      // min(224, 480 − 48 − 8) = 224（224 上限が効くので (b) の式是正でも値は不変）
       expect(pop.style.maxHeight).toBe(`${PLAN_A_MAX}px`);
       expect(pop.style.getPropertyValue('--naga-dock-max')).toBe(`${PLAN_A_MAX}px`);
       expect(pop.style.getPropertyValue('--naga-dock-avail')).toBe('480px');
@@ -122,7 +127,7 @@ describe('NagaIME モバイル dock（AC10）', () => {
   );
 
   it(
-    'AC10-c: 残り可視高が小さい機種では vvAvail − H_CTX まで縮む（本体入力欄の帯を必ず残す）',
+    'AC10-c: 残り可視高が小さい機種では vvAvail − H_CTX − gap まで縮む（本体入力欄の帯を必ず残す）',
     async () => {
       // 横持ち SE 級: 残り可視高 200px
       stubViewport({ width: 390, height: 200, offsetTop: 0, innerHeight: 375 });
@@ -130,11 +135,14 @@ describe('NagaIME モバイル dock（AC10）', () => {
       await ime.open(field);
 
       const pop = popupOf();
-      // min(224, 200 − 48) = 152
-      expect(pop.style.maxHeight).toBe(`${200 - H_CTX}px`);
-      // popup の上に残る帯（vvAvail − gap − popupMax）が H_CTX − gap 以上ある
-      const clearance = 200 - DOCK_GAP - (200 - H_CTX);
-      expect(clearance).toBeGreaterThanOrEqual(H_CTX - DOCK_GAP);
+      // min(224, 200 − 48 − 8) = 144（(b) 案1 最小分: gap を割り付けに織り込む）
+      expect(pop.style.maxHeight).toBe(`${200 - H_CTX - DOCK_GAP}px`);
+      // popup の上に残る帯（vvAvail − gap − popupMax）がちょうど H_CTX になる。
+      // popupMax は実装が style へ書いた実値から取る（テスト内の literal 同士の
+      // 突き合わせ＝恒真式にしない。申し送り U4-Minor の解消）。
+      const popupMax = parseFloat(pop.style.maxHeight);
+      const clearance = 200 - DOCK_GAP - popupMax;
+      expect(clearance).toBe(H_CTX);
     },
     DICTIONARY_TEST_TIMEOUT_MS,
   );
@@ -154,10 +162,10 @@ describe('NagaIME モバイル dock（AC10）', () => {
       expect(pop.style.bottom).toBe(`${DOCK_GAP}px`);
       expect(pop.style.maxHeight).toBe(`${PLAN_A_MAX}px`);
 
-      // より大きなキーボード（残り可視高 240px）
+      // より大きなキーボード（残り可視高 240px）→ min(224, 240 − 48 − 8) = 184
       stubViewport({ width: 390, height: 240, offsetTop: 0, innerHeight: 844 });
       window.dispatchEvent(new Event('resize'));
-      expect(popupOf().style.maxHeight).toBe(`${240 - H_CTX}px`);
+      expect(popupOf().style.maxHeight).toBe(`${240 - H_CTX - DOCK_GAP}px`);
     },
     DICTIONARY_TEST_TIMEOUT_MS,
   );
@@ -279,6 +287,255 @@ describe('NagaIME モバイル dock（AC10）', () => {
       // PC では wrapper が display: contents なので従来と同じ 1 行のまま
       expect(NAGA_STYLE_TEXT).toMatch(/\.naga-search-row\s*\{[^}]*display:\s*contents/);
       expect(NAGA_STYLE_TEXT).toMatch(/\.naga-search-label\s*\{[^}]*display:\s*none/);
+    },
+    DICTIONARY_TEST_TIMEOUT_MS,
+  );
+});
+
+/* ================================================================================
+ * AC11（oct26-m7-t1 (b) 差し替え候補・b-fix-design §5.1）
+ *
+ * (b) の推奨セット = 案2（入力中の欄を帯へ寄せる）＋案1 の最小分（割り付けに
+ * gap を織り込み、帯の実効値を H_CTX に一致させる）。実測 216px の内訳は
+ * 39/168/8 → 48/160/8 になる。
+ *
+ * jsdom は layout を持たないので、ここでも測るのは「仕組み」である。欄の矩形と
+ * 内側スクロールコンテナの寸法を差し替え、実装が client 座標で何 px 寄せるかを
+ * 機械が実行時に導出する（値の凍結ではない）。
+ * ================================================================================ */
+
+/** 実機 iPhone の実測（2026-09-16）。vvAvail=216 / innerHeight=619。 */
+const PHONE_MEASURED = { width: 390, height: 216, offsetTop: 0, innerHeight: 619 };
+/** 帯の内側に取る余白（実装の DOCK_REVEAL_MARGIN_PX と対）。 */
+const REVEAL_MARGIN = 4;
+
+const originalScrollY = Object.getOwnPropertyDescriptor(window, 'scrollY');
+
+/** 要素の矩形を「読み出しのたびに計算する」形で差し替える（内側 scroll に追従させるため）。 */
+function stubRect(el: Element, read: () => { top: number; height: number }): void {
+  vi.spyOn(el, 'getBoundingClientRect').mockImplementation(() => {
+    const { top, height } = read();
+    return {
+      top, bottom: top + height, height, left: 0, right: 240, width: 240, x: 0, y: top,
+      toJSON: () => ({}),
+    } as DOMRect;
+  });
+}
+
+/** jsdom の scrollTop は常に 0 なので、箱として振る舞う own property を持たせる。 */
+function makeScrollBox(clientHeight: number, scrollHeight: number, clientTop: number): HTMLDivElement {
+  const box = document.createElement('div');
+  box.style.overflowY = 'auto';
+  let scrollTop = 0;
+  Object.defineProperty(box, 'scrollTop', {
+    configurable: true,
+    get: () => scrollTop,
+    set: (v: number) => { scrollTop = Math.min(Math.max(v, 0), scrollHeight - clientHeight); },
+  });
+  Object.defineProperty(box, 'clientHeight', { configurable: true, get: () => clientHeight });
+  Object.defineProperty(box, 'scrollHeight', { configurable: true, get: () => scrollHeight });
+  stubRect(box, () => ({ top: clientTop, height: clientHeight }));
+  return box;
+}
+
+function revealStateOf(): string | null {
+  return popupOf().getAttribute('data-naga-reveal');
+}
+
+describe('NagaIME dock 中の入力欄の寄せ（AC11・(b) 差し替え候補）', () => {
+  let field: HTMLInputElement;
+  let ime: NagaIME;
+  let scrollBy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    localStorage.clear();
+    field = document.createElement('input');
+    field.type = 'text';
+    document.body.append(field);
+    ime = new NagaIME({ loadFonts: false });
+    scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    ime.destroy();
+    field.remove();
+    restoreViewport();
+    if (originalScrollY) Object.defineProperty(window, 'scrollY', originalScrollY);
+    vi.restoreAllMocks();
+  });
+
+  it(
+    'AC10-c: 実測 216px の回帰案例 — 帯 48 / popup 160 / gap 8（合計 216）',
+    async () => {
+      stubViewport(PHONE_MEASURED);
+      ime.attach(field);
+      await ime.open(field);
+
+      const pop = popupOf();
+      expect(pop.style.bottom).toBe(`${619 - 216 + DOCK_GAP}px`);
+      expect(pop.style.maxHeight).toBe('160px');
+      const popupMax = parseFloat(pop.style.maxHeight);
+      // 帯（popup 上端の client Y）と合計の検算（いずれも実装が書いた値から導く）
+      expect(216 - DOCK_GAP - popupMax).toBe(H_CTX);
+      expect(H_CTX + popupMax + DOCK_GAP).toBe(216);
+      expect(popupMax).toBeLessThan(PLAN_A_MAX);
+    },
+    DICTIONARY_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'AC11-a: 欄が帯より下にあるとき、popup を開くと帯の下端までページを寄せる',
+    async () => {
+      stubViewport(PHONE_MEASURED);
+      // iOS がキーボード直上へ置いた欄（client [160, 200]）
+      stubRect(field, () => ({ top: 160, height: 40 }));
+      ime.attach(field);
+      await ime.open(field);
+
+      // 帯 = [0, 48]。余白 4 を見て、欄の下端を 44 に合わせる → 200 − 44 = 156px
+      expect(scrollBy).toHaveBeenCalledTimes(1);
+      expect(scrollBy).toHaveBeenCalledWith(0, 200 - (H_CTX - REVEAL_MARGIN));
+    },
+    DICTIONARY_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'AC11-b: 欄が既に帯の中にあるときは動かさない（冪等・往復しない）',
+    async () => {
+      stubViewport(PHONE_MEASURED);
+      // 帯 [4, 44] に収まっている欄
+      stubRect(field, () => ({ top: 4, height: 40 }));
+      ime.attach(field);
+      await ime.open(field);
+      expect(scrollBy).not.toHaveBeenCalled();
+      expect(revealStateOf()).toBe('in-band');
+
+      // 2 度目（キーボード追従）でも呼ばれない
+      window.dispatchEvent(new Event('resize'));
+      expect(scrollBy).not.toHaveBeenCalled();
+    },
+    DICTIONARY_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'AC11-c: PC（non-docked）では一切寄せない（data-naga-reveal も残さない）',
+    async () => {
+      stubViewport({ width: 1024, height: 768, offsetTop: 0, innerHeight: 768 });
+      stubRect(field, () => ({ top: 700, height: 40 }));
+      ime.attach(field);
+      await ime.open(field);
+
+      expect(popupOf().classList.contains('naga-is-docked')).toBe(false);
+      expect(scrollBy).not.toHaveBeenCalled();
+      expect(revealStateOf()).toBeNull();
+    },
+    DICTIONARY_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'AC11-d: open / キーボード開閉 / 確定 の 3 経路すべてで寄せが走る',
+    async () => {
+      stubViewport(PHONE_MEASURED);
+      stubRect(field, () => ({ top: 160, height: 40 }));
+      ime.attach(field);
+      field.focus();
+
+      // ① open
+      await ime.open(field);
+      expect(scrollBy).toHaveBeenCalledTimes(1);
+
+      // ② キーボード開閉（visualViewport の変化 → onResize）
+      scrollBy.mockClear();
+      stubViewport({ width: 390, height: 240, offsetTop: 0, innerHeight: 619 });
+      window.dispatchEvent(new Event('resize'));
+      // 帯 = 240 − 8 − min(224, 240 − 48 − 8) = 48
+      expect(scrollBy).toHaveBeenCalledWith(0, 200 - (H_CTX - REVEAL_MARGIN));
+
+      // ③ 確定（連続入力）
+      scrollBy.mockClear();
+      stubViewport(PHONE_MEASURED);
+      itemsOf()[0].click();
+      expect(ime.isOpen).toBe(true);
+      expect(scrollBy).toHaveBeenCalledWith(0, 200 - (H_CTX - REVEAL_MARGIN));
+    },
+    DICTIONARY_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'AC11-f: textarea はキャレット行で寄せ、ページ座標を client 座標へ正規化する',
+    async () => {
+      const area = document.createElement('textarea');
+      area.style.lineHeight = '20px';
+      area.style.fontSize = '16px';
+      area.value = 'あいうえお';
+      document.body.append(area);
+      // ページが 300px スクロールされた状態（measureCaret() はページ座標を返す）
+      Object.defineProperty(window, 'scrollY', { value: 300, configurable: true });
+      stubViewport(PHONE_MEASURED);
+      stubRect(area, () => ({ top: 160, height: 80 }));
+      try {
+        ime.attach(area);
+        await ime.open(area);
+        // キャレット行 = client [160, 180]。正規化を忘れると 300px ずれる
+        expect(scrollBy).toHaveBeenCalledTimes(1);
+        expect(scrollBy).toHaveBeenCalledWith(0, 180 - (H_CTX - REVEAL_MARGIN));
+      } finally {
+        area.remove();
+      }
+    },
+    DICTIONARY_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'AC11-g: 入れ子のスクロールコンテナ内の欄は、内側の箱を先に動かして帯へ寄せる',
+    async () => {
+      // 箱は client [0, 200] に見えていて、中身は 400px ある
+      const box = makeScrollBox(200, 400, 0);
+      document.body.append(box);
+      box.append(field);
+      stubViewport(PHONE_MEASURED);
+      stubRect(field, () => ({ top: 160 - box.scrollTop, height: 40 }));
+      try {
+        ime.attach(field);
+        await ime.open(field);
+
+        // 内側だけで 156px 吸収できる → window は動かさない
+        expect(box.scrollTop).toBe(200 - (H_CTX - REVEAL_MARGIN));
+        expect(scrollBy).not.toHaveBeenCalled();
+        expect(revealStateOf()).toBe('in-band');
+      } finally {
+        document.body.append(field);
+        box.remove();
+      }
+    },
+    DICTIONARY_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'AC11-h: 寄せが届かないときは、できる分だけ寄せて out-of-band を残し、それ以上は何もしない',
+    async () => {
+      // スクロールできない箱（scrollHeight == clientHeight）。window も動かない（stub）
+      const box = makeScrollBox(60, 60, 150);
+      document.body.append(box);
+      box.append(field);
+      stubViewport(PHONE_MEASURED);
+      stubRect(field, () => ({ top: 160 - box.scrollTop, height: 40 }));
+      try {
+        ime.attach(field);
+        await ime.open(field);
+
+        expect(box.scrollTop).toBe(0);
+        // window へ 1 回だけ投げる（再帰・ループしない）
+        expect(scrollBy).toHaveBeenCalledTimes(1);
+        expect(scrollBy).toHaveBeenCalledWith(0, 200 - (H_CTX - REVEAL_MARGIN));
+        // 届かなかったことが機械にも人間にも読める
+        expect(revealStateOf()).toBe('out-of-band');
+        // body には手を入れない（padding-bottom フォールバックは初期実装に含めない）
+        expect(document.body.style.paddingBottom).toBe('');
+      } finally {
+        document.body.append(field);
+        box.remove();
+      }
     },
     DICTIONARY_TEST_TIMEOUT_MS,
   );

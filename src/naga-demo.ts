@@ -34,6 +34,19 @@ if (new URLSearchParams(location.search).get('debugViewport') === '1') {
   ].join(';');
   document.body.appendChild(panel);
 
+  // 「入力中の欄」＝ popup の外にある最後に触れた input / textarea（読み入力欄は除く）。
+  let lastField: HTMLElement | null = null;
+  document.addEventListener(
+    'focusin',
+    (e) => {
+      const el = e.target as HTMLElement | null;
+      if (!el) return;
+      if (el.closest('.naga-popup')) return;
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) lastField = el;
+    },
+    true,
+  );
+
   const render = (): void => {
     const vv = window.visualViewport;
     const vvAvail = vv ? Math.round(vv.height) : window.innerHeight;
@@ -45,6 +58,16 @@ if (new URLSearchParams(location.search).get('debugViewport') === '1') {
     const maxH = shown ? pop.style.maxHeight || '(未設定)' : '-';
     // popup の上に残っている帯（本体の入力欄が見える高さ）
     const clearance = rect ? Math.round(rect.top - offsetTop) : null;
+    // 入力中の欄が帯（popup 上端より上）に見えているか
+    const fRect = lastField ? lastField.getBoundingClientRect() : null;
+    let visibility = '-';
+    if (fRect) {
+      if (!rect) visibility = `${Math.round(fRect.top)}（popup 非表示）`;
+      else if (fRect.bottom <= rect.top && fRect.top >= offsetTop) visibility = '見えている（帯の中）';
+      else if (fRect.top >= rect.top) visibility = 'popup の背後';
+      else if (fRect.top < offsetTop) visibility = '可視領域の上へ外れた';
+      else visibility = 'popup に一部かかっている';
+    }
     panel.textContent = [
       `vv.height   = ${vvAvail}`,
       `vv.offsetTop= ${offsetTop}`,
@@ -55,6 +78,10 @@ if (new URLSearchParams(location.search).get('debugViewport') === '1') {
       `popup 上端  = ${rect ? Math.round(rect.top) : '-'}`,
       `上に残る帯  = ${clearance === null ? '-' : clearance}`,
       `docked      = ${pop ? pop.classList.contains('naga-is-docked') : '-'}`,
+      // (b) 差し替え候補の判定用: 入力中の欄が popup 上端より上に見えているか
+      `欄 上端/下端= ${fRect ? `${Math.round(fRect.top)} / ${Math.round(fRect.bottom)}` : '-'}`,
+      `欄の可視    = ${visibility}`,
+      `寄せ結果    = ${pop?.getAttribute('data-naga-reveal') ?? '-'}`,
     ].join('\n');
   };
 

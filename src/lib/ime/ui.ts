@@ -2,6 +2,14 @@ import { IMECore } from './core';
 import { FontLoader } from '../fonts/loader';
 import { IMEUIProps, IMEUIState } from './ui-types';
   
+import { warnLegacyIMEOnce } from './legacy-warning';
+
+/**
+ * legacy の `<ime-ui>` custom element。
+ *
+ * @deprecated 1.1.0 で非推奨。2.0.0 でも維持し、3.0.0 で削除予定です。新規実装では `NagaIME` を使用してください。
+ * 文書へ接続されたとき（connectedCallback）に `console.warn` で非推奨警告を 1 回だけ出します。
+ */
 export class IMEUIElement extends HTMLElement {
   private props: IMEUIProps = {
     target: document.createElement('input'),
@@ -57,6 +65,7 @@ export class IMEUIElement extends HTMLElement {
   
   // Web Componentsのライフサイクルメソッド
   connectedCallback() {
+    warnLegacyIMEOnce();
     this.render();
     this.setupStyles();
     this.setupEventListeners();

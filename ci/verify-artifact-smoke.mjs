@@ -143,6 +143,31 @@ try {
   push("S5c 配布物が IMEManager を export する（.d.ts / ESM / CJS の静的照合）", false, error.message);
 }
 
+// S5c-4: 配布物が NagaIME を export することを S5c-3 と同じ手法で静的に照合する（oct26-m7-t1 設計 §5.1）。
+// 既存の S5c-1〜3 は変更しない。label は "S5c-4 " で始め、判定側が前方一致で本項目だけを拾えるようにする。
+try {
+  const dtsText = fs.readFileSync(path.join(pkgDir, "dist", "ime.d.ts"), "utf8");
+  const esmText = fs.readFileSync(path.join(pkgDir, "dist", "nagarjuna-ime.js"), "utf8");
+  const cjsText = fs.readFileSync(path.join(pkgDir, "dist", "nagarjuna-ime.cjs"), "utf8");
+  const dtsOk = dtsText.includes("NagaIME");
+  let esmOk = false;
+  const spaced = esmText.lastIndexOf("export {");
+  const tight = esmText.lastIndexOf("export{");
+  const start = spaced > tight ? spaced : tight;
+  if (start >= 0) {
+    const end = esmText.indexOf("}", start);
+    if (end > start) esmOk = esmText.slice(start, end).includes("NagaIME");
+  }
+  const cjsOk = cjsText.includes("exports.NagaIME=") || cjsText.includes("exports.NagaIME =");
+  push(
+    "S5c-4 配布物が NagaIME を export する（.d.ts / ESM / CJS の静的照合）",
+    dtsOk && esmOk && cjsOk,
+    "dts=" + dtsOk + " esm=" + esmOk + " cjs=" + cjsOk,
+  );
+} catch (error) {
+  push("S5c-4 配布物が NagaIME を export する（.d.ts / ESM / CJS の静的照合）", false, error.message);
+}
+
 // (d) 恒久ガード: 配布物に Pages 専用資産 / テスト由来 .d.ts / dist/src の入れ子が無いこと。
 // 否定形の検査は「対象が空でも通る」空虚化の経路を持つ ∴ detail に dist エントリ総数を必ず出す。
 try {

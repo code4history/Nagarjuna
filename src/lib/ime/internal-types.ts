@@ -1,3 +1,5 @@
+import type { NagaCategoryId } from './types';
+
 export type IMEType = 
   | 'hentaigana' 
   | 'siddham' 
@@ -9,6 +11,15 @@ export interface IMEEntry {
   char: string;
   type: IMEType;
   isBuddhaName: boolean;
+}
+
+/**
+ * 生成辞書（src/data/dictionary.ts）の 1 件。legacy の IMEEntry の field をそのまま持ち、
+ * NagaIME 用の説明文とカテゴリを追加で持つ（legacy の IMECore はこれらを読まない）。
+ */
+export interface NagaDictionaryEntry extends IMEEntry {
+  description: string;
+  category: NagaCategoryId;
 }
 
 export interface IMESearchResult {

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>龍樹(Nagarjuna) NagaIME デモ</title>
+  <link rel="icon" type="image/png" sizes="196x196" href="icons/favicon-196.png">
+  <link rel="apple-touch-icon" href="icons/apple-icon-180.png">
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 20px 16px 40vh; /* 下部ドッキングの確認用に余白 */
+      color: #333;
+    }
+
+    @font-face {
+      font-family: "Genkai";
+      src: url("./fonts/genkai-nagarjuna.woff2") format('woff2'),
+        url("./fonts/genkai-nagarjuna.woff") format('woff');
+    }
+    .genkai {
+      font-family: "Genkai";
+    }
+
+    h1 { font-size: 1.4rem; }
+    .lead { color: #888; font-size: 0.9rem; }
+    .note {
+      background: #f4f1fa;
+      border-left: 4px solid #5b4a8a;
+      padding: 10px 14px;
+      font-size: 0.85rem;
+      line-height: 1.7;
+      margin: 16px 0 24px;
+    }
+    .note code { background: #fff; padding: 1px 4px; border-radius: 3px; }
+    .field { margin: 28px 0; }
+    .field label {
+      display: block;
+      font-size: 0.85rem;
+      color: #666;
+      margin-bottom: 6px;
+    }
+    .field input, .field textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #bbb;
+      border-radius: 6px;
+    }
+    .plain-note { font-size: 0.75rem; color: #999; }
+    .links { font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <h1><span class="genkai">龍樹(Nagarjuna)</span>: NagaIME デモ</h1>
+  <span class="lead">Ver. <span id="version"></span></span>
+
+  <div class="note">
+    <strong>使い方</strong><br>
+    ① 下の入力欄にフォーカスすると、欄の右上に小さな <code>梵</code> ボタンが出ます（普段はそれだけで、通常の入力は妨げません）。<br>
+    ② 特殊文字を入れたくなったら <code>梵</code> ボタンを押すか <code>Ctrl+J</code>（Mac は <code>⌘J</code>）。<br>
+    ③ ポップアップで読みを入力 → <code>↑↓</code> かタップで選択 → <code>Enter</code> でキャレット位置に確定（連続入力できます）。<code>Esc</code> で閉じます。<br>
+    ④ 説明文でも探せます（例: 異体字タブで「時」と入力）。<code>1</code>〜<code>9</code> キーで直接選択もできます。
+  </div>
+
+  <div class="field">
+    <label for="naga-field-1">入力テスト1（input・NagaIME 有効）</label>
+    <input type="text" id="naga-field-1" class="naga-target" placeholder="普通の日本語入力はそのまま。特殊文字だけ Ctrl+J で">
+  </div>
+
+  <div class="field">
+    <label for="naga-field-2">入力テスト2（textarea・NagaIME 有効）</label>
+    <textarea id="naga-field-2" class="naga-target" rows="5" placeholder="石仏の銘文を写す想定"></textarea>
+  </div>
+
+  <div class="field">
+    <label for="naga-field-3">入力テスト3（NagaIME <strong>無効</strong>の普通の欄）</label>
+    <input type="text" id="naga-field-3" placeholder="ここには梵ボタンが出ません">
+    <p class="plain-note">※ .naga-target を付けた欄にだけ起動ボタンが出ます</p>
+  </div>
+
+  <p class="links">従来の IMEManager（1.1.0 で非推奨）のデモは <a href="./index.html">index.html</a> にあります。</p>
+
+  <script type="module" src="./src/naga-demo.ts"></script>
+</body>
+</html>

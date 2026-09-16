@@ -31,8 +31,53 @@ type TabId = NagaCategoryId | 'recent';
 
 const DEFAULT_RECENT_KEY = 'nagarjuna-naga-recents';
 const SEARCH_PLACEHOLDER = 'よみを入力（例: あ / とき）';
+const SEARCH_LABEL = '読み';
+const SEARCH_ARIA_LABEL = '読みを入力';
+const RECENT_LABEL = '最近';
+const RECENT_SHORT = '近';
 const FONT_SETTINGS: FontSettings = { hentaigana: true, siddham: true, itaiji: true };
 const CATEGORY_IDS = new Set<string>(NAGA_CATEGORIES.map((c) => c.id));
+
+/*
+ * モバイル dock の割り付け（是正設計 v2 §3.2-3.3・案 A）。この 5 つと下の
+ * DOCK_POPUP_MAX_PX が「dock 時の寸法」の唯一の出どころである（CSS 側には
+ * --naga-dock-max 未設定時のフォールバックしか置かない）。
+ *   popupMax = clamp(DOCK_MIN_PX, vvAvail − DOCK_CONTEXT_MIN_PX, DOCK_POPUP_MAX_PX)
+ * 静的な vh（旧 45vh / 30vh）には依存しない。
+ */
+/** H_CTX: popup の上に必ず残す「本体の入力欄が見える帯」（設計 §3.2）。 */
+const DOCK_CONTEXT_MIN_PX = 48;
+/** タブ帯の高さ（設計 §3.3）。 */
+const DOCK_TABS_PX = 40;
+/** 読み入力欄の高さ（設計 §3.3。font-size 16px で iOS の自動ズームを避ける）。 */
+const DOCK_SEARCH_PX = 40;
+/** 候補 1 行の高さ（設計 §3.3）。 */
+const DOCK_ROW_PX = 44;
+/** dock 時に同時に見せる候補の件数（設計 §3.4・案 A）。 */
+const DOCK_ROWS = 3;
+/** popup 上下の境界線。 */
+const DOCK_BORDER_PX = 2;
+/** 行の端数・読み入力欄の外余白などの丸め分。 */
+const DOCK_SLACK_PX = 10;
+/** キーボード上端（可視領域の下端）との間隔。既存実装から不変。 */
+const DOCK_GAP_PX = 8;
+/** 案 A の popup 高さ上限 = 40 + 40 + 44×3 + 2 + 10 = 224px（設計 §3.5 の既定値）。 */
+const DOCK_POPUP_MAX_PX =
+  DOCK_TABS_PX + DOCK_SEARCH_PX + DOCK_ROW_PX * DOCK_ROWS + DOCK_BORDER_PX + DOCK_SLACK_PX;
+/** 極端に小さい可視高（横持ち・分割表示）でも popup を潰さない下限。list が内側で scroll する。 */
+const DOCK_MIN_PX = 96;
+
+/** タブの正式名称（PC・aria-label・title で常に使う）。 */
+function tabLabelOf(id: TabId): string {
+  if (id === 'recent') return RECENT_LABEL;
+  return NAGA_CATEGORIES.find((c) => c.id === id)?.label ?? id;
+}
+
+/** タブの一文字表記（dock 時の非選択タブ。設計 §4 案 A）。 */
+function tabShortLabelOf(id: TabId): string {
+  if (id === 'recent') return RECENT_SHORT;
+  return NAGA_CATEGORIES.find((c) => c.id === id)?.short ?? tabLabelOf(id).charAt(0);
+}
 
 let instanceSeq = 0;
 
@@ -77,6 +122,8 @@ export class NagaIME {
   private composing = false;
   private openState = false;
   private openSeq = 0;
+  /** 下部ドッキング中か（`.naga-is-docked` と対。dock 限定の振る舞いの唯一の判定源・設計 §6.2-3）。 */
+  private docked = false;
 
   private trigger: HTMLButtonElement | null = null;
   private popup: HTMLDivElement | null = null;
@@ -277,6 +324,18 @@ export class NagaIME {
     search.setAttribute('role', 'combobox');
     search.setAttribute('aria-expanded', 'true');
     search.setAttribute('aria-controls', listId);
+    search.setAttribute('aria-label', SEARCH_ARIA_LABEL);
+
+    // 読み入力欄の行（設計 §5）。PC では CSS の `display: contents` により
+    // input が従来どおり popup 直下の flex item として並ぶ（見た目は不変）。
+    // dock 時だけラベルとアクセント縦線が出て、本体の入力欄と見分けられる。
+    const searchRow = document.createElement('div');
+    searchRow.className = 'naga-search-row';
+    const searchLabel = document.createElement('span');
+    searchLabel.className = 'naga-search-label';
+    searchLabel.textContent = SEARCH_LABEL;
+    searchLabel.setAttribute('aria-hidden', 'true');
+    searchRow.append(searchLabel, search);
 
     const list = document.createElement('div');
     list.className = 'naga-list';
@@ -287,7 +346,7 @@ export class NagaIME {
     hint.className = 'naga-hint';
     hint.textContent = '↑↓:選択 Enter:確定（連続入力可） 1-9:直接選択 Esc:閉じる';
 
-    popup.append(titlebar, search, list, hint);
+    popup.append(titlebar, searchRow, list, hint);
 
     const tabIds: TabId[] = ['recent', ...this.options.categories];
     for (const id of tabIds) {
@@ -296,7 +355,11 @@ export class NagaIME {
       b.className = 'naga-tab';
       b.id = `${this.uid}-tab-${id}`;
       b.dataset.category = id;
-      b.textContent = id === 'recent' ? '最近' : NAGA_CATEGORIES.find((c) => c.id === id)!.label;
+      // 初期値は正式名称。dock 時の一文字表記は applyTabLabels() が一手に引き受ける。
+      b.textContent = tabLabelOf(id);
+      // 一文字表記でも何のタブか分かるよう、正式名称は常に取れるようにしておく（設計 §6.1 ③）。
+      b.title = tabLabelOf(id);
+      b.setAttribute('aria-label', tabLabelOf(id));
       b.setAttribute('role', 'tab');
       b.setAttribute('aria-controls', listId);
       b.addEventListener('mousedown', (e) => e.preventDefault());
@@ -373,6 +436,7 @@ export class NagaIME {
     this.searchEl = null;
     this.listEl = null;
     this.target = null;
+    this.docked = false;
   }
 
   private bindField(field: NagaTarget): void {
@@ -473,6 +537,29 @@ export class NagaIME {
       b.classList.toggle('naga-is-active', on);
       b.setAttribute('aria-selected', String(on));
     });
+    this.applyTabLabels();
+  }
+
+  /**
+   * タブの表示名を `docked` と `activeTab` から冪等に決める（設計 §6.1 ②）。
+   * dock 時は非選択タブを一文字にして、タブ帯を 1 行に収める（案 A）。
+   * PC（non-docked）は常に正式名称で、既存の見た目を変えない。
+   * 呼び出し元は renderTabs()（選択が変わるとき）と setDocked()（dock 遷移のとき）の 2 つだけ。
+   */
+  private applyTabLabels(): void {
+    this.tabsEl?.querySelectorAll<HTMLElement>('.naga-tab').forEach((b) => {
+      const id = b.dataset.category as TabId | undefined;
+      if (!id) return;
+      const short = this.docked && id !== this.activeTab;
+      b.textContent = short ? tabShortLabelOf(id) : tabLabelOf(id);
+    });
+  }
+
+  /** dock 状態の遷移を 1 か所で扱う（変化したときだけ表示名を作り直す）。 */
+  private setDocked(next: boolean): void {
+    if (this.docked === next) return;
+    this.docked = next;
+    this.applyTabLabels();
   }
 
   private renderList(): void {
@@ -598,17 +685,30 @@ export class NagaIME {
     // 狭幅（またはソフトキーボードで縮んだ viewport）は下部ドッキング
     if (vw < this.options.dockBreakpoint) {
       pop.classList.add('naga-is-docked');
+      this.setDocked(true);
       style.position = 'fixed';
       style.left = '8px';
       style.right = '8px';
       style.width = 'auto';
       style.top = 'auto';
-      const bottom = vv ? Math.max(0, window.innerHeight - (vv.height + vv.offsetTop)) + 8 : 8;
+      const bottom = vv ? Math.max(0, window.innerHeight - (vv.height + vv.offsetTop)) + DOCK_GAP_PX : DOCK_GAP_PX;
       style.bottom = `${bottom}px`;
+      // 高さは「使える高さ」から逆算する（設計 §3.2）。静的な vh には依らない。
+      // ソフトキーボードが出ている間の残り可視高 = visualViewport.height。
+      const vvAvail = vv ? vv.height : window.innerHeight;
+      const popupMax = Math.max(DOCK_MIN_PX, Math.min(DOCK_POPUP_MAX_PX, vvAvail - DOCK_CONTEXT_MIN_PX));
+      style.maxHeight = `${popupMax}px`;
+      style.setProperty('--naga-dock-max', `${popupMax}px`);
+      style.setProperty('--naga-dock-avail', `${vvAvail}px`);
       return;
     }
 
     pop.classList.remove('naga-is-docked');
+    this.setDocked(false);
+    // dock から戻ったときだけ後片付けする（PC しか使わない場合は最初から未設定のまま）。
+    if (style.maxHeight) style.maxHeight = '';
+    style.removeProperty('--naga-dock-max');
+    style.removeProperty('--naga-dock-avail');
     style.position = 'absolute';
     style.width = `${Math.min(360, vw - 16)}px`;
 

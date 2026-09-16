@@ -103,6 +103,18 @@ export const NAGA_STYLE_TEXT = `
   font-weight: 600;
 }
 
+/*
+ * 読み入力欄の行（是正設計 v2 §5「区別の付け方」）。
+ * PC（non-docked）では display: contents なので、input は従来どおり popup 直下の
+ * flex item として並び、行も高さも増えない。ラベルは PC では出さない。
+ */
+.naga-search-row {
+  display: contents;
+}
+.naga-search-label {
+  display: none;
+}
+
 .naga-search {
   margin: 8px;
   padding: 8px 10px;
@@ -189,15 +201,80 @@ export const NAGA_STYLE_TEXT = `
   background: #fafafa;
 }
 
+/*
+ * モバイル dock（是正設計 v2 §3「使える高さからの逆算」・§4 案 A・§5・§6.2）。
+ * ここから下の規則はすべて .naga-popup.naga-is-docked スコープに閉じる（PC 非影響）。
+ * 高さの静的な viewport 比指定（旧 dock ルールの vh 値）は廃止した。--naga-dock-max は
+ * positionPopup() が visualViewport の実測から毎回設定する（未設定時のみ案 A の既定 224px）。
+ */
 .naga-popup.naga-is-docked {
   border-radius: 12px 12px 0 0;
-  max-height: 45vh;
+  max-height: var(--naga-dock-max, 224px);
 }
+/* 縮むのは内側の list だけ（タブ帯と読み入力欄は潰さない） */
 .naga-popup.naga-is-docked .naga-list {
-  max-height: 30vh;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .naga-popup.naga-is-docked .naga-hint {
   display: none;
+}
+/* タブ帯: 背景と下線で「ヘッダー帯」に見せ、候補領域の白と分ける（高さは増やさない） */
+.naga-popup.naga-is-docked .naga-titlebar {
+  background: #fafafa;
+  border-bottom: 1px solid #e2e2e2;
+}
+.naga-popup.naga-is-docked .naga-tab {
+  padding: 9px 12px;
+  font-size: 15px;
+  line-height: 1.25;
+}
+.naga-popup.naga-is-docked .naga-close {
+  padding: 0 14px;
+}
+/* 読み入力欄: アクセント縦線＋「読み」ラベルで本体の入力欄と見分ける（高さは 1 行のまま） */
+.naga-popup.naga-is-docked .naga-search-row {
+  display: flex;
+  align-items: stretch;
+  flex: none;
+  margin: 6px 8px;
+  border: 1px solid #ccc;
+  border-left: 3px solid var(--naga-accent);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+.naga-popup.naga-is-docked .naga-search-label {
+  display: flex;
+  align-items: center;
+  flex: none;
+  padding: 0 8px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--naga-accent);
+  background: #f3f0fa;
+  border-right: 1px solid #e4dff2;
+}
+.naga-popup.naga-is-docked .naga-search {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  font-size: 16px; /* iOS の focus 時自動ズームを避ける下限 */
+  padding: 7px 10px;
+}
+.naga-popup.naga-is-docked .naga-search:focus {
+  outline-offset: -2px;
+}
+/* 候補行: 44px/行（設計 §3.3）。max-height 224px で 3 件強が見える */
+.naga-popup.naga-is-docked .naga-item {
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 5px 10px;
 }
 `;
 

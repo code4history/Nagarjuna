@@ -10,15 +10,21 @@ import type { NagaCandidate, NagaCategoryId } from './types';
 export interface NagaCategoryDef {
   id: NagaCategoryId;
   label: string;
+  /**
+   * 幅の無いモバイル dock で使う一文字表記（是正設計 v2 §4 案 A・§6.1 ②）。
+   * `label` の先頭文字で導出せず明示する（'組文字'→'組' は成立するが 'recent'→'近' は
+   * 先頭文字では作れず、導出と明示が混在すると出どころが二つになるため）。
+   */
+  short: string;
 }
 
 /** タブの既定順（PoC と同じ）。'recent' は NagaIME 側で先頭に足す。 */
 export const NAGA_CATEGORIES: readonly NagaCategoryDef[] = [
-  { id: 'hentaigana', label: '変体仮名' },
-  { id: 'siddham', label: '悉曇' },
-  { id: 'buddha', label: '仏名' },
-  { id: 'itaiji', label: '異体字' },
-  { id: 'kumimoji', label: '組文字' },
+  { id: 'hentaigana', label: '変体仮名', short: '変' },
+  { id: 'siddham', label: '悉曇', short: '悉' },
+  { id: 'buddha', label: '仏名', short: '仏' },
+  { id: 'itaiji', label: '異体字', short: '異' },
+  { id: 'kumimoji', label: '組文字', short: '組' },
 ];
 
 export type NagaDictionary = ReadonlyMap<NagaCategoryId, readonly NagaCandidate[]>;

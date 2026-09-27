@@ -3,7 +3,7 @@
 このプロジェクトの主な変更を記録します。版数は [Semantic Versioning](https://semver.org/) に従います。
 Notable changes to this project are documented here. This project follows [Semantic Versioning](https://semver.org/).
 
-## 1.1.0
+## [1.1.0-rc.1] - 2026-09-28
 
 ### 追加 / Added
 

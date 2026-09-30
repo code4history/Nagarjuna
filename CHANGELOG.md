@@ -3,6 +3,13 @@
 このプロジェクトの主な変更を記録します。版数は [Semantic Versioning](https://semver.org/) に従います。
 Notable changes to this project are documented here. This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.1.0-rc.2] - 2026-10-01
+
+### 変更 / Changed
+
+- デモのトップ（`index.html`）を NagaIME にし、非推奨の旧 `IMEManager` / `<ime-ui>` のデモを `legacy.html` へ移しました。旧 URL の `naga.html` はトップへ転送します。 / The demo top page is now NagaIME; the deprecated legacy `IMEManager` / `<ime-ui>` demo moved to `legacy.html`, and `naga.html` redirects to the top page.
+- テスト: 負荷の高い環境で時間切れになっていた legacy 警告のテストに、個別の時間制限を付けました（公開 API への影響はありません）。 / Test: gave the legacy-warning test its own timeout (no public API impact).
+
 ## [1.1.0-rc.1] - 2026-09-28
 
 ### 追加 / Added

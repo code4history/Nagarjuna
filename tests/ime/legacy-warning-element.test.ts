@@ -12,7 +12,8 @@ import { describe, it, expect, vi } from 'vitest';
 const DEPRECATION_PREFIX = '[nagarjuna] DEPRECATED:';
 
 describe('<ime-ui> の直接接続による非推奨警告（AC4 ②）', () => {
-  it('vi.resetModules() 後に <ime-ui> を body へ接続するだけで 1 回、2 個目の接続では増えない', async () => {
+  // vi.resetModules() 後の動的 import はモジュールを評価し直すため、負荷の高い環境では既定の 1000ms を超える（2026-10-01 に時間切れで揺れた）
+  it('vi.resetModules() 後に <ime-ui> を body へ接続するだけで 1 回、2 個目の接続では増えない', { timeout: 10_000 }, async () => {
     vi.resetModules();
     expect(window.customElements.get('ime-ui')).toBeUndefined();
     const warn = vi.spyOn(console, 'warn');

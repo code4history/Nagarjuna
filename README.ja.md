@@ -29,8 +29,8 @@ pnpm add nagarjuna
 
 ### 動作デモ
 
-- NagaIME: https://code4history.dev/Nagarjuna/
-- `IMEManager` / `<ime-ui>`: https://code4history.dev/Nagarjuna/legacy.html
+- IME のデモ（`IMEManager` / `<ime-ui>`）: https://code4history.dev/Nagarjuna/
+- 次のトレインで公開予定の新しい IME UI のプレビュー（API は公開されておらず、変更される可能性があります）: https://code4history.dev/Nagarjuna/naga.html
 
 ### 表示用途のみ（フォントローダー）
 

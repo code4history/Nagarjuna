@@ -2,17 +2,14 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>龍樹(Nagarjuna) NagaIME デモ</title>
-  <link rel="icon" type="image/png" sizes="196x196" href="icons/favicon-196.png">
-  <link rel="apple-touch-icon" href="icons/apple-icon-180.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>龍樹(Nagarjuna)歴史調査文字IMEデモ</title>
   <style>
     body {
-      font-family: system-ui, -apple-system, sans-serif;
-      max-width: 760px;
+      font-family: sans-serif;
+      max-width: 800px;
       margin: 0 auto;
-      padding: 20px 16px 40vh; /* 下部ドッキングの確認用に余白 */
-      color: #333;
+      padding: 20px;
     }
 
     @font-face {
@@ -24,67 +21,96 @@
       font-family: "Genkai";
     }
 
-    h1 { font-size: 1.4rem; }
-    .lead { color: #888; font-size: 0.9rem; }
-    .note {
-      background: #f4f1fa;
-      border-left: 4px solid #5b4a8a;
-      padding: 10px 14px;
-      font-size: 0.85rem;
-      line-height: 1.7;
-      margin: 16px 0 24px;
+    .input-area {
+      margin: 20px 0;
     }
-    .note code { background: #fff; padding: 1px 4px; border-radius: 3px; }
-    .field { margin: 28px 0; }
-    .field label {
-      display: block;
-      font-size: 0.85rem;
-      color: #666;
-      margin-bottom: 6px;
-    }
-    .field input, .field textarea {
+
+    .input-area input,
+    .input-area textarea {
       width: 100%;
-      box-sizing: border-box;
-      padding: 10px;
+      padding: 8px;
       font-size: 16px;
-      border: 1px solid #bbb;
-      border-radius: 6px;
+      margin-top: 8px;
     }
-    .plain-note { font-size: 0.75rem; color: #999; }
-    .links { font-size: 0.85rem; }
+
+    .options {
+      margin: 20px 0;
+      padding: 16px;
+      background: #f5f5f5;
+      border-radius: 4px;
+    }
+
+    .option-item {
+      margin: 8px 0;
+    }
   </style>
+  <link rel="icon" type="image/png" sizes="196x196" href="icons/favicon-196.png">
+  <link rel="apple-touch-icon" href="icons/apple-icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-2048-2732.jpg" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-2732-2048.jpg" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-1668-2388.jpg" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-2388-1668.jpg" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-1536-2048.jpg" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-2048-1536.jpg" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-1668-2224.jpg" media="(device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-2224-1668.jpg" media="(device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-1620-2160.jpg" media="(device-width: 810px) and (device-height: 1080px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-2160-1620.jpg" media="(device-width: 810px) and (device-height: 1080px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-1284-2778.jpg" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-2778-1284.jpg" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-1170-2532.jpg" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-2532-1170.jpg" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-1125-2436.jpg" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-2436-1125.jpg" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-1242-2688.jpg" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-2688-1242.jpg" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-828-1792.jpg" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-1792-828.jpg" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-1242-2208.jpg" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-2208-1242.jpg" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-750-1334.jpg" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-1334-750.jpg" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-640-1136.jpg" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+  <link rel="apple-touch-startup-image" href="icons/apple-splash-1136-640.jpg" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
 </head>
 <body>
-  <h1><span class="genkai">龍樹(Nagarjuna)</span>: NagaIME デモ</h1>
+  <h1><span class="genkai">龍樹(Nagarjuna)</span>: 歴史的文字IMEデモ</h1>
   <span class="lead">Ver. <span id="version"></span></span>
-  <p class="lead"><a href="./legacy.html">旧 IMEManager / &lt;ime-ui&gt; のデモ（非推奨）はこちら</a></p>
-
-  <div class="note">
-    <strong>使い方</strong><br>
-    ① 下の入力欄にフォーカスすると、欄の右上に小さな <code>梵</code> ボタンが出ます（普段はそれだけで、通常の入力は妨げません）。<br>
-    ② 特殊文字を入れたくなったら <code>梵</code> ボタンを押すか <code>Ctrl+J</code>（Mac は <code>⌘J</code>）。<br>
-    ③ ポップアップで読みを入力 → <code>↑↓</code> かタップで選択 → <code>Enter</code> でキャレット位置に確定（連続入力できます）。<code>Esc</code> で閉じます。<br>
-    ④ 説明文でも探せます（例: 異体字タブで「時」と入力）。<code>1</code>〜<code>9</code> キーで直接選択もできます。
+  <p><a href="./naga.html">新 UI のプレビュー（次のトレインで公開予定の新しい IME UI。API は非公開）</a></p>
+  <div class="options">
+    <h2>有効な文字体系</h2>
+    <div class="option-item">
+      <label>
+        <input type="checkbox" id="hentaigana" checked> 変体仮名
+      </label>
+    </div>
+    <div class="option-item">
+      <label>
+        <input type="checkbox" id="siddham" checked> 悉曇文字
+      </label>
+    </div>
+    <div class="option-item">
+      <label>
+        <input type="checkbox" id="itaiji" checked> 異体字
+      </label>
+    </div>
+    <div class="option-item">
+      <label>
+        <input type="checkbox" id="buddha_name"> 仏名（悉曇文字）
+      </label>
+    </div>
   </div>
 
-  <div class="field">
-    <label for="naga-field-1">入力テスト1（input・NagaIME 有効）</label>
-    <input type="text" id="naga-field-1" class="naga-target" placeholder="普通の日本語入力はそのまま。特殊文字だけ Ctrl+J で">
+  <div class="input-area">
+    <label for="input1">入力テスト1（input）：</label>
+    <input type="text" id="input1" class="ime-enabled">
   </div>
 
-  <div class="field">
-    <label for="naga-field-2">入力テスト2（textarea・NagaIME 有効）</label>
-    <textarea id="naga-field-2" class="naga-target" rows="5" placeholder="石仏の銘文を写す想定"></textarea>
+  <div class="input-area">
+    <label for="input2">入力テスト2（textarea）：</label>
+    <textarea id="input2" class="ime-enabled" rows="4"></textarea>
   </div>
-
-  <div class="field">
-    <label for="naga-field-3">入力テスト3（NagaIME <strong>無効</strong>の普通の欄）</label>
-    <input type="text" id="naga-field-3" placeholder="ここには梵ボタンが出ません">
-    <p class="plain-note">※ .naga-target を付けた欄にだけ起動ボタンが出ます</p>
-  </div>
-
-  <p class="links">従来の IMEManager（1.1.0 で非推奨）のデモは <a href="./index.html">index.html</a> にあります。</p>
-
-  <script type="module" src="./src/naga-demo.ts"></script>
+  <script type="module" src="./src/demo.ts"></script>
 </body>
 </html>

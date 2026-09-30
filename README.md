@@ -31,8 +31,8 @@ pnpm add nagarjuna
 
 ### Live demo
 
-- NagaIME: https://code4history.dev/Nagarjuna/
-- `IMEManager` / `<ime-ui>`: https://code4history.dev/Nagarjuna/legacy.html
+- IME demo (`IMEManager` / `<ime-ui>`): https://code4history.dev/Nagarjuna/
+- Preview of the new IME UI planned for the next release train (its API is not public yet and may change): https://code4history.dev/Nagarjuna/naga.html
 
 ### Display only (font loader)
 

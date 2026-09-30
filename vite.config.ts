@@ -29,10 +29,11 @@ export default defineConfig({
         emptyOutDir: true,
         rollupOptions: {
           input: {
-            // NagaIME の demo（oct26-m7-t1）がトップ。root に追跡ファイルとして置く（public/ だと変換されない）
+            // トップ: 正式な IME（IMEManager / <ime-ui>）の demo（src/demo.ts）。
+            // root に追跡ファイルとして置く（public/ だと変換されない。かつての deploy 時コピーは廃止）
             main: resolve(__dirname, 'index.html'),
-            // 旧 IMEManager / <ime-ui> の demo（1.1.0 で非推奨）
-            legacy: resolve(__dirname, 'legacy.html')
+            // 次トレインで公開予定の新 IME UI（NagaIME）のプレビュー（src/naga-demo.ts。API は非公開）
+            naga: resolve(__dirname, 'naga.html')
           },
           output: {
             entryFileNames: 'assets/[name].[hash].js',

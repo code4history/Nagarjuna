@@ -30,7 +30,7 @@ pnpm add nagarjuna
 ### 動作デモ
 
 - NagaIME: https://code4history.dev/Nagarjuna/
-- 従来の `IMEManager`（非推奨）: https://code4history.dev/Nagarjuna/legacy.html
+- `IMEManager` / `<ime-ui>`: https://code4history.dev/Nagarjuna/legacy.html
 
 ### 表示用途のみ（フォントローダー）
 
@@ -89,9 +89,9 @@ ime.destroy();
 
 注意: `nagarjuna/ime` を import すると、`NagaIME` だけを使う場合でも legacy の `<ime-ui>` custom element が登録されます。同一の input / textarea に `IMEManager` と `NagaIME` を同時に attach する使い方はサポートしません。
 
-### 従来の IME（IMEManager）— 非推奨
+### IME機能を使用（IMEManager）
 
-`IMEManager`、`IIMEManager`、`IMEOptions`、`IMEAttachOptions`、`onChange`、`updateOptions`、および legacy custom element `<ime-ui>` は **1.1.0 で非推奨**になりました。1.1.0 では動作を変えずに維持し、**2.0.0 でも維持**し、**3.0.0 で削除予定**です。`IMEManager` または `<ime-ui>` を使用すると、同一プロセスで 1 回だけ `console.warn` に非推奨警告（`[nagarjuna] DEPRECATED: …`）を出力します。1.1.0 にこの警告の抑止オプションはありません。新規実装では `NagaIME` と `input` イベントを使用してください。
+入力機能が必要な場合:
 
 ```javascript
 import { IMEManager } from 'nagarjuna/ime';

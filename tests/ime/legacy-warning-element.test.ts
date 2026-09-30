@@ -1,19 +1,20 @@
 /**
- * AC4 ②: <ime-ui> を直接生成・接続するだけでも、非推奨警告が同一 process で 1 回だけ出る。
+ * <ime-ui> を直接生成・接続しても console.warn を出さない。
  *
- * oct26-m7-t1 設計 v4 §5.6.2 Minor-G により legacy-manager.test.ts から分離した。
+ * 1.1.0-rc.1 では IMEManager / <ime-ui> を非推奨とし、接続時に 1 回だけ警告していた。
+ * 1.1.0-rc.3 で非推奨化を取り消した（正式な IME は従来どおり IMEManager / <ime-ui>）ため、
+ * 警告が出ないことを検査する。
+ *
  * customElements の registry は vi.resetModules() で消えず、ui.ts の登録 guard
  * （既登録なら define しない）があるため、同じファイルで IMEManager を先に使うと
- * 接続される要素は古いモジュールの guard を通り、警告が 0 回になる（実装時に試作で再現）。
- * vitest はテストファイルごとに環境を分けるので、ここでは registry が空の状態から始まる。
+ * 新しいモジュールの connectedCallback を通らない。vitest はテストファイルごとに環境を
+ * 分けるので、ここでは registry が空の状態から始まる。
  */
 import { describe, it, expect, vi } from 'vitest';
 
-const DEPRECATION_PREFIX = '[nagarjuna] DEPRECATED:';
-
-describe('<ime-ui> の直接接続による非推奨警告（AC4 ②）', () => {
+describe('<ime-ui> の直接接続では警告を出さない', () => {
   // vi.resetModules() 後の動的 import はモジュールを評価し直すため、負荷の高い環境では既定の 1000ms を超える（2026-10-01 に時間切れで揺れた）
-  it('vi.resetModules() 後に <ime-ui> を body へ接続するだけで 1 回、2 個目の接続では増えない', { timeout: 10_000 }, async () => {
+  it('vi.resetModules() 後に <ime-ui> を body へ 2 個接続しても console.warn は 0 回', { timeout: 10_000 }, async () => {
     vi.resetModules();
     expect(window.customElements.get('ime-ui')).toBeUndefined();
     const warn = vi.spyOn(console, 'warn');
@@ -21,21 +22,19 @@ describe('<ime-ui> の直接接続による非推奨警告（AC4 ②）', () => 
 
     await import('@/lib/ime/ui');
     expect(window.customElements.get('ime-ui')).toBeTypeOf('function');
-    // import（登録）だけでは警告しない
-    const count = () =>
-      warn.mock.calls.filter(
-        (args: unknown[]) => typeof args[0] === 'string' && (args[0] as string).startsWith(DEPRECATION_PREFIX)
-      ).length;
-    expect(count()).toBe(0);
 
     const first = document.createElement('ime-ui');
-    expect(count()).toBe(0); // 生成だけでは出さない（接続で出す）
+    // 生成だけでは描画しない（connectedCallback で描画する）
+    expect(first.shadowRoot!.querySelector('.ime-container')).toBeNull();
     document.body.appendChild(first);
-    expect(count()).toBe(1);
+    // 接続で connectedCallback が走った（描画された）ことを確かめてから数える
+    expect(first.shadowRoot!.querySelector('.ime-container')).not.toBeNull();
 
     const second = document.createElement('ime-ui');
     document.body.appendChild(second);
-    expect(count()).toBe(1);
+    expect(second.shadowRoot!.querySelector('.ime-container')).not.toBeNull();
+
+    expect(warn).not.toHaveBeenCalled();
 
     first.remove();
     second.remove();

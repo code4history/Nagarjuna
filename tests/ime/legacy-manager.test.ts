@@ -1,22 +1,14 @@
 /**
  * legacy IME（IMEManager / IMEOptions / onChange / updateOptions / <ime-ui>）の契約テスト。
  *
- * oct26-m7-t1（設計 v4 §5.3.2 AC1・AC3-d・AC4 ①）。1.1.0 で非推奨化するが、動作契約は
- * 1.0.0 のまま維持する。src/demo.ts と同じ呼出し順（resetInstance → getInstance →
+ * oct26-m7-t1（設計 v4 §5.3.2 AC1・AC3-d）。動作契約は 1.0.0 のまま維持する。
+ * 1.1.0-rc.1 で入れた非推奨化（console.warn）は 1.1.0-rc.3 で取り消した ∴ 警告が出ないことも検査する。
+ * src/demo.ts と同じ呼出し順（resetInstance → getInstance →
  * focus で attach(element, { options }) → updateOptions）で検証する。
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { IMEManager, NagaIME } from '@/ime';
 import type { IMEOptions, IMEAttachOptions, IIMEManager, NagaIMEOptions } from '@/ime';
-
-const DEPRECATION_PREFIX = '[nagarjuna] DEPRECATED:';
-
-/** console.warn の呼出しのうち、非推奨警告だけを数える（既存 ui.ts の 'Search failed:' を除外）。 */
-function countDeprecationWarnings(spy: ReturnType<typeof vi.spyOn>): number {
-  return spy.mock.calls.filter(
-    (args: unknown[]) => typeof args[0] === 'string' && (args[0] as string).startsWith(DEPRECATION_PREFIX)
-  ).length;
-}
 
 type LegacyUI = HTMLElement & { updatePosition?: unknown; updateOptions?: unknown };
 
@@ -61,7 +53,7 @@ describe('legacy IMEManager の契約（1.0.0 と同じ動作）', () => {
   });
 
   it(
-    'demo と同じ順序で attach / updateOptions / onChange / detach が動き、<ime-ui> が昇格し、非推奨警告は 1 回だけ（AC3-d・AC4 ①）',
+    'demo と同じ順序で attach / updateOptions / onChange / detach が動き、<ime-ui> が昇格し、console.warn は 0 回（AC3-d）',
     async () => {
       const warn = vi.spyOn(console, 'warn');
       vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -113,19 +105,14 @@ describe('legacy IMEManager の契約（1.0.0 と同じ動作）', () => {
       manager.detach();
       expect(findImeUI()).toBeNull();
 
-      // 再 attach でも警告は増えない
+      // 再 attach
       manager.attach(input, { options });
       expect(findImeUI()).not.toBeNull();
       manager.detach();
       expect(findImeUI()).toBeNull();
 
-      expect(countDeprecationWarnings(warn)).toBe(1);
-      const message = warn.mock.calls.find(
-        (args: unknown[]) => typeof args[0] === 'string' && (args[0] as string).startsWith(DEPRECATION_PREFIX)
-      )![0];
-      expect(message).toBe(
-        '[nagarjuna] DEPRECATED: IMEManager and <ime-ui> are deprecated since 1.1.0 and will be removed in 3.0.0. Use NagaIME instead.'
-      );
+      // 非推奨化は取り消した ∴ getInstance()・<ime-ui> の接続・再 attach のいずれでも警告しない
+      expect(warn).not.toHaveBeenCalled();
       input.remove();
     },
     8000

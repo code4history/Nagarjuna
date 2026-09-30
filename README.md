@@ -32,7 +32,7 @@ pnpm add nagarjuna
 ### Live demo
 
 - NagaIME: https://code4history.dev/Nagarjuna/
-- Legacy `IMEManager` (deprecated): https://code4history.dev/Nagarjuna/legacy.html
+- `IMEManager` / `<ime-ui>`: https://code4history.dev/Nagarjuna/legacy.html
 
 ### Display only (font loader)
 
@@ -91,9 +91,9 @@ ime.destroy();
 
 Note: importing `nagarjuna/ime` also registers the legacy `<ime-ui>` custom element, even if you only use `NagaIME`. Attaching both `IMEManager` and `NagaIME` to the same input / textarea is not supported.
 
-### Legacy IME (IMEManager) — deprecated
+### Using the IME (IMEManager)
 
-`IMEManager`, `IIMEManager`, `IMEOptions`, `IMEAttachOptions`, `onChange`, `updateOptions` and the legacy custom element `<ime-ui>` are **deprecated since 1.1.0**. They keep working unchanged in 1.1.0, will **still be kept in 2.0.0**, and are **scheduled for removal in 3.0.0**. Using `IMEManager` or `<ime-ui>` prints a deprecation warning once per process via `console.warn` (`[nagarjuna] DEPRECATED: …`); 1.1.0 has no option to suppress it. Please use `NagaIME` and the `input` event for new code.
+When you also need input:
 
 ```javascript
 import { IMEManager } from 'nagarjuna/ime';

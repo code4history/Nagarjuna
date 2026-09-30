@@ -13,8 +13,6 @@ import { FontLoader } from '@/lib/fonts/loader';
 // 高負荷時に偽の赤になる（実装レビュー Round 1 Minor-1）。legacy-manager.test.ts と同じく個別に 8000ms を与える。
 const DICTIONARY_TEST_TIMEOUT_MS = 8000;
 
-const DEPRECATION_PREFIX = '[nagarjuna] DEPRECATED:';
-
 function key(type: 'keydown', init: KeyboardEventInit): KeyboardEvent {
   return new KeyboardEvent(type, { bubbles: true, cancelable: true, ...init });
 }
@@ -397,8 +395,8 @@ describe('NagaIME', () => {
   }, DICTIONARY_TEST_TIMEOUT_MS);
 });
 
-describe('NagaIME だけの利用では非推奨警告を出さない（AC4 ③）', () => {
-  it('vi.resetModules() 後に nagarjuna/ime から NagaIME だけを使って attach / 入力 / detach しても 0 回', async () => {
+describe('NagaIME だけの利用では console.warn を出さない（AC4 ③）', () => {
+  it('vi.resetModules() 後に NagaIME だけを使って attach / 入力 / detach しても 0 回', async () => {
     vi.resetModules();
     const warn = vi.spyOn(console, 'warn');
     const { NagaIME: FreshNagaIME } = await import('@/ime');
@@ -414,10 +412,7 @@ describe('NagaIME だけの利用では非推奨警告を出さない（AC4 ③�
     search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
     local.detach(target);
     target.remove();
-    const deprecations = warn.mock.calls.filter(
-      (args: unknown[]) => typeof args[0] === 'string' && (args[0] as string).startsWith(DEPRECATION_PREFIX)
-    );
-    expect(deprecations).toHaveLength(0);
+    expect(warn).not.toHaveBeenCalled();
     warn.mockRestore();
   }, DICTIONARY_TEST_TIMEOUT_MS);
 });

@@ -36,9 +36,6 @@ export interface NagaIMEOptions {
   loadFonts?: boolean;
 }
 
-/**
- * @deprecated 1.1.0 で非推奨・2.0.0 で維持・3.0.0 で削除予定。`NagaIMEOptions`（NagaIME 専用）を使用してください。
- */
 export interface IMEOptions {
   enabledTypes: {
     hentaigana?: boolean;
@@ -48,23 +45,15 @@ export interface IMEOptions {
   };
 }
   
-/**
- * @deprecated 1.1.0 で非推奨・2.0.0 で維持・3.0.0 で削除予定。`NagaIMEOptions`（NagaIME 専用）を使用してください。
- */
 export interface IMEAttachOptions {
   options?: IMEOptions;
   position?: 'bottom' | 'cursor';
-  /** @deprecated 1.1.0 で非推奨・3.0.0 で削除予定。対象 input / textarea の bubbles `input` event を購読してください。 */
   onChange?: (value: string) => void;
 }
   
 // IMEManagerのパブリックインターフェース
-/**
- * @deprecated 1.1.0 で非推奨・2.0.0 で維持・3.0.0 で削除予定。`NagaIME` を使用してください。
- */
 export interface IIMEManager {
   attach(element: HTMLInputElement | HTMLTextAreaElement, options?: IMEAttachOptions): void;
   detach(): void;
-  /** @deprecated 1.1.0 で非推奨・3.0.0 で削除予定。 */
   updateOptions(options: IMEOptions): void;
 }

@@ -1,6 +1,6 @@
 import { NagaIME } from './ime';
 
-// NagaIME の人間検証用 demo（naga.html）。legacy の src/demo.ts とは独立している。
+// NagaIME の人間検証用 demo（トップの index.html。旧 URL の naga.html はここへ転送する）。legacy の src/demo.ts とは独立している。
 const version = document.getElementById('version');
 if (version) version.textContent = import.meta.env.APP_VERSION;
 
@@ -10,7 +10,7 @@ ime.attach('.naga-target');
 
 /*
  * 実測用の読み取り（oct26-m7-t1 是正設計 v2 §9「要実測一覧」）。
- * `naga.html?debugViewport=1` のときだけ、ソフトキーボード表示中の
+ * `index.html?debugViewport=1`（旧 `naga.html?debugViewport=1` も転送される）のときだけ、ソフトキーボード表示中の
  * visualViewport の値と popup の占有高さを画面に出す。人間が実機で数値を読み上げる。
  * 既定（query 無し）では何も作らないので、通常のデモ・配布物の見た目は変わらない。
  */

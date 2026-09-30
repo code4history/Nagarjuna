@@ -29,7 +29,7 @@
     "dev": "pnpm run build:dictionary && vite",
     "build": "pnpm run build:dictionary && tsc --noEmit && cross-env BUILD_MODE=package vite build",
     "build:dictionary": "tsx scripts/build-dictionary.ts",
-    "deploy": "pnpm run build:dictionary && cp public/index.html index.html && tsc && vite build",
+    "deploy": "pnpm run build:dictionary && tsc && vite build",
     "pretest": "pnpm run build:dictionary",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

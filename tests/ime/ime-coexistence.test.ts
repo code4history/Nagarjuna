@@ -11,10 +11,16 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 // 高負荷時に偽の赤になる（実装レビュー Round 1 Minor-1）。legacy-manager.test.ts と同じく個別に 8000ms を与える。
 const DICTIONARY_TEST_TIMEOUT_MS = 8000;
 
-type ImeModule = typeof import('@/ime');
-
-async function loadIme(): Promise<ImeModule> {
-  return import('@/ime');
+/**
+ * 公開エントリ（@/ime）の IMEManager と、ソース直の NagaIME を読む。
+ * NagaIME は 1.1.0 の公開 API に含めない（新 UI のプレビュー）ため @/ime からは得られない。
+ */
+async function loadIme(): Promise<{
+  IMEManager: typeof import('@/ime').IMEManager;
+  NagaIME: typeof import('@/lib/ime/naga-ime').NagaIME;
+}> {
+  const [{ IMEManager }, { NagaIME }] = await Promise.all([import('@/ime'), import('@/lib/ime/naga-ime')]);
+  return { IMEManager, NagaIME };
 }
 
 /** CSS テキストから規則のセレクタを取り出す（@media 等の at-rule の prelude は除く）。 */

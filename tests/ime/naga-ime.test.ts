@@ -399,7 +399,7 @@ describe('NagaIME だけの利用では console.warn を出さない（AC4 ③�
   it('vi.resetModules() 後に NagaIME だけを使って attach / 入力 / detach しても 0 回', async () => {
     vi.resetModules();
     const warn = vi.spyOn(console, 'warn');
-    const { NagaIME: FreshNagaIME } = await import('@/ime');
+    const { NagaIME: FreshNagaIME } = await import('@/lib/ime/naga-ime');
     const target = document.createElement('input');
     document.body.appendChild(target);
     const local = new FreshNagaIME();

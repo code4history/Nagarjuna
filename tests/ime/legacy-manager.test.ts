@@ -7,8 +7,9 @@
  * focus で attach(element, { options }) → updateOptions）で検証する。
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { IMEManager, NagaIME } from '@/ime';
-import type { IMEOptions, IMEAttachOptions, IIMEManager, NagaIMEOptions } from '@/ime';
+import * as imeEntry from '@/ime';
+import { IMEManager } from '@/ime';
+import type { IMEOptions, IMEAttachOptions, IIMEManager } from '@/ime';
 
 type LegacyUI = HTMLElement & { updatePosition?: unknown; updateOptions?: unknown };
 
@@ -39,17 +40,20 @@ describe('legacy IMEManager の契約（1.0.0 と同じ動作）', () => {
     vi.restoreAllMocks();
   });
 
-  it('旧 export と型、および NagaIME の追加 export が @/ime から得られる（AC1）', () => {
+  it('旧 export と型が @/ime から得られる（AC1）', () => {
     const options: IMEOptions = { enabledTypes: { hentaigana: true } };
     const attachOptions: IMEAttachOptions = { options, position: 'bottom' };
-    const naga: NagaIMEOptions = {};
     const asInterface: (m: IMEManager) => IIMEManager = (m) => m;
     expect(typeof IMEManager.getInstance).toBe('function');
     expect(typeof IMEManager.resetInstance).toBe('function');
-    expect(typeof NagaIME).toBe('function');
     expect(attachOptions.options).toBe(options);
-    expect(naga).toEqual({});
     expect(typeof asInterface).toBe('function');
+  });
+
+  it('NagaIME は公開 API（@/ime = nagarjuna/ime のエントリ）に無い（1.1.0 では新 UI のプレビューとしてデモでのみ使う）', () => {
+    // 値の export は 1.0.0 と同じ IMEManager だけ（型は実行時に存在しない）
+    expect(Object.keys(imeEntry).sort()).toEqual(['IMEManager']);
+    expect('NagaIME' in imeEntry).toBe(false);
   });
 
   it(

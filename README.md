@@ -19,7 +19,7 @@ This repository is a JavaScript library that makes those characters easier to ha
 - Siddham script (using Noto Sans Siddham)
 - Kanji variant forms (using Noto Sans JP)
 - Automatic font loading
-- Mobile-friendly IME (`NagaIME`: an on-demand special-character picker, added in 1.1.0)
+- Mobile-friendly IME
 
 ## Installation
 
@@ -59,39 +59,7 @@ element.style.fontFamily = fontLoader.getFontFamilyString({
 });
 ```
 
-### Using the IME (NagaIME)
-
-When you also need input, attach `NagaIME` to your input / textarea elements:
-
-```javascript
-import { NagaIME } from 'nagarjuna/ime';
-
-const ime = new NagaIME();
-
-// Attach to elements (a CSS selector, an element, or a list of elements)
-ime.attach('.naga-target');
-
-// React to inserted characters with the standard, bubbling `input` event
-document.querySelector('.naga-target').addEventListener('input', (event) => {
-  console.log(event.target.value);
-});
-
-// Detach from one element, or from all elements and clean up the DOM
-ime.detach(document.querySelector('.naga-target'));
-ime.destroy();
-```
-
-- Focusing a field shows only a small trigger button; normal typing is never intercepted.
-- Open the picker with the trigger button or **Ctrl+J / Cmd+J**. Search by reading (hiragana) or by description (e.g. `時` in the Itai-ji tab), pick with ↑↓ / Enter / Tab / click / 1–9, and close with Esc.
-- The character is inserted at the caret with `setRangeText()` and a bubbling `input` event is dispatched; the picker stays open for continuous input.
-- Tabs: Recent, Hentai-kana, Siddham, Buddha names, Itai-ji, Kumi-moji. Recently used characters are kept in `localStorage`.
-- The dictionary is bundled with the package (no network fetch). Fonts are loaded with `FontLoader`.
-- On narrow viewports (< 560px) the picker docks to the bottom of the screen.
-- Options (all optional): `categories`, `triggerLabel`, `shortcut`, `recentStorageKey` (`null` disables persistence), `recentMax`, `maxCandidates`, `dockBreakpoint`, `loadFonts`.
-
-Note: importing `nagarjuna/ime` also registers the legacy `<ime-ui>` custom element, even if you only use `NagaIME`. Attaching both `IMEManager` and `NagaIME` to the same input / textarea is not supported.
-
-### Using the IME (IMEManager)
+### Using the IME
 
 When you also need input:
 

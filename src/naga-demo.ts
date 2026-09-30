@@ -1,4 +1,5 @@
-import { NagaIME } from './ime';
+// NagaIME は 1.1.0 の公開 API（nagarjuna/ime）に含めない ∴ ソースを直接 import する
+import { NagaIME } from './lib/ime/naga-ime';
 
 // NagaIME の人間検証用 demo（トップの index.html。旧 URL の naga.html はここへ転送する）。legacy の src/demo.ts とは独立している。
 const version = document.getElementById('version');

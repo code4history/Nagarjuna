@@ -3,6 +3,12 @@
 このプロジェクトの主な変更を記録します。版数は [Semantic Versioning](https://semver.org/) に従います。
 Notable changes to this project are documented here. This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-10-05
+
+1.1.0-rc.3 と同じ内容の正式版です（版番号のみ変更）。変更点は 1.1.0-rc.3 までの各項を参照してください。
+
+The stable release with the same content as 1.1.0-rc.3 (version number only). See the entries up to 1.1.0-rc.3 for the changes.
+
 ## [1.1.0-rc.3] - 2026-10-01
 
 1.1.0 の位置づけを変更しました。**正式な IME は従来どおり `IMEManager` / `<ime-ui>` です。** 新しい IME UI（`NagaIME`）は次のトレインで公開する予定で、1.1.0 ではデモ上のプレビューとしてのみ提供します（API は公開しません）。1.1.0-rc.1 に記載した内容のうち、`NagaIME` の追加（「追加」）と legacy IME の非推奨化（「非推奨」）は、この版で取り消しました。1.1.0-rc.2 は npm に公開していません（欠番）。

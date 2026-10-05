@@ -22,7 +22,7 @@
 import { FontLoader } from '../fonts/loader';
 import { fontFamilies } from '../fonts/styles';
 import type { FontSettings } from '../fonts/types';
-import type { NagaCandidate, NagaCategoryId, NagaIMEOptions } from './types';
+import type { NagaCandidate, NagaCategoryId, NagaIMEOptions } from './naga-types';
 import { NAGA_CATEGORIES, loadNagaDictionary, searchNagaCandidates, type NagaDictionary } from './naga-dictionary';
 import { ensureNagaStyle } from './naga-styles';
 

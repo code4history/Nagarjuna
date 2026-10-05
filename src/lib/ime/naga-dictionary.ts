@@ -5,7 +5,7 @@
  * カテゴリ別の候補を導出する。HTTP fetch・PoC の baseUrl は持たない（offline / CSP / file:// の
  * 既存 bundle 利用を壊さない）。legacy の `<ime-ui>` と同じく動的 import で読み、同じ chunk を共有する。
  */
-import type { NagaCandidate, NagaCategoryId } from './types';
+import type { NagaCandidate, NagaCategoryId } from './naga-types';
 
 export interface NagaCategoryDef {
   id: NagaCategoryId;

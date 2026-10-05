@@ -1,7 +1,7 @@
 {
   "name": "nagarjuna",
   "description": "Nagarjuna (龍樹): Tool for Bijakshara (種子), Hentai-kana (変体仮名), Itai-ji (異体字), Kumi-moji (組み文字)",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "private": false,
   "main": "./dist/nagarjuna.cjs",
@@ -29,7 +29,7 @@
     "dev": "pnpm run build:dictionary && vite",
     "build": "pnpm run build:dictionary && tsc --noEmit && cross-env BUILD_MODE=package vite build",
     "build:dictionary": "tsx scripts/build-dictionary.ts",
-    "deploy": "pnpm run build:dictionary && cp public/index.html index.html && tsc && vite build",
+    "deploy": "pnpm run build:dictionary && tsc && vite build",
     "pretest": "pnpm run build:dictionary",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

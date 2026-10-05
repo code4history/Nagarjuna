@@ -1,6 +1,7 @@
-import { NagaIME } from './ime';
+// 次トレインで公開予定の新 IME UI（NagaIME）のプレビュー demo（naga.html）。トップ（index.html）の src/demo.ts とは独立している。
+// NagaIME は 1.1.0 の公開 API（nagarjuna/ime）に含めない ∴ ソースを直接 import する
+import { NagaIME } from './lib/ime/naga-ime';
 
-// NagaIME の人間検証用 demo（naga.html）。legacy の src/demo.ts とは独立している。
 const version = document.getElementById('version');
 if (version) version.textContent = import.meta.env.APP_VERSION;
 

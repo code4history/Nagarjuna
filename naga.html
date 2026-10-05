@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>龍樹(Nagarjuna) NagaIME デモ</title>
+  <title>龍樹(Nagarjuna) 新 IME UI プレビュー（NagaIME）</title>
   <link rel="icon" type="image/png" sizes="196x196" href="icons/favicon-196.png">
   <link rel="apple-touch-icon" href="icons/apple-icon-180.png">
   <style>
@@ -52,10 +52,23 @@
     }
     .plain-note { font-size: 0.75rem; color: #999; }
     .links { font-size: 0.85rem; }
+    .preview-notice {
+      background: #fff7e6;
+      border: 1px solid #d9a441;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 0.9rem;
+      line-height: 1.7;
+      margin: 0 0 16px;
+    }
   </style>
 </head>
 <body>
-  <h1><span class="genkai">龍樹(Nagarjuna)</span>: NagaIME デモ</h1>
+  <p class="preview-notice" role="note">
+    <strong>プレビュー版</strong>: 次のトレインで公開予定の新しい IME UI（NagaIME）のプレビューです。API は公開されておらず、変更される可能性があります。<br>
+    現在の正式な IME（<code>IMEManager</code> / <code>&lt;ime-ui&gt;</code>）のデモは <a href="./">トップページ</a> にあります。
+  </p>
+  <h1><span class="genkai">龍樹(Nagarjuna)</span>: 新 IME UI のプレビュー（NagaIME）</h1>
   <span class="lead">Ver. <span id="version"></span></span>
 
   <div class="note">
@@ -82,7 +95,7 @@
     <p class="plain-note">※ .naga-target を付けた欄にだけ起動ボタンが出ます</p>
   </div>
 
-  <p class="links">従来の IMEManager（1.1.0 で非推奨）のデモは <a href="./index.html">index.html</a> にあります。</p>
+  <p class="links">正式な IME（IMEManager / &lt;ime-ui&gt;）のデモは <a href="./">トップページ</a> にあります。</p>
 
   <script type="module" src="./src/naga-demo.ts"></script>
 </body>

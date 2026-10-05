@@ -1,4 +1,4 @@
-import type { NagaCategoryId } from './types';
+import type { NagaCategoryId } from './naga-types';
 
 export type IMEType = 
   | 'hentaigana' 

@@ -69,3 +69,38 @@ jobs:
         with:
           name: cycle2-nagarjuna-artifact-smoke-node-${{ matrix.node }}
           path: ci-evidence/artifact-smoke-node-${{ matrix.node }}.txt
+  # ---- nov26-m3-t1: NagaIME の e2e（Playwright・chromium）----
+  # 前例は Weiwudi の ci.yml。verify（Node 22・24 の matrix）とは別の job にし、verify の行は変えない。
+  # 辞書の生成は playwright.config.ts の webServer.command の中で行う。
+  e2e:
+    name: E2E (chromium)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 11
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Activate CI-only workspace policy
+        run: cp ci/pnpm-workspace.ci.yaml pnpm-workspace.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck e2e
+        run: pnpm exec tsc -p e2e/tsconfig.json
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+      - name: E2E
+        run: pnpm run test:e2e
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nagarjuna-playwright-report
+          path: playwright-report/
+          retention-days: 7

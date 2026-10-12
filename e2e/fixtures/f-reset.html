@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>F-RESET</title>
+  <!-- nov26-m3-t1 §3.2: F-CLEAN と同じ DOM に、Bootstrap の reboot 相当と敵対的な規則を当てる。
+       欄 #f1・#f2 は inline の !important で F-CLEAN と同じ形・同じ場所に固定してある -->
+  <style>
+    body{margin:0;height:3000px}
+    /* Bootstrap reboot 相当 */
+    *,::before,::after{box-sizing:border-box}
+    body{margin:0;font-family:system-ui;font-size:1rem;line-height:1.5;color:#212529}
+    button{border-radius:0;text-transform:none}
+    [hidden]{display:none!important}
+    /* マイルストーン設計 §3 の 1 の敵対的な規則 */
+    html{font-size:62.5%}
+    body{line-height:3;letter-spacing:.3em;color:#f00;text-align:right}
+    *{box-sizing:content-box!important}
+    button,input,div{all:unset}
+  </style>
+</head>
+<body>
+  <input id="f1" type="text" style="position:absolute!important; left:40px!important; width:320px!important; margin:0!important; box-sizing:border-box!important; padding:4px 8px!important; border:1px solid #888!important; font:16px/22px monospace!important; letter-spacing:0!important; text-align:left!important; direction:ltr!important; color:#000!important; background:#fff!important; display:inline-block!important; top:120px!important; height:32px!important;">
+  <textarea id="f2" style="position:absolute!important; left:40px!important; width:320px!important; margin:0!important; box-sizing:border-box!important; padding:4px 8px!important; border:1px solid #888!important; font:16px/22px monospace!important; letter-spacing:0!important; text-align:left!important; direction:ltr!important; color:#000!important; background:#fff!important; display:inline-block!important; top:200px!important; height:96px!important;"></textarea>
+  <script type="module">
+    // origin/master の NagaIME は公開 API に無い ∴ デモ（src/naga-demo.ts）と同じくソースを直に読む
+    import { NagaIME } from '/src/lib/ime/naga-ime.ts';
+    const ime = new NagaIME({ loadFonts: false });
+    ime.attach([document.getElementById('f1'), document.getElementById('f2')]);
+    window.__naga = ime;
+  </script>
+</body>
+</html>

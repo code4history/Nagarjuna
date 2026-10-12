@@ -58,8 +58,6 @@ test('S-b: #s1 で Control+j を押すと popup が見える', async ({ page }) 
 });
 
 test('S-c: 開いた状態で #s1 を click しても popup は開いたまま', async ({ page }) => {
-  // origin/master で落ちることを実測した（nov26-m3-t1）。t2 が外す
-  test.fail();
   await page.locator(shadowField('s1')).focus();
   await page.keyboard.press('Control+j');
   await waitShown(page, PART.item);
@@ -76,8 +74,6 @@ test('S-d: #s1 で候補を click すると a<候補>b になり、キャレッ�
 });
 
 test('S-e: S-d の確定で文書の input listener に composed な input が 1 件届く', async ({ page }) => {
-  // origin/master で落ちることを実測した（nov26-m3-t1）。t2 が外す
-  test.fail();
   await commitFirst(page, 's1');
   const got = await page.evaluate(() => (window as unknown as { __docInputs: Array<{ type: string; composed: boolean }> }).__docInputs);
   expect(got.length, '[measure:S-e]').toBe(1);

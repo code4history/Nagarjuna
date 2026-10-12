@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { fieldRect, gotoFixture } from './helpers';
 
-// nov26-m3-t1 §3.6: 前提の spec。test.fail() を付けない（前提が崩れたらここが赤になる）。
+// nov26-m3-t1 §3.6: 前提の spec。失敗を期待する印（test の fail 指定）を付けない（前提が崩れたらここが赤になる）。
 
 test('F-1: F-CLEAN と F-RESET で #f1・#f2 の矩形が 0.5px 以内で同じ', async ({ page }) => {
   await gotoFixture(page, 'f-clean');

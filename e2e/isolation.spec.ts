@@ -2,8 +2,9 @@ import { expect, test, type Page } from '@playwright/test';
 import { PART, STYLE_PROPS, fieldRect, fillAndFocus, gotoFixture, partInfo, waitShown, type PartName } from './helpers';
 
 // nov26-m3-t1 §3.4 R: ページ側 CSS の影響（F-CLEAN と F-RESET の比較）。
-// 各 expect には測りの印 [measure:<ID>] を付ける。test.fail() の付いた項目は、最初のエラーに
-// 自分の印（test の題の先頭の ID と同じ）が入っていることを t1/AC6 (b) で機械的に確かめる。
+// 各 expect には測りの印 [measure:<ID>] を付ける。t1 では origin/master で落ちることを、最初のエラーに
+// 自分の印（test の題の先頭の ID と同じ）が入っていることで機械的に確かめた（t1/AC6 (b)）。
+// nov26-m3-t2 で部品を <naga-ime> の影の中へ入れ、失敗を期待する印を外した（緑であることが基準）。
 
 interface Measured {
   w: number;
@@ -51,8 +52,6 @@ const CASES: Array<{ id: string; part: PartName; label: string }> = [
 
 for (const c of CASES) {
   test(`${c.id}: ${c.label}（${PART[c.part]}）が F-CLEAN と F-RESET で同じ寸法・位置・書式`, async ({ page }, testInfo) => {
-    // origin/master で落ちることを実測した（nov26-m3-t1）。t2 が外す
-    test.fail();
     const clean = await measure(page, 'f-clean', c.part);
     const reset = await measure(page, 'f-reset', c.part);
     const diffs = compare(clean, reset);

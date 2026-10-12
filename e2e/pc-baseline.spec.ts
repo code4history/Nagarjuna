@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { PART, deepActiveId, deepHandle, fieldRect, fillAndFocus, gotoFixture, isShown, nagaIsOpen, partInfo, waitShown } from './helpers';
 
 // nov26-m3-t1 §3.5: PC の振る舞いの基準（F-CLEAN・1280×800）。origin/master の実装で緑。
-// test.fail() を付けない。t2・t3・t4 はこの spec を緑のまま保つ（マイルストーン設計 M-6）。
+// 失敗を期待する印（test の fail 指定）を付けない。t2・t3・t4 はこの spec を緑のまま保つ（マイルストーン設計 M-6）。
 
 async function openWithShortcut(page: Page): Promise<void> {
   await page.keyboard.press('Control+j');
@@ -67,7 +67,8 @@ test('P-4: 読み → Enter を 2 回で #f1 に 2 文字入り、popup は開�
   await page.keyboard.type('こと');
   await page.keyboard.press('Enter');
   const value = await page.evaluate(() => (document.getElementById('f1') as HTMLInputElement).value);
-  expect([...value].length).toBe(2);
+  // M3T1-MIN-1（nov26-m3-t2 で拾った）: 文字数だけでなく中身を見る（組文字の「より」「こと」）
+  expect(value).toBe('ゟヿ');
   expect(await nagaIsOpen(page)).toBe(true);
   expect(await isShown(page, PART.popup)).toBe(true);
 });

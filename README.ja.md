@@ -22,8 +22,19 @@
 ## インストール
 
 ```bash
-pnpm add nagarjuna
+pnpm add @c4h/nagarjuna
 ```
+
+### スコープなしの旧名からの移行
+
+1.1.0 までは、スコープなしの nagarjuna という名前で公開していました。2026-11 のリリースから `@c4h/nagarjuna` の名前で公開します。API は同じで、変わるのはパッケージ名だけです。
+
+```bash
+pnpm remove nagarjuna
+pnpm add @c4h/nagarjuna
+```
+
+import の指定子を書き換えてください: nagarjuna は `@c4h/nagarjuna` に、nagarjuna/ime は `@c4h/nagarjuna/ime` になります。
 
 ## 使用方法
 
@@ -37,7 +48,7 @@ pnpm add nagarjuna
 特殊文字の表示のみが必要な場合:
 
 ```javascript
-import { FontLoader } from 'nagarjuna';
+import { FontLoader } from '@c4h/nagarjuna';
 
 const fontLoader = new FontLoader();
 
@@ -62,7 +73,7 @@ element.style.fontFamily = fontLoader.getFontFamilyString({
 入力機能が必要な場合:
 
 ```javascript
-import { IMEManager } from 'nagarjuna/ime';
+import { IMEManager } from '@c4h/nagarjuna/ime';
 
 // IMEマネージャーの初期化
 const manager = IMEManager.getInstance();

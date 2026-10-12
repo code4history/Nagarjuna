@@ -11,26 +11,24 @@ if (version) version.textContent = import.meta.env.APP_VERSION;
  * `naga.html?debugViewport=1` のときだけ、ソフトキーボード表示中の
  * visualViewport の値と popup の占有高さを画面に出す。人間が実機で数値を読み上げる。
  * 既定（query 無し）では何も作らないので、通常のデモ・配布物の見た目は変わらない。
+ * nov26-m3-t3（M-5）: 画面を覆わないよう、`.lead` の行の直後（文書の流れの中）に置く。
+ * 位置・重ね順・ポインタの指定は持たない（計算済みの position は static）。
  */
 if (new URLSearchParams(location.search).get('debugViewport') === '1') {
-  const panel = document.createElement('div');
+  const panel = document.createElement('pre');
   panel.id = 'naga-debug-viewport';
   panel.setAttribute('aria-hidden', 'true');
   panel.style.cssText = [
-    'position: fixed',
-    'top: 0',
-    'left: 0',
-    'z-index: 10000',
-    'margin: 4px',
-    'padding: 6px 8px',
-    'background: rgba(0, 0, 0, 0.78)',
-    'color: #fff',
     'font: 11px/1.5 ui-monospace, monospace',
+    'background: #f4f4f4',
+    'border: 1px solid #ccc',
+    'padding: 6px 8px',
     'white-space: pre',
-    'border-radius: 6px',
-    'pointer-events: none',
+    'overflow-x: auto',
   ].join(';');
-  document.body.appendChild(panel);
+  const lead = document.querySelector('.lead');
+  if (lead) lead.after(panel);
+  else document.body.prepend(panel);
 
   const render = (): void => {
     const vv = window.visualViewport;
@@ -53,6 +51,7 @@ if (new URLSearchParams(location.search).get('debugViewport') === '1') {
       `popup 上端  = ${rect ? Math.round(rect.top) : '-'}`,
       `上に残る帯  = ${clearance === null ? '-' : clearance}`,
       `docked      = ${pop ? pop.classList.contains('naga-is-docked') : '-'}`,
+      `folded      = ${pop ? pop.classList.contains('naga-is-folded') : '-'}`,
     ].join('\n');
   };
 

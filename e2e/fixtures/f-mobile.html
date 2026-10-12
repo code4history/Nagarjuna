@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>F-MOBILE</title>
+  <!--
+    nov26-m3-t3 §3.7: スマートフォンの見え方（M-1〜M-4）の固定ページ。
+    文書（body 3000px）・#scroller（内側でスクロールする箱）・#m2（複数行の textarea）の 3 つが
+    それぞれスクロールできる。spec は開く前に 3 つを 0 以外へ動かしておく（M-1 の比較を 0 どうしにしない）。
+  -->
+  <style>
+    body { margin: 0; height: 3000px; font: 16px/20px sans-serif; }
+    #scroller { position: absolute; top: 80px; left: 16px; right: 16px; height: 160px; overflow: auto; border: 1px solid #888; }
+    #scroller .pad-top { height: 40px; }
+    #scroller .pad-bottom { height: 400px; }
+    #m1 { display: block; box-sizing: border-box; width: 100%; height: 32px; margin: 0 0 10px; padding: 4px 8px; font: 16px/22px monospace; border: 1px solid #888; }
+    #m2 { display: block; box-sizing: border-box; width: 100%; height: 64px; margin: 0; padding: 2px 8px; font: 16px/20px monospace; border: 1px solid #888; resize: none; }
+  </style>
+</head>
+<body>
+  <div id="scroller">
+    <div class="pad-top"></div>
+    <input id="m1" type="text" value="あいう">
+    <textarea id="m2">一行目
+二行目
+三行目
+四行目
+五行目
+六行目
+七行目
+八行目</textarea>
+    <div class="pad-bottom"></div>
+  </div>
+  <naga-ime for="m1 m2" load-fonts="false"></naga-ime>
+  <script type="module">
+    import '/src/lib/ime/naga-ime.ts';
+    window.__naga = document.querySelector('naga-ime');
+  </script>
+</body>
+</html>

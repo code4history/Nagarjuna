@@ -114,3 +114,30 @@ test('P-7: #f1 の下に 100px しか残らない viewport で開くと popup �
   expect(pop.rect.bottom).toBeLessThanOrEqual(f1Now.top + 5);
   expect(pop.rect.top).toBeLessThan(f1Now.top);
 });
+
+test('P-8: PC の読み欄は popup の枠の内側から左右 8px・タイトル行の下端から 8px・一覧の上端まで 8px', async ({ page }) => {
+  // nov26-m3-t3 §3.7: .naga-search-row の display: contents → flex で PC の見え方が変わらないことの陽性対照。
+  // t2 の head（display: contents）で緑であることを先に確かめてから CSS を変えた。
+  await page.focus('#f1');
+  await openWithShortcut(page);
+  const pop = (await deepHandle(page, PART.popup))!;
+  const m = await pop.evaluate((el) => {
+    const q = (sel: string) => {
+      const r = el.querySelector(sel)!.getBoundingClientRect();
+      return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+    };
+    const cs = getComputedStyle(el);
+    const p = el.getBoundingClientRect();
+    return {
+      innerLeft: p.left + parseFloat(cs.borderLeftWidth),
+      innerRight: p.right - parseFloat(cs.borderRightWidth),
+      search: q('.naga-search'),
+      titlebar: q('.naga-titlebar'),
+      list: q('.naga-list'),
+    };
+  });
+  expect(Math.abs(m.search.left - m.innerLeft - 8)).toBeLessThanOrEqual(0.5);
+  expect(Math.abs(m.innerRight - m.search.right - 8)).toBeLessThanOrEqual(0.5);
+  expect(Math.abs(m.search.top - m.titlebar.bottom - 8)).toBeLessThanOrEqual(0.5);
+  expect(Math.abs(m.list.top - m.search.bottom - 8)).toBeLessThanOrEqual(0.5);
+});

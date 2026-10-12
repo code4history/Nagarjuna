@@ -54,8 +54,11 @@ function restoreViewport(): void {
   if (originalInnerHeight) Object.defineProperty(window, 'innerHeight', originalInnerHeight);
 }
 
+/** nov26-m3-t2: popup は <naga-ime>（describe の ime）の影の中にある。 */
+let ime: NagaIME;
+
 function popupOf(): HTMLElement {
-  return document.body.querySelector('.naga-popup') as HTMLElement;
+  return ime.shadowRoot!.querySelector('.naga-popup') as HTMLElement;
 }
 
 function tabTextsOf(): string[] {
@@ -71,7 +74,6 @@ const PHONE_KEYBOARD = { width: 390, height: 480, offsetTop: 0, innerHeight: 844
 
 describe('NagaIME モバイル dock（AC10）', () => {
   let field: HTMLInputElement;
-  let ime: NagaIME;
 
   beforeEach(() => {
     localStorage.clear();
@@ -214,7 +216,8 @@ describe('NagaIME モバイル dock（AC10）', () => {
 
       const pop = popupOf();
       expect(pop.classList.contains('naga-is-docked')).toBe(false);
-      expect(pop.style.position).toBe('absolute');
+      // nov26-m3-t2（マイルストーン設計 §5.2）: viewport 基準の fixed。見え方の非後退は e2e の P-1〜P-7 が見る
+    expect(pop.style.position).toBe('fixed');
       expect(pop.style.maxHeight).toBe('');
       expect(pop.style.getPropertyValue('--naga-dock-max')).toBe('');
       expect(pop.style.getPropertyValue('--naga-dock-avail')).toBe('');

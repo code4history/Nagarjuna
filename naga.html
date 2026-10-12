@@ -81,19 +81,21 @@
 
   <div class="field">
     <label for="naga-field-1">入力テスト1（input・NagaIME 有効）</label>
-    <input type="text" id="naga-field-1" class="naga-target" placeholder="普通の日本語入力はそのまま。特殊文字だけ Ctrl+J で">
+    <input type="text" id="naga-field-1" placeholder="普通の日本語入力はそのまま。特殊文字だけ Ctrl+J で">
   </div>
 
   <div class="field">
     <label for="naga-field-2">入力テスト2（textarea・NagaIME 有効）</label>
-    <textarea id="naga-field-2" class="naga-target" rows="5" placeholder="石仏の銘文を写す想定"></textarea>
+    <textarea id="naga-field-2" rows="5" placeholder="石仏の銘文を写す想定"></textarea>
   </div>
 
   <div class="field">
     <label for="naga-field-3">入力テスト3（NagaIME <strong>無効</strong>の普通の欄）</label>
     <input type="text" id="naga-field-3" placeholder="ここには梵ボタンが出ません">
-    <p class="plain-note">※ .naga-target を付けた欄にだけ起動ボタンが出ます</p>
+    <p class="plain-note">※ <code>&lt;naga-ime for&gt;</code> に書いた欄にだけ起動ボタンが出ます</p>
   </div>
+
+  <naga-ime for="naga-field-1 naga-field-2"></naga-ime>
 
   <p class="links">正式な IME（IMEManager / &lt;ime-ui&gt;）のデモは <a href="./">トップページ</a> にあります。</p>
 

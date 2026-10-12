@@ -1,13 +1,10 @@
 // 次トレインで公開予定の新 IME UI（NagaIME）のプレビュー demo（naga.html）。トップ（index.html）の src/demo.ts とは独立している。
 // NagaIME は 1.1.0 の公開 API（nagarjuna/ime）に含めない ∴ ソースを直接 import する
-import { NagaIME } from './lib/ime/naga-ime';
+// import の副作用で <naga-ime> を登録する（naga.html の <naga-ime for> が昇格する）
+import './lib/ime/naga-ime';
 
 const version = document.getElementById('version');
 if (version) version.textContent = import.meta.env.APP_VERSION;
-
-const ime = new NagaIME();
-// .naga-target が付いた欄にだけ取り付ける
-ime.attach('.naga-target');
 
 /*
  * 実測用の読み取り（oct26-m7-t1 是正設計 v2 §9「要実測一覧」）。
@@ -40,7 +37,7 @@ if (new URLSearchParams(location.search).get('debugViewport') === '1') {
     const vvAvail = vv ? Math.round(vv.height) : window.innerHeight;
     const offsetTop = vv ? Math.round(vv.offsetTop) : 0;
     const kb = Math.max(0, window.innerHeight - (vvAvail + offsetTop));
-    const pop = document.querySelector('.naga-popup') as HTMLElement | null;
+    const pop = document.querySelector('naga-ime')?.shadowRoot?.querySelector('.naga-popup') as HTMLElement | null;
     const shown = pop && !pop.hidden;
     const rect = shown ? pop.getBoundingClientRect() : null;
     const maxH = shown ? pop.style.maxHeight || '(未設定)' : '-';

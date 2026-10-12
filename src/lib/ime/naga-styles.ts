@@ -1,14 +1,29 @@
 /**
- * NagaIME 専用の style（oct26-m7-t1 設計 §3.2-3）。
+ * NagaIME 専用の style（oct26-m7-t1 設計 §3.2-3・nov26-m3-t2 で Shadow DOM へ移した）。
  *
- * - selector はすべて `.naga-` で始める（legacy の `ime-*` / 利用者の CSS と衝突させない・AC6）。
- * - global `:root` へ custom property を足さない。`--naga-*` は popup / trigger の要素上だけに置く。
+ * - `<naga-ime>` の影の中に閉じる（`<style data-naga-style>` を影の中に 1 つ置く。document.head には入れない）。
+ *   selector は `.naga-` か `:host` で始める（legacy の `ime-*` / 利用者の CSS と衝突させない・AC6）。
+ * - 影の中の最上位 `.naga-root` に `all: initial` を当て、ページの継承性質を断つ。`all` は `direction` と
+ *   custom property を戻さないので `direction` は明示し、`--naga-*` は popup / trigger の要素上で宣言する。
+ * - 寸法は px で書く（rem・em を使わない。ページの `html { font-size }` に引きずられないため）。
  * - 書体は FontLoader が読む family（NINJAL Hentaigana / Noto Sans Siddham / Noto Sans JP）を使う。
  *   @font-face は FontLoader 側が注入するため、ここでは宣言しない。
  * - 見た目は PoC（Playground/NextNaga/css/naga-ime.css）に合わせる。PoC の状態 class
  *   `is-active` / `is-selected` は接頭辞規則のため `naga-is-active` / `naga-is-selected` に改めた。
  */
 export const NAGA_STYLE_TEXT = `
+:host {
+  display: contents;
+}
+:host([hidden]) {
+  display: none;
+}
+.naga-root {
+  all: initial;
+  display: contents;
+  direction: ltr;
+}
+
 .naga-popup,
 .naga-trigger {
   --naga-special-font: 'NINJAL Hentaigana', 'Noto Sans Siddham', 'Noto Sans JP', serif;
@@ -21,7 +36,7 @@ export const NAGA_STYLE_TEXT = `
 }
 
 .naga-trigger {
-  position: absolute;
+  position: fixed;
   z-index: 9998;
   width: 26px;
   height: 26px;
@@ -44,7 +59,7 @@ export const NAGA_STYLE_TEXT = `
 }
 
 .naga-popup {
-  position: absolute;
+  position: fixed;
   z-index: 9999;
   box-sizing: border-box;
   background: #fff;
@@ -278,13 +293,5 @@ export const NAGA_STYLE_TEXT = `
 }
 `;
 
-const STYLE_ATTRIBUTE = 'data-naga-style';
-
-/** 文書に NagaIME の style が無ければ 1 つだけ入れる（複数インスタンスで共有する）。 */
-export function ensureNagaStyle(doc: Document = document): void {
-  if (doc.head.querySelector(`style[${STYLE_ATTRIBUTE}]`)) return;
-  const style = doc.createElement('style');
-  style.setAttribute(STYLE_ATTRIBUTE, '');
-  style.textContent = NAGA_STYLE_TEXT;
-  doc.head.appendChild(style);
-}
+/** 影の中の `<style>` に付ける印（テストが引く）。 */
+export const NAGA_STYLE_ATTRIBUTE = 'data-naga-style';

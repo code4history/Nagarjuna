@@ -17,8 +17,27 @@ function key(type: 'keydown', init: KeyboardEventInit): KeyboardEvent {
   return new KeyboardEvent(type, { bubbles: true, cancelable: true, ...init });
 }
 
+/**
+ * nov26-m3-t2: 部品は <naga-ime> の影の中にある。文書の <naga-ime> の影を順に見て、
+ * 最初に見つかった部品を返す（各テストで文書に入っている <naga-ime> は 1 つ）。
+ */
+function partOf(selector: string): HTMLElement {
+  for (const el of Array.from(document.querySelectorAll('naga-ime'))) {
+    const hit = el.shadowRoot?.querySelector(selector);
+    if (hit) return hit as HTMLElement;
+  }
+  return null as unknown as HTMLElement;
+}
+
+/** 文書の全 <naga-ime> の影から部品を集める。 */
+function partsOf(selector: string): HTMLElement[] {
+  return Array.from(document.querySelectorAll('naga-ime')).flatMap((el) =>
+    Array.from(el.shadowRoot?.querySelectorAll<HTMLElement>(selector) ?? []),
+  );
+}
+
 function popupOf(): HTMLElement {
-  return document.body.querySelector('.naga-popup') as HTMLElement;
+  return partOf('.naga-popup');
 }
 
 function searchOf(): HTMLInputElement {
@@ -113,7 +132,7 @@ describe('NagaIME', () => {
 
   it('focus で trigger だけを出し、trigger の mousedown と Ctrl/Cmd+J で開閉する（AC5）', async () => {
     ime.attach(field);
-    const trigger = document.body.querySelector('.naga-trigger') as HTMLButtonElement;
+    const trigger = partOf('.naga-trigger') as HTMLButtonElement;
     expect(trigger.hidden).toBe(true);
 
     field.focus();
@@ -228,6 +247,11 @@ describe('NagaIME', () => {
     expect(bubbled).toHaveLength(1);
     expect(bubbled[0].bubbles).toBe(true);
     expect(bubbled[0].target).toBe(textarea);
+    // nov26-m3-t2（§5.5）: ネイティブの入力と同じ性質の InputEvent（影の外のフレームワークに届く）
+    expect(bubbled[0]).toBeInstanceOf(InputEvent);
+    expect(bubbled[0].composed).toBe(true);
+    expect((bubbled[0] as InputEvent).inputType).toBe('insertText');
+    expect((bubbled[0] as InputEvent).data).toBe('ゟ');
 
     // 連続入力モード: 開いたまま検索語だけクリア
     expect(ime.isOpen).toBe(true);
@@ -352,14 +376,16 @@ describe('NagaIME', () => {
   it('detach / destroy で trigger・popup・class・listener を片付け、再 attach できる（AC5・AC6 cleanup）', async () => {
     ime.attach(field);
     expect(field.classList.contains('naga-enabled')).toBe(true);
-    expect(document.body.querySelectorAll('.naga-popup')).toHaveLength(1);
-    expect(document.body.querySelectorAll('.naga-trigger')).toHaveLength(1);
+    expect(partsOf('.naga-popup')).toHaveLength(1);
+    expect(partsOf('.naga-trigger')).toHaveLength(1);
+    // 影の外（document.body の直下・文書の木）に NagaIME の部品は無い（t2/AC4）
+    expect(document.body.querySelectorAll('.naga-popup, .naga-trigger')).toHaveLength(0);
     await ime.open(field);
 
     ime.detach(field);
     expect(field.classList.contains('naga-enabled')).toBe(false);
-    expect(document.body.querySelectorAll('.naga-popup')).toHaveLength(0);
-    expect(document.body.querySelectorAll('.naga-trigger')).toHaveLength(0);
+    expect(partsOf('.naga-popup')).toHaveLength(0);
+    expect(partsOf('.naga-trigger')).toHaveLength(0);
     expect(ime.isOpen).toBe(false);
 
     const ev = key('keydown', { key: 'j', ctrlKey: true });
@@ -380,8 +406,8 @@ describe('NagaIME', () => {
     document.body.appendChild(other);
     second.attach(other);
 
-    const popups = Array.from(document.body.querySelectorAll('.naga-popup'));
-    const triggers = Array.from(document.body.querySelectorAll('.naga-trigger'));
+    const popups = partsOf('.naga-popup');
+    const triggers = partsOf('.naga-trigger');
     expect(popups).toHaveLength(2);
     expect(new Set(popups.map((p) => p.id)).size).toBe(2);
     expect(triggers.map((t) => t.getAttribute('aria-controls')).sort()).toEqual(popups.map((p) => p.id).sort());
@@ -395,24 +421,6 @@ describe('NagaIME', () => {
   }, DICTIONARY_TEST_TIMEOUT_MS);
 });
 
-describe('NagaIME だけの利用では console.warn を出さない（AC4 ③）', () => {
-  it('vi.resetModules() 後に NagaIME だけを使って attach / 入力 / detach しても 0 回', async () => {
-    vi.resetModules();
-    const warn = vi.spyOn(console, 'warn');
-    const { NagaIME: FreshNagaIME } = await import('@/lib/ime/naga-ime');
-    const target = document.createElement('input');
-    document.body.appendChild(target);
-    const local = new FreshNagaIME();
-    local.attach(target);
-    target.focus();
-    await local.open(target);
-    const search = document.body.querySelector('.naga-search') as HTMLInputElement;
-    search.value = 'より';
-    search.dispatchEvent(new Event('input', { bubbles: true }));
-    search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
-    local.detach(target);
-    target.remove();
-    expect(warn).not.toHaveBeenCalled();
-    warn.mockRestore();
-  }, DICTIONARY_TEST_TIMEOUT_MS);
-});
+// oct26 の「NagaIME だけの利用では console.warn を出さない（AC4 ③）」は nov26-m3-t2 で
+// tests/ime/naga-registration.test.ts の 2 へ移した（再評価したクラスの new は TypeError になるため。
+// 意図と期待値 0 は変えない）。

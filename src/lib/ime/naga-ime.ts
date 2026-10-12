@@ -1,42 +1,57 @@
 /**
- * NagaIME — トリガー式の特殊文字入力ポップアップ（oct26-m7-t1 設計 §3.2-1）。
+ * NagaIME — トリガー式の特殊文字入力ポップアップ（oct26-m7-t1 設計 §3.2-1、
+ * nov26-m3-t2 で custom element `<naga-ime>`＋open Shadow DOM に包み直した）。
  *
  * PoC（Playground/NextNaga/js/naga-ime.js）の UX を TypeScript 化したもの。
  *  - 常駐しない。対象にフォーカスすると小さな起動ボタンが出るだけ。
  *  - 起動はボタン押下または Ctrl/Cmd+J の明示操作のみ。
  *  - 起動中もシステム IME の変換（composition）には介入しない。
  *  - 確定は Enter / Tab / クリック / 数字キー、取消は Esc。
- *  - 確定文字は setRangeText() でキャレット位置に挿入し、bubbles な input イベントを発火する。
+ *  - 確定文字は setRangeText() でキャレット位置に挿入し、欄へ InputEvent（composed）を出す。
  *  - 確定してもポップアップは閉じない（連続入力）。
  *  - 直近使用を localStorage に保持し、次回は「最近」タブから開く。
- *  - PC はキャレットの少し下、狭い viewport では画面下部へドッキングする。
+ *  - PC はキャレットの少し下（viewport 基準の fixed）、狭い viewport では画面下部へドッキングする。
+ *
+ * 要素の形（マイルストーン設計 nov26-m3 §5）:
+ *  - `new NagaIME(options)` でも `<naga-ime>` でも同じものができる。モジュールの評価で `naga-ime` を登録する。
+ *    別の実装が登録済みなら上書きせず何も出さない。そのときこのクラスの `new` は TypeError を投げる。
+ *  - trigger・popup・スタイルは影の中に置く。document.head に `<style>` を入れない。
+ *  - 属性 → プロパティの一方向。プロパティへの代入は属性を変えない。不正な値は黙って既定値にする。
+ *  - console.warn を出さない（登録の衝突も・不正な属性値や代入も）。legacy の非推奨警告も呼ばない。
  *
  * PoC との意図的な差分:
  *  - 辞書は fetch せず package bundle を使う（naga-dictionary.ts）。`baseUrl` は無い。
  *  - 書体は FontLoader で読む。`window.nagaIME` は公開しない（demo 専用だったため）。
  *  - DOM の class はすべて `naga-` 接頭辞、id と aria-controls はインスタンス固有。
- *  - custom element を登録しない。legacy の非推奨警告も呼ばない。
  *  - detach / destroy で DOM と listener を片付ける。候補は textContent で描画する。
  *  - 対象の inline fontFamily は空のときだけ設定し、detach では自分の値のままなら空へ戻す（§3.1）。
  */
 import { FontLoader } from '../fonts/loader';
 import { fontFamilies } from '../fonts/styles';
 import type { FontSettings } from '../fonts/types';
-import type { NagaCandidate, NagaCategoryId, NagaIMEOptions } from './naga-types';
+import type { NagaCandidate, NagaCategoryId, NagaIMEEventMap, NagaIMEOptions } from './naga-types';
 import { NAGA_CATEGORIES, loadNagaDictionary, searchNagaCandidates, type NagaDictionary } from './naga-dictionary';
-import { ensureNagaStyle } from './naga-styles';
+import { NAGA_STYLE_ATTRIBUTE, NAGA_STYLE_TEXT } from './naga-styles';
 
 type NagaTarget = HTMLInputElement | HTMLTextAreaElement;
 type TabId = NagaCategoryId | 'recent';
+type AttachTarget = string | Element | ArrayLike<Element> | Iterable<Element>;
 
+const TAG_NAME = 'naga-ime';
 const DEFAULT_RECENT_KEY = 'nagarjuna-naga-recents';
+const DEFAULT_TRIGGER_LABEL = '梵';
+const DEFAULT_RECENT_MAX = 14;
+const DEFAULT_MAX_CANDIDATES = 60;
+const DEFAULT_DOCK_BREAKPOINT = 560;
 const SEARCH_PLACEHOLDER = 'よみを入力（例: あ / とき）';
 const SEARCH_LABEL = '読み';
 const SEARCH_ARIA_LABEL = '読みを入力';
 const RECENT_LABEL = '最近';
 const RECENT_SHORT = '近';
+const TRIGGER_SIZE_PX = 26;
 const FONT_SETTINGS: FontSettings = { hentaigana: true, siddham: true, itaiji: true };
-const CATEGORY_IDS = new Set<string>(NAGA_CATEGORIES.map((c) => c.id));
+const ALL_CATEGORIES: readonly NagaCategoryId[] = NAGA_CATEGORIES.map((c) => c.id);
+const CATEGORY_IDS = new Set<string>(ALL_CATEGORIES);
 
 /*
  * モバイル dock の割り付け（是正設計 v2 §3.2-3.3・案 A）。この 5 つと下の
@@ -67,6 +82,87 @@ const DOCK_POPUP_MAX_PX =
 /** 極端に小さい可視高（横持ち・分割表示）でも popup を潰さない下限。list が内側で scroll する。 */
 const DOCK_MIN_PX = 96;
 
+/** 属性名 → プロパティ名（大文字の前で区切り `-` でつなぐ機械変換。`for` だけは DOM の前例どおり `htmlFor`）。 */
+const ATTRIBUTE_TO_PROPERTY = {
+  for: 'htmlFor',
+  categories: 'categories',
+  'trigger-label': 'triggerLabel',
+  shortcut: 'shortcut',
+  'recent-storage-key': 'recentStorageKey',
+  'recent-max': 'recentMax',
+  'max-candidates': 'maxCandidates',
+  'dock-breakpoint': 'dockBreakpoint',
+  'load-fonts': 'loadFonts',
+} as const;
+
+type ObservedAttribute = keyof typeof ATTRIBUTE_TO_PROPERTY;
+
+/** 昇格前に代入されうるプロパティ（upgrade property。§5.3 末尾）。 */
+const UPGRADE_PROPERTIES = [
+  'htmlFor',
+  'categories',
+  'triggerLabel',
+  'shortcut',
+  'recentStorageKey',
+  'recentMax',
+  'maxCandidates',
+  'dockBreakpoint',
+  'loadFonts',
+] as const;
+
+/* ------------------------------------------------------------ *
+ * 値の解釈（属性の経路と代入の経路の両方から呼ぶ。不正な値は undefined＝既定値）
+ * ------------------------------------------------------------ */
+
+function boolFromAttribute(value: string | null, name: string): boolean | undefined {
+  if (value === null) return undefined;
+  if (value === '' || value === 'true' || value === name) return true;
+  if (value === 'false') return false;
+  return undefined;
+}
+
+function boolFromProperty(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined;
+}
+
+function intFromNumber(value: number, min: number): number | undefined {
+  if (!Number.isFinite(value)) return undefined;
+  const n = Math.floor(value);
+  return n >= min ? n : undefined;
+}
+
+function intFromAttribute(value: string | null, min: number): number | undefined {
+  if (value === null || value.trim() === '') return undefined;
+  return intFromNumber(Number(value), min);
+}
+
+function intFromProperty(value: unknown, min: number): number | undefined {
+  return typeof value === 'number' ? intFromNumber(value, min) : undefined;
+}
+
+function stringFromValue(value: unknown): string | undefined {
+  return typeof value === 'string' && value !== '' ? value : undefined;
+}
+
+/** 既知のカテゴリだけを、最初に出た順で重複なく取る。有効なものが 0 個なら全カテゴリ。 */
+function normalizeCategories(values: readonly unknown[]): NagaCategoryId[] {
+  const out: NagaCategoryId[] = [];
+  for (const v of values) {
+    if (typeof v === 'string' && CATEGORY_IDS.has(v) && !out.includes(v as NagaCategoryId)) out.push(v as NagaCategoryId);
+  }
+  return out.length ? out : [...ALL_CATEGORIES];
+}
+
+function categoriesFromAttribute(value: string | null): NagaCategoryId[] {
+  return normalizeCategories(value === null ? [] : value.split(/\s+/));
+}
+
+function categoriesFromProperty(value: unknown): NagaCategoryId[] {
+  return normalizeCategories(Array.isArray(value) ? value : []);
+}
+
+/* ------------------------------------------------------------ */
+
 /** タブの正式名称（PC・aria-label・title で常に使う）。 */
 function tabLabelOf(id: TabId): string {
   if (id === 'recent') return RECENT_LABEL;
@@ -86,6 +182,10 @@ interface FieldBinding {
   /** attach 時に NagaIME が設定した inline fontFamily（設定しなかった場合は null） */
   appliedFontFamily: string | null;
   addedClass: boolean;
+  /** `for` で付けた（`for` の付け直し・再接続で引き直す対象） */
+  viaFor: boolean;
+  /** `attach()` で付けた（`for` の付け直しでは外さない） */
+  viaAttach: boolean;
 }
 
 function isTarget(el: unknown): el is NagaTarget {
@@ -107,16 +207,63 @@ function isCandidate(value: unknown): value is NagaCandidate {
   );
 }
 
-export class NagaIME {
-  private readonly options: Required<Omit<NagaIMEOptions, 'recentStorageKey'>> & { recentStorageKey: string | null };
+function copyCandidate(candidate: NagaCandidate): NagaCandidate {
+  return {
+    char: candidate.char,
+    reading: candidate.reading,
+    description: candidate.description,
+    category: candidate.category,
+  };
+}
+
+/** 影を辿った最も深い activeElement（影の中の欄・自分の影の中の部品を見分けるため）。 */
+function deepActiveElement(): Element | null {
+  let ae: Element | null = document.activeElement;
+  while (ae && ae.shadowRoot && ae.shadowRoot.activeElement) ae = ae.shadowRoot.activeElement;
+  return ae;
+}
+
+function toElements(target: AttachTarget): Element[] {
+  if (typeof target === 'string') return Array.from(document.querySelectorAll(target));
+  if (target instanceof Element) return [target];
+  return Array.from(target as ArrayLike<Element>);
+}
+
+function constructionError(): TypeError {
+  const name = import.meta.env.PACKAGE_NAME;
+  return new TypeError(
+    `[${name}] cannot construct NagaIME: <naga-ime> is defined by another implementation. ` +
+      `Load a single copy of ${name}, or use document.createElement('naga-ime').`,
+  );
+}
+
+export class NagaIME extends HTMLElement {
+  static get observedAttributes(): string[] {
+    return Object.keys(ATTRIBUTE_TO_PROPERTY);
+  }
+
+  /* 設定の実効値（§5.3）。公開プロパティは prototype の getter / setter（upgrade property のため） */
+  private cfgFor = '';
+  private cfgCategories: NagaCategoryId[] = [...ALL_CATEGORIES];
+  private cfgTriggerLabel = DEFAULT_TRIGGER_LABEL;
+  private cfgShortcut = true;
+  private cfgRecentStorageKey: string | null = DEFAULT_RECENT_KEY;
+  private cfgRecentMax = DEFAULT_RECENT_MAX;
+  private cfgMaxCandidates = DEFAULT_MAX_CANDIDATES;
+  private cfgDockBreakpoint = DEFAULT_DOCK_BREAKPOINT;
+  private cfgLoadFonts = true;
+
   private readonly uid: string;
-  private readonly fontLoader: FontLoader | null;
+  private readonly root: HTMLDivElement;
+  private fontLoader: FontLoader | null = null;
   private readonly fields = new Map<NagaTarget, FieldBinding>();
 
   private dictionary: NagaDictionary | null = null;
-  private recents: NagaCandidate[];
+  private recents: NagaCandidate[] = [];
+  /** recents を localStorage から読んだか（読むのは最初の open まで遅らせる。§5.3 規則 6） */
+  private recentsLoaded = false;
   private target: NagaTarget | null = null;
-  private activeTab: TabId;
+  private activeTab: TabId = ALL_CATEGORIES[0];
   private candidates: NagaCandidate[] = [];
   private selectedIndex = 0;
   private composing = false;
@@ -124,6 +271,9 @@ export class NagaIME {
   private openSeq = 0;
   /** 下部ドッキング中か（`.naga-is-docked` と対。dock 限定の振る舞いの唯一の判定源・設計 §6.2-3）。 */
   private docked = false;
+  /** 初回の connectedCallback を終えたか（昇格中の attributeChangedCallback で for を引かない） */
+  private initialized = false;
+  private pendingForLookup: (() => void) | null = null;
 
   private trigger: HTMLButtonElement | null = null;
   private popup: HTMLDivElement | null = null;
@@ -133,21 +283,176 @@ export class NagaIME {
   private globalCleanup: (() => void) | null = null;
 
   constructor(options: NagaIMEOptions = {}) {
-    const categories = (options.categories ?? NAGA_CATEGORIES.map((c) => c.id)).filter((id) => CATEGORY_IDS.has(id));
-    this.options = {
-      categories: categories.length ? categories : NAGA_CATEGORIES.map((c) => c.id),
-      triggerLabel: options.triggerLabel ?? '梵',
-      shortcut: options.shortcut ?? true,
-      recentStorageKey: options.recentStorageKey === undefined ? DEFAULT_RECENT_KEY : options.recentStorageKey,
-      recentMax: Math.max(0, options.recentMax ?? 14),
-      maxCandidates: Math.max(1, options.maxCandidates ?? 60),
-      dockBreakpoint: options.dockBreakpoint ?? 560,
-      loadFonts: options.loadFonts ?? true,
-    };
+    // 別の実装が naga-ime を登録済みなら、ブラウザの Illegal constructor に任せず理由を言って投げる（§5.2）
+    if (new.target === NagaIME && customElements.get(TAG_NAME) !== NagaIME) throw constructionError();
+    super();
     this.uid = `naga-${++instanceSeq}`;
-    this.fontLoader = this.options.loadFonts ? new FontLoader() : null;
-    this.recents = this.loadRecents();
-    this.activeTab = this.options.categories[0];
+    // custom element の構築の規則: 属性と light DOM の子は作らない（影の中だけを作る）
+    const shadow = this.attachShadow({ mode: 'open' });
+    const style = document.createElement('style');
+    style.setAttribute(NAGA_STYLE_ATTRIBUTE, '');
+    style.textContent = NAGA_STYLE_TEXT;
+    const root = document.createElement('div');
+    root.className = 'naga-root';
+    shadow.append(style, root);
+    this.root = root;
+
+    if (options.categories !== undefined) this.categories = options.categories;
+    if (options.triggerLabel !== undefined) this.triggerLabel = options.triggerLabel;
+    if (options.shortcut !== undefined) this.shortcut = options.shortcut;
+    if (options.recentStorageKey !== undefined) this.recentStorageKey = options.recentStorageKey;
+    if (options.recentMax !== undefined) this.recentMax = options.recentMax;
+    if (options.maxCandidates !== undefined) this.maxCandidates = options.maxCandidates;
+    if (options.dockBreakpoint !== undefined) this.dockBreakpoint = options.dockBreakpoint;
+    if (options.loadFonts !== undefined) this.loadFonts = options.loadFonts;
+  }
+
+  /* ------------------------------------------------------------ *
+   * custom element のライフサイクル
+   * ------------------------------------------------------------ */
+
+  connectedCallback(): void {
+    // 昇格前に代入された own property を取り込み直す（prototype の setter を通す）
+    for (const name of UPGRADE_PROPERTIES) {
+      if (Object.prototype.hasOwnProperty.call(this, name)) {
+        const value = (this as unknown as Record<string, unknown>)[name];
+        delete (this as unknown as Record<string, unknown>)[name];
+        (this as unknown as Record<string, unknown>)[name] = value;
+      }
+    }
+    this.initialized = true;
+    this.resolveFor();
+    if (document.readyState === 'loading' && !this.pendingForLookup) {
+      const onReady = () => {
+        this.pendingForLookup = null;
+        if (this.isConnected) this.resolveFor();
+      };
+      this.pendingForLookup = () => document.removeEventListener('DOMContentLoaded', onReady);
+      document.addEventListener('DOMContentLoaded', onReady, { once: true });
+    }
+  }
+
+  disconnectedCallback(): void {
+    // 同じタスク内の付け替え（appendChild での移動）では作り直さない（§5.4）
+    queueMicrotask(() => {
+      if (this.isConnected) return;
+      this.pendingForLookup?.();
+      this.pendingForLookup = null;
+      this.detach();
+    });
+  }
+
+  attributeChangedCallback(name: string, _old: string | null, value: string | null): void {
+    // 同じ値の setAttribute でも呼ばれる。値が変わったときだけに最適化しない（最後に変えた方が効く。§0.3）
+    switch (name as ObservedAttribute) {
+      case 'for':
+        this.setFor(value ?? '');
+        break;
+      case 'categories':
+        this.setCategories(categoriesFromAttribute(value));
+        break;
+      case 'trigger-label':
+        this.setTriggerLabel(stringFromValue(value) ?? DEFAULT_TRIGGER_LABEL);
+        break;
+      case 'shortcut':
+        this.cfgShortcut = boolFromAttribute(value, name) ?? true;
+        break;
+      case 'recent-storage-key':
+        this.setRecentStorageKey(stringFromValue(value) ?? DEFAULT_RECENT_KEY);
+        break;
+      case 'recent-max':
+        this.setRecentMax(intFromAttribute(value, 0) ?? DEFAULT_RECENT_MAX);
+        break;
+      case 'max-candidates':
+        this.cfgMaxCandidates = intFromAttribute(value, 1) ?? DEFAULT_MAX_CANDIDATES;
+        break;
+      case 'dock-breakpoint':
+        this.cfgDockBreakpoint = intFromAttribute(value, 0) ?? DEFAULT_DOCK_BREAKPOINT;
+        break;
+      case 'load-fonts':
+        this.cfgLoadFonts = boolFromAttribute(value, name) ?? true;
+        break;
+    }
+  }
+
+  /* ------------------------------------------------------------ *
+   * プロパティ（§5.3。読み出しは実効値。代入は属性を変えない）
+   * ------------------------------------------------------------ */
+
+  /**
+   * 取り付ける欄の id（空白区切り）。id は要素の root（`getRootNode()`。影の中に置けばその影の中）で引く。
+   * 接続時と、文書の読込中なら DOMContentLoaded 時に引く。後から足された欄は `attach()` で付ける。
+   * `<label>.htmlFor` と違い、代入は `for` 属性を変えない。
+   */
+  get htmlFor(): string {
+    return this.cfgFor;
+  }
+  set htmlFor(value: string) {
+    this.setFor(typeof value === 'string' ? value : '');
+  }
+
+  /** 表示するカテゴリタブと順序。既定は全カテゴリ。読み出しは複製。 */
+  get categories(): NagaCategoryId[] {
+    return [...this.cfgCategories];
+  }
+  set categories(value: NagaCategoryId[]) {
+    this.setCategories(categoriesFromProperty(value));
+  }
+
+  /** 起動ボタンに表示する文字。既定は '梵'。 */
+  get triggerLabel(): string {
+    return this.cfgTriggerLabel;
+  }
+  set triggerLabel(value: string) {
+    this.setTriggerLabel(stringFromValue(value) ?? DEFAULT_TRIGGER_LABEL);
+  }
+
+  /** Ctrl+J / Cmd+J で開閉するか。既定は true。 */
+  get shortcut(): boolean {
+    return this.cfgShortcut;
+  }
+  set shortcut(value: boolean) {
+    this.cfgShortcut = boolFromProperty(value) ?? true;
+  }
+
+  /** 最近使った文字を保存する localStorage のキー。null で保存も読み出しもしない。 */
+  get recentStorageKey(): string | null {
+    return this.cfgRecentStorageKey;
+  }
+  set recentStorageKey(value: string | null) {
+    this.setRecentStorageKey(value === null ? null : (stringFromValue(value) ?? DEFAULT_RECENT_KEY));
+  }
+
+  /** 最近使った文字の最大件数。0 で「最近」タブを持たず、localStorage を読みも書きもしない。 */
+  get recentMax(): number {
+    return this.cfgRecentMax;
+  }
+  set recentMax(value: number) {
+    this.setRecentMax(intFromProperty(value, 0) ?? DEFAULT_RECENT_MAX);
+  }
+
+  /** 一度に表示する候補の最大件数。既定は 60。 */
+  get maxCandidates(): number {
+    return this.cfgMaxCandidates;
+  }
+  set maxCandidates(value: number) {
+    this.cfgMaxCandidates = intFromProperty(value, 1) ?? DEFAULT_MAX_CANDIDATES;
+  }
+
+  /** この幅（CSS px）未満の viewport ではポップアップを画面下部へドッキングする。既定は 560。 */
+  get dockBreakpoint(): number {
+    return this.cfgDockBreakpoint;
+  }
+  set dockBreakpoint(value: number) {
+    this.cfgDockBreakpoint = intFromProperty(value, 0) ?? DEFAULT_DOCK_BREAKPOINT;
+  }
+
+  /** FontLoader で特殊文字フォントを読み込むか。既定は true。次の `attach()` から効く。 */
+  get loadFonts(): boolean {
+    return this.cfgLoadFonts;
+  }
+  set loadFonts(value: boolean) {
+    this.cfgLoadFonts = boolFromProperty(value) ?? true;
   }
 
   /** ポップアップが開いているか。 */
@@ -155,63 +460,131 @@ export class NagaIME {
     return this.openState;
   }
 
+  private setFor(value: string): void {
+    this.cfgFor = value;
+    if (this.initialized && this.isConnected) this.resolveFor();
+  }
+
+  private setCategories(next: NagaCategoryId[]): void {
+    this.cfgCategories = next;
+    if (this.activeTab !== 'recent' && !next.includes(this.activeTab)) this.activeTab = next[0];
+    this.rebuildTabs();
+  }
+
+  private setTriggerLabel(next: string): void {
+    this.cfgTriggerLabel = next;
+    if (this.trigger) this.trigger.textContent = next;
+  }
+
+  private setRecentStorageKey(next: string | null): void {
+    this.cfgRecentStorageKey = next;
+    // null は以後読まない・書かない（記憶の中の最近は要素の中で働き続ける）。新しいキーは読み直す
+    if (next !== null && this.recentsLoaded) this.reloadRecents();
+  }
+
+  private setRecentMax(next: number): void {
+    const prev = this.cfgRecentMax;
+    this.cfgRecentMax = next;
+    if (next === 0) {
+      // 「最近」タブを外し、記憶の中の最近を捨てる（保存された値は消さない。§0.2）
+      this.recents = [];
+      if (this.activeTab === 'recent') this.activeTab = this.cfgCategories[0];
+    } else if (prev === 0) {
+      if (this.recentsLoaded) this.reloadRecents();
+    } else {
+      this.recents = this.recents.slice(0, next);
+    }
+    if (prev === 0 || next === 0) this.rebuildTabs();
+  }
+
   /* ------------------------------------------------------------ *
    * 取り付け / 取り外し
    * ------------------------------------------------------------ */
 
-  /** セレクタ、要素、または要素の列に取り付ける。input / textarea 以外は無視する。 */
-  attach(target: string | Element | ArrayLike<Element> | Iterable<Element>): void {
-    const elements: Element[] =
-      typeof target === 'string'
-        ? Array.from(document.querySelectorAll(target))
-        : target instanceof Element
-          ? [target]
-          : Array.from(target as ArrayLike<Element>);
-    const fields = elements.filter(isTarget).filter((el) => !this.fields.has(el));
-    if (fields.length === 0) return;
-
-    this.ensureDom();
-    if (this.fontLoader) {
-      this.fontLoader.loadFonts(FONT_SETTINGS).catch(() => {
-        /* 書体の読込失敗は入力機能を止めない（Google Fonts 未到達など） */
-      });
-    }
-    fields.forEach((field) => this.bindField(field));
+  /**
+   * セレクタ、要素、または要素の列に取り付ける。input / textarea 以外は無視する。
+   * 文字列は `document.querySelectorAll` で引く。影の中の欄は Element を渡すか、
+   * 同じ影の中に置いた `<naga-ime for>` を使う。要素が未接続なら `document.body` の末尾へ入れる。
+   */
+  attach(target: AttachTarget): void {
+    this.bindAll(toElements(target), 'attach');
   }
 
   /** 指定要素（省略時はすべて）から取り外す。取り付け先が無くなれば DOM と listener も片付ける。 */
-  detach(target?: string | Element | ArrayLike<Element> | Iterable<Element>): void {
-    const elements: Element[] =
-      target === undefined
-        ? Array.from(this.fields.keys())
-        : typeof target === 'string'
-          ? Array.from(document.querySelectorAll(target))
-          : target instanceof Element
-            ? [target]
-            : Array.from(target as ArrayLike<Element>);
+  detach(target?: AttachTarget): void {
+    const elements = target === undefined ? Array.from(this.fields.keys()) : toElements(target);
     for (const el of elements) {
-      if (!isTarget(el)) continue;
-      const binding = this.fields.get(el);
-      if (!binding) continue;
-      binding.cleanup();
-      if (binding.addedClass) el.classList.remove('naga-enabled');
-      if (binding.appliedFontFamily !== null && el.style.fontFamily === binding.appliedFontFamily) {
-        el.style.fontFamily = '';
-      }
-      this.fields.delete(el);
-      if (this.target === el) {
-        this.close();
-        this.target = null;
-        if (this.trigger) this.trigger.hidden = true;
-      }
+      if (isTarget(el)) this.unbindField(el);
     }
     if (this.fields.size === 0) this.teardownDom();
   }
 
-  /** すべての取り付けを外し、DOM と listener を片付ける。 */
+  /** すべての取り付けを外し、DOM と listener を片付け、要素を DOM から外す。 */
   destroy(): void {
     this.detach();
     this.teardownDom();
+    this.remove();
+  }
+
+  private bindAll(elements: Element[], via: 'attach' | 'for'): void {
+    const targets = elements.filter(isTarget);
+    const fresh: NagaTarget[] = [];
+    for (const field of targets) {
+      const binding = this.fields.get(field);
+      if (binding) {
+        if (via === 'attach') binding.viaAttach = true;
+        else binding.viaFor = true;
+      } else if (!fresh.includes(field)) {
+        fresh.push(field);
+      }
+    }
+    if (fresh.length === 0) return;
+
+    if (!this.isConnected) document.body.append(this);
+    this.ensureDom();
+    if (this.cfgLoadFonts) {
+      this.fontLoader ??= new FontLoader();
+      this.fontLoader.loadFonts(FONT_SETTINGS).catch(() => {
+        /* 書体の読込失敗は入力機能を止めない（Google Fonts 未到達など） */
+      });
+    }
+    fresh.forEach((field) => this.bindField(field, via));
+  }
+
+  /** `for` の id を要素の root で引き直す。`for` で付けた欄だけを付け直す（§5.4）。 */
+  private resolveFor(): void {
+    const root = this.getRootNode() as Document | ShadowRoot;
+    const found: Element[] = [];
+    if (typeof root.getElementById === 'function') {
+      for (const id of this.cfgFor.split(/\s+/)) {
+        if (!id) continue;
+        const el = root.getElementById(id);
+        if (el) found.push(el);
+      }
+    }
+    for (const [field, binding] of Array.from(this.fields)) {
+      if (!binding.viaFor || found.includes(field)) continue;
+      if (binding.viaAttach) binding.viaFor = false;
+      else this.unbindField(field);
+    }
+    if (found.length) this.bindAll(found, 'for');
+    if (this.fields.size === 0) this.teardownDom();
+  }
+
+  private unbindField(el: NagaTarget): void {
+    const binding = this.fields.get(el);
+    if (!binding) return;
+    binding.cleanup();
+    if (binding.addedClass) el.classList.remove('naga-enabled');
+    if (binding.appliedFontFamily !== null && el.style.fontFamily === binding.appliedFontFamily) {
+      el.style.fontFamily = '';
+    }
+    this.fields.delete(el);
+    if (this.target === el) {
+      this.close();
+      this.target = null;
+      if (this.trigger) this.trigger.hidden = true;
+    }
   }
 
   /* ------------------------------------------------------------ *
@@ -239,26 +612,34 @@ export class NagaIME {
     // 読込中に close / detach / 別の open が起きたら、この open は取り消す
     if (seq !== this.openSeq || !this.popup || !this.searchEl || !this.fields.has(field)) return;
 
+    if (!this.recentsLoaded) this.reloadRecents();
     this.openState = true;
     this.popup.hidden = false;
     this.trigger?.setAttribute('aria-expanded', 'true');
     this.searchEl.value = '';
     this.selectedIndex = 0;
     if (this.recents.length) this.activeTab = 'recent';
-    else if (this.activeTab === 'recent') this.activeTab = this.options.categories[0];
+    else if (this.activeTab === 'recent') this.activeTab = this.cfgCategories[0];
     this.renderTabs();
     this.refresh();
     this.positionPopup();
     this.searchEl.focus();
+    this.emit('nagaOpen', { field });
   }
 
   close({ refocus = false }: { refocus?: boolean } = {}): void {
+    const wasOpen = this.openState;
     this.openSeq++;
     this.openState = false;
     this.composing = false;
     if (this.popup) this.popup.hidden = true;
     this.trigger?.setAttribute('aria-expanded', 'false');
     if (refocus && this.target) this.target.focus();
+    if (wasOpen) this.emit('nagaClose', { field: this.target });
+  }
+
+  private emit<K extends keyof NagaIMEEventMap>(type: K, detail: NagaIMEEventMap[K]['detail']): void {
+    this.dispatchEvent(new CustomEvent(type, { bubbles: true, composed: false, cancelable: false, detail }));
   }
 
   /* ------------------------------------------------------------ *
@@ -267,7 +648,6 @@ export class NagaIME {
 
   private ensureDom(): void {
     if (this.popup) return;
-    ensureNagaStyle(document);
     const popupId = `${this.uid}-popup`;
     const listId = `${this.uid}-list`;
 
@@ -275,7 +655,7 @@ export class NagaIME {
     trigger.type = 'button';
     trigger.className = 'naga-trigger';
     trigger.id = `${this.uid}-trigger`;
-    trigger.textContent = this.options.triggerLabel;
+    trigger.textContent = this.cfgTriggerLabel;
     trigger.title = '特殊文字を入力 (Ctrl+J / ⌘J)';
     trigger.setAttribute('aria-label', '特殊文字を入力');
     trigger.setAttribute('aria-haspopup', 'dialog');
@@ -348,7 +728,70 @@ export class NagaIME {
 
     popup.append(titlebar, searchRow, list, hint);
 
-    const tabIds: TabId[] = ['recent', ...this.options.categories];
+    // 検索欄: システム IME の変換中は介入しない
+    search.addEventListener('compositionstart', () => {
+      this.composing = true;
+    });
+    search.addEventListener('compositionend', () => {
+      this.composing = false;
+      this.refresh();
+    });
+    search.addEventListener('input', () => {
+      if (!this.composing) this.refresh();
+    });
+    search.addEventListener('keydown', (e) => this.onSearchKeydown(e));
+
+    list.addEventListener('mousedown', (e) => e.preventDefault());
+    list.addEventListener('click', (e) => {
+      const item = (e.target as Element | null)?.closest?.('.naga-item') as HTMLElement | null;
+      if (item) this.commit(this.candidates[Number(item.dataset.index)]);
+    });
+
+    // 部品は影の中（§5.2）。document.body には何も入れない
+    this.root.append(trigger, popup);
+    this.trigger = trigger;
+    this.popup = popup;
+    this.tabsEl = tabs;
+    this.searchEl = search;
+    this.listEl = list;
+    this.rebuildTabs();
+
+    const onDocMouseDown = (e: MouseEvent) => {
+      if (!this.openState || !this.popup) return;
+      // 影の中の欄・自分の影の中の部品は document から見ると e.target が host に付け替えられる ∴ composedPath で判定する
+      const path = typeof e.composedPath === 'function' ? e.composedPath() : [e.target];
+      if (path.some((n) => n === this.popup || n === this.trigger || (this.target !== null && n === this.target))) return;
+      this.close({ refocus: true });
+    };
+    const onResize = () => {
+      if (this.openState) this.positionPopup();
+      if (this.target && this.trigger && !this.trigger.hidden) this.positionTrigger(this.target);
+    };
+    // fixed（viewport 基準）なので、ページのスクロールで popup と trigger を置き直す
+    const onScroll = () => {
+      if (this.openState && this.popup && !this.popup.classList.contains('naga-is-docked')) this.positionPopup();
+      if (this.target && this.trigger && !this.trigger.hidden) this.positionTrigger(this.target);
+    };
+    const vv = window.visualViewport;
+    document.addEventListener('mousedown', onDocMouseDown);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('scroll', onScroll, true);
+    vv?.addEventListener('resize', onResize);
+    this.globalCleanup = () => {
+      document.removeEventListener('mousedown', onDocMouseDown);
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('scroll', onScroll, true);
+      vv?.removeEventListener('resize', onResize);
+    };
+  }
+
+  /** タブを作り直す（categories・recentMax の変更と DOM の構築時）。選択と dock の表示名は保つ。 */
+  private rebuildTabs(): void {
+    const tabs = this.tabsEl;
+    if (!tabs) return;
+    const listId = `${this.uid}-list`;
+    const tabIds: TabId[] = this.cfgRecentMax > 0 ? ['recent', ...this.cfgCategories] : [...this.cfgCategories];
+    tabs.replaceChildren();
     for (const id of tabIds) {
       const b = document.createElement('button');
       b.type = 'button';
@@ -371,57 +814,8 @@ export class NagaIME {
       });
       tabs.appendChild(b);
     }
-
-    // 検索欄: システム IME の変換中は介入しない
-    search.addEventListener('compositionstart', () => {
-      this.composing = true;
-    });
-    search.addEventListener('compositionend', () => {
-      this.composing = false;
-      this.refresh();
-    });
-    search.addEventListener('input', () => {
-      if (!this.composing) this.refresh();
-    });
-    search.addEventListener('keydown', (e) => this.onSearchKeydown(e));
-
-    list.addEventListener('mousedown', (e) => e.preventDefault());
-    list.addEventListener('click', (e) => {
-      const item = (e.target as Element | null)?.closest?.('.naga-item') as HTMLElement | null;
-      if (item) this.commit(this.candidates[Number(item.dataset.index)]);
-    });
-
-    document.body.append(trigger, popup);
-    this.trigger = trigger;
-    this.popup = popup;
-    this.tabsEl = tabs;
-    this.searchEl = search;
-    this.listEl = list;
-
-    const onDocMouseDown = (e: MouseEvent) => {
-      if (!this.openState || !this.popup) return;
-      const t = e.target as Node | null;
-      if (t && (this.popup.contains(t) || t === this.trigger || t === this.target)) return;
-      this.close({ refocus: true });
-    };
-    const onResize = () => {
-      if (this.openState) this.positionPopup();
-      if (this.target && this.trigger && !this.trigger.hidden) this.positionTrigger(this.target);
-    };
-    const onScroll = () => {
-      if (this.openState && this.popup && !this.popup.classList.contains('naga-is-docked')) this.positionPopup();
-    };
-    const vv = window.visualViewport;
-    document.addEventListener('mousedown', onDocMouseDown);
-    window.addEventListener('resize', onResize);
-    window.addEventListener('scroll', onScroll, true);
-    vv?.addEventListener('resize', onResize);
-    this.globalCleanup = () => {
-      document.removeEventListener('mousedown', onDocMouseDown);
-      window.removeEventListener('resize', onResize);
-      window.removeEventListener('scroll', onScroll, true);
-      vv?.removeEventListener('resize', onResize);
-    };
+    this.renderTabs();
+    if (this.openState) this.refresh();
   }
 
   private teardownDom(): void {
@@ -439,7 +833,7 @@ export class NagaIME {
     this.docked = false;
   }
 
-  private bindField(field: NagaTarget): void {
+  private bindField(field: NagaTarget, via: 'attach' | 'for'): void {
     let appliedFontFamily: string | null = null;
     if (!field.style.fontFamily) {
       // loadFonts: false でも family 文字列は FontLoader と同じ並びにする（style は注入しない）
@@ -461,15 +855,16 @@ export class NagaIME {
 
     const onFocus = () => this.showTrigger(field);
     const onBlur = () => {
-      // setTimeout を挟むと focus による付け替えと競合するため、同期的に activeElement で判定する
+      // setTimeout を挟むと focus による付け替えと競合するため、同期的に activeElement で判定する。
+      // 影の中の欄・自分の影の中の trigger を見分けるため、影を辿った最も深い要素で判定する
       if (this.openState) return;
-      const ae = document.activeElement;
+      const ae = deepActiveElement();
       if (ae !== this.trigger && !(isTarget(ae) && this.fields.has(ae))) {
         if (this.trigger) this.trigger.hidden = true;
       }
     };
     const onKeydown = (e: KeyboardEvent) => {
-      if (this.options.shortcut && (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'j') {
+      if (this.cfgShortcut && (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'j') {
         e.preventDefault();
         void this.toggle(field);
         return;
@@ -485,13 +880,15 @@ export class NagaIME {
     this.fields.set(field, {
       appliedFontFamily,
       addedClass,
+      viaFor: via === 'for',
+      viaAttach: via === 'attach',
       cleanup: () => {
         el.removeEventListener('focus', onFocus);
         el.removeEventListener('blur', onBlur);
         el.removeEventListener('keydown', onKeydown);
       },
     });
-    if (document.activeElement === field) this.showTrigger(field);
+    if (deepActiveElement() === field) this.showTrigger(field);
   }
 
   /* ------------------------------------------------------------ *
@@ -505,12 +902,12 @@ export class NagaIME {
     this.trigger.hidden = false;
   }
 
+  /** 起動ボタンを欄の右上に置く（fixed・viewport の座標）。 */
   private positionTrigger(field: NagaTarget): void {
     if (!this.trigger) return;
     const r = field.getBoundingClientRect();
-    const size = 26;
-    this.trigger.style.top = `${window.scrollY + r.top - size - 4}px`;
-    this.trigger.style.left = `${window.scrollX + r.right - size}px`;
+    this.trigger.style.top = `${r.top - TRIGGER_SIZE_PX - 4}px`;
+    this.trigger.style.left = `${r.right - TRIGGER_SIZE_PX}px`;
   }
 
   /* ------------------------------------------------------------ *
@@ -526,7 +923,7 @@ export class NagaIME {
     if (!this.searchEl) return;
     const query = this.searchEl.value.trim();
     const recentChars = new Set(this.recents.map((r) => r.char));
-    this.candidates = searchNagaCandidates(this.currentEntries(), query, recentChars, this.options.maxCandidates);
+    this.candidates = searchNagaCandidates(this.currentEntries(), query, recentChars, this.cfgMaxCandidates);
     this.selectedIndex = 0;
     this.renderList();
   }
@@ -658,8 +1055,12 @@ export class NagaIME {
     } else {
       (field as NagaTarget).value += candidate.char;
     }
-    // React / Vue 等に変更を知らせるため bubbles な input を発火する
-    field.dispatchEvent(new Event('input', { bubbles: true }));
+    // ネイティブの入力と同じ性質の InputEvent（§5.5）。composed なので影の中の欄でも影の外の
+    // React / Vue 等に届く
+    field.dispatchEvent(
+      new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: candidate.char }),
+    );
+    this.emit('nagaCommit', { field, candidate: copyCandidate(candidate) });
 
     // 連続入力: 開いたまま検索語だけクリアし、キャレットへ追従する
     if (this.searchEl) this.searchEl.value = '';
@@ -670,7 +1071,7 @@ export class NagaIME {
   }
 
   /* ------------------------------------------------------------ *
-   * 位置
+   * 位置（PC は fixed・viewport の座標）
    * ------------------------------------------------------------ */
 
   private positionPopup(): void {
@@ -683,7 +1084,7 @@ export class NagaIME {
     const style = pop.style;
 
     // 狭幅（またはソフトキーボードで縮んだ viewport）は下部ドッキング
-    if (vw < this.options.dockBreakpoint) {
+    if (vw < this.cfgDockBreakpoint) {
       pop.classList.add('naga-is-docked');
       this.setDocked(true);
       style.position = 'fixed';
@@ -709,7 +1110,7 @@ export class NagaIME {
     if (style.maxHeight) style.maxHeight = '';
     style.removeProperty('--naga-dock-max');
     style.removeProperty('--naga-dock-avail');
-    style.position = 'absolute';
+    style.position = 'fixed';
     style.width = `${Math.min(360, vw - 16)}px`;
 
     let anchor: { x: number; y: number; lineHeight: number } | null = null;
@@ -728,14 +1129,14 @@ export class NagaIME {
       top = anchor.y + anchor.lineHeight + 2;
       left = anchor.x;
     } else {
-      top = window.scrollY + r.bottom + 4;
-      left = window.scrollX + r.left;
+      top = r.bottom + 4;
+      left = r.left;
     }
-    if (top - window.scrollY + h > vpBottom) {
-      top = anchor ? anchor.y - h - 2 : window.scrollY + r.top - h - 4;
+    if (top + h > vpBottom) {
+      top = anchor ? anchor.y - h - 2 : r.top - h - 4;
     }
-    if (left - window.scrollX + w > vw) left = window.scrollX + vw - w - 8;
-    if (left < window.scrollX + 4) left = window.scrollX + 4;
+    if (left + w > vw) left = vw - w - 8;
+    if (left < 4) left = 4;
 
     style.top = `${top}px`;
     style.left = `${left}px`;
@@ -743,7 +1144,11 @@ export class NagaIME {
     style.right = 'auto';
   }
 
-  /** キャレット座標の計測（ミラー要素方式）。 */
+  /**
+   * キャレット座標の計測（ミラー要素方式・viewport の座標）。ミラーは影の中の `.naga-root`
+   * （継承を断った箱）に置く。document.body に置くとページの CSS（`text-align` の継承・
+   * `div { all: unset }` 等）に写した値を上書きされる（nov26-m3-t1 の R-popup の dx）。
+   */
   private measureCaret(field: NagaTarget): { x: number; y: number; lineHeight: number } {
     const rect = field.getBoundingClientRect();
     const cs = getComputedStyle(field);
@@ -768,7 +1173,7 @@ export class NagaIME {
     const marker = document.createElement('span');
     marker.textContent = '​'; // 末尾改行でも高さを確保する
     mirror.appendChild(marker);
-    document.body.appendChild(mirror);
+    this.root.appendChild(mirror);
     const mRect = marker.getBoundingClientRect();
     const dRect = mirror.getBoundingClientRect();
     mirror.remove();
@@ -777,8 +1182,8 @@ export class NagaIME {
     const relX = mRect.left - dRect.left - (field.scrollLeft || 0);
     const relY = mRect.top - dRect.top - (field.scrollTop || 0);
     return {
-      x: window.scrollX + rect.left + relX,
-      y: window.scrollY + rect.top + relY,
+      x: rect.left + relX,
+      y: rect.top + relY,
       lineHeight,
     };
   }
@@ -787,31 +1192,79 @@ export class NagaIME {
    * 直近使用
    * ------------------------------------------------------------ */
 
-  private loadRecents(): NagaCandidate[] {
-    const key = this.options.recentStorageKey;
-    if (!key) return [];
+  /** localStorage から読み直す。recentStorageKey が null か recentMax が 0 なら読まない。 */
+  private reloadRecents(): void {
+    this.recentsLoaded = true;
+    const key = this.cfgRecentStorageKey;
+    const max = this.cfgRecentMax;
+    if (key === null || max === 0) {
+      if (max === 0) this.recents = [];
+      return;
+    }
     try {
       const parsed: unknown = JSON.parse(localStorage.getItem(key) || '[]');
-      return Array.isArray(parsed) ? parsed.filter(isCandidate).slice(0, this.options.recentMax) : [];
+      this.recents = Array.isArray(parsed) ? parsed.filter(isCandidate).slice(0, max) : [];
     } catch {
-      return [];
+      this.recents = [];
     }
   }
 
   private pushRecent(candidate: NagaCandidate): void {
-    const entry: NagaCandidate = {
-      char: candidate.char,
-      reading: candidate.reading,
-      description: candidate.description,
-      category: candidate.category,
-    };
-    this.recents = [entry, ...this.recents.filter((r) => r.char !== entry.char)].slice(0, this.options.recentMax);
-    const key = this.options.recentStorageKey;
-    if (!key) return;
+    const max = this.cfgRecentMax;
+    if (max === 0) return;
+    const entry = copyCandidate(candidate);
+    this.recents = [entry, ...this.recents.filter((r) => r.char !== entry.char)].slice(0, max);
+    const key = this.cfgRecentStorageKey;
+    if (key === null) return;
     try {
       localStorage.setItem(key, JSON.stringify(this.recents));
     } catch {
       /* private mode 等は黙殺する */
     }
   }
+}
+
+/** `<naga-ime>` のイベントの型（`addEventListener('nagaCommit', e => e.detail…)`）。 */
+export interface NagaIME {
+  addEventListener<K extends keyof NagaIMEEventMap>(
+    type: K,
+    listener: (this: NagaIME, ev: NagaIMEEventMap[K]) => unknown,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+  addEventListener<K extends keyof HTMLElementEventMap>(
+    type: K,
+    listener: (this: NagaIME, ev: HTMLElementEventMap[K]) => unknown,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+  addEventListener(
+    type: string,
+    listener: EventListenerOrEventListenerObject,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+  removeEventListener<K extends keyof NagaIMEEventMap>(
+    type: K,
+    listener: (this: NagaIME, ev: NagaIMEEventMap[K]) => unknown,
+    options?: boolean | EventListenerOptions,
+  ): void;
+  removeEventListener<K extends keyof HTMLElementEventMap>(
+    type: K,
+    listener: (this: NagaIME, ev: HTMLElementEventMap[K]) => unknown,
+    options?: boolean | EventListenerOptions,
+  ): void;
+  removeEventListener(
+    type: string,
+    listener: EventListenerOrEventListenerObject,
+    options?: boolean | EventListenerOptions,
+  ): void;
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'naga-ime': NagaIME;
+  }
+}
+
+// 登録（モジュールの評価につき 1 回）。既に登録済みなら（自分でも別の実装でも）何もしない・何も出さない
+if (typeof customElements !== 'undefined' && !customElements.get(TAG_NAME)) {
+  customElements.define(TAG_NAME, NagaIME);
 }

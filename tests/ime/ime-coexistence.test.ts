@@ -1,9 +1,11 @@
 /**
- * 同一ページでの legacy <ime-ui> と NagaIME の共存（oct26-m7-t1 設計 v4 §3.1・AC6）。
+ * 同一ページでの legacy <ime-ui> と NagaIME の共存（oct26-m7-t1 設計 v4 §3.1・AC6、
+ * nov26-m3-t2 でマイルストーン設計 §5.7-9 の形へ追随）。
  *
  * テストの順序に意味がある: 最初のテストは <ime-ui> がまだ登録されていない registry で
- * NagaIME だけを import し、NagaIME が custom element を登録しないことを spy で確かめる
- * （registry は列挙できず、ui.ts は既登録なら define を飛ばすため、登録後では判定にならない）。
+ * NagaIME だけを import し、NagaIME が naga-ime だけを登録し ime-ui を登録しないことを spy で
+ * 確かめる（registry は列挙できず、ui.ts は既登録なら define を飛ばすため、登録後では判定にならない）。
+ * NagaIME の部品とスタイルは各 <naga-ime> の影の中にある（§5.2）。
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
@@ -37,9 +39,17 @@ function selectorsOf(cssText: string): string[] {
   return selectors;
 }
 
+/** 文書の全 <naga-ime> の影から集めた部品（popup・trigger と、その子孫）。 */
 function nagaCreatedElements(): Element[] {
-  const roots = Array.from(document.body.querySelectorAll('.naga-popup, .naga-trigger'));
+  const roots = Array.from(document.querySelectorAll('naga-ime')).flatMap((el) =>
+    Array.from(el.shadowRoot?.querySelectorAll('.naga-popup, .naga-trigger') ?? []),
+  );
   return roots.flatMap((root) => [root, ...Array.from(root.querySelectorAll('*'))]);
+}
+
+/** 文書の <naga-ime> の影の中の最初の部品。 */
+function nagaPart(naga: Element, selector: string): HTMLElement | null {
+  return (naga.shadowRoot?.querySelector(selector) as HTMLElement | null) ?? null;
 }
 
 describe('legacy <ime-ui> と NagaIME の同一ページ共存（AC6）', () => {
@@ -48,7 +58,7 @@ describe('legacy <ime-ui> と NagaIME の同一ページ共存（AC6）', () => 
     document.body.innerHTML = '';
   });
 
-  it('NagaIME は custom element を登録しない（naga-ime だけを import・attach・open して define 0 回）', async () => {
+  it('NagaIME は naga-ime だけを登録し、ime-ui を登録しない（naga-ime だけを import・attach・open して define は naga-ime の 1 回）', async () => {
     expect(window.customElements.get('ime-ui')).toBeUndefined();
     vi.resetModules();
     const define = vi.spyOn(window.customElements, 'define');
@@ -59,7 +69,8 @@ describe('legacy <ime-ui> と NagaIME の同一ページ共存（AC6）', () => 
     naga.attach(input);
     await naga.open(input);
     naga.destroy();
-    expect(define).not.toHaveBeenCalled();
+    expect(define).toHaveBeenCalledTimes(1);
+    expect(define.mock.calls[0][0]).toBe('naga-ime');
     expect(window.customElements.get('ime-ui')).toBeUndefined();
   }, DICTIONARY_TEST_TIMEOUT_MS);
 
@@ -87,9 +98,16 @@ describe('legacy <ime-ui> と NagaIME の同一ページ共存（AC6）', () => 
     await naga.open(nagaInput);
 
     expect(document.body.querySelectorAll('ime-ui')).toHaveLength(1);
-    expect(document.body.querySelectorAll('.naga-popup')).toHaveLength(2);
+    const nagas = Array.from(document.querySelectorAll('naga-ime'));
+    expect(nagas).toHaveLength(2);
+    for (const n of nagas) expect(n.shadowRoot!.querySelectorAll('.naga-popup')).toHaveLength(1);
+    expect(document.body.querySelectorAll('.naga-popup')).toHaveLength(0);
 
-    const ids = Array.from(document.querySelectorAll('[id]')).map((el) => el.id);
+    // 影の中の id（各 <naga-ime> の部品）も含めて重複 0（aria-controls がインスタンス固有）
+    const ids = [
+      ...Array.from(document.querySelectorAll('[id]')),
+      ...nagas.flatMap((n) => Array.from(n.shadowRoot!.querySelectorAll('[id]'))),
+    ].map((el) => el.id);
     expect(ids.length).toBeGreaterThan(2);
     expect(ids.length - new Set(ids).size).toBe(0);
 
@@ -103,15 +121,19 @@ describe('legacy <ime-ui> と NagaIME の同一ページ共存（AC6）', () => 
     // Naga は ime-* class を light DOM に作らない
     expect(document.body.querySelectorAll('[class^="ime-"], [class*=" ime-"]')).toHaveLength(0);
 
+    // selector は .naga- 始まりか :host（自分の host にしか当たらない ∴ ページの要素と衝突しない）
     const selectors = selectorsOf(NAGA_STYLE_TEXT);
     expect(selectors.length).toBeGreaterThan(10);
     for (const s of selectors) {
-      expect(s.startsWith('.naga-'), s).toBe(true);
+      expect(s.startsWith('.naga-') || s === ':host' || s.startsWith(':host('), s).toBe(true);
     }
-    // 文書へ入った style も同じ内容で 1 つだけ
-    const styles = Array.from(document.head.querySelectorAll('style[data-naga-style]'));
-    expect(styles).toHaveLength(1);
-    expect(styles[0].textContent).toBe(NAGA_STYLE_TEXT);
+    // document.head には入れない（§5.2）。各 <naga-ime> の影の中に同じ内容で 1 つ
+    expect(document.head.querySelectorAll('style[data-naga-style]')).toHaveLength(0);
+    for (const n of nagas) {
+      const styles = Array.from(n.shadowRoot!.querySelectorAll('style[data-naga-style]'));
+      expect(styles).toHaveLength(1);
+      expect(styles[0].textContent).toBe(NAGA_STYLE_TEXT);
+    }
 
     manager.detach();
     naga.destroy();
@@ -138,10 +160,10 @@ describe('legacy <ime-ui> と NagaIME の同一ページ共存（AC6）', () => 
     naga.close();
     expect(naga.isOpen).toBe(false);
     await naga.open(nagaInput);
-    expect((document.body.querySelector('.naga-popup') as HTMLElement).hidden).toBe(false);
+    expect((nagaPart(naga, '.naga-popup') as HTMLElement).hidden).toBe(false);
 
     naga.detach(nagaInput);
-    expect(document.body.querySelector('.naga-popup')).toBeNull();
+    expect(nagaPart(naga, '.naga-popup')).toBeNull();
     manager.attach(legacyInput);
     const ui = document.body.querySelector('ime-ui') as HTMLElement & { updatePosition?: unknown };
     expect(ui).not.toBeNull();

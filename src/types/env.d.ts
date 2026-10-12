@@ -2,6 +2,7 @@
 
 interface ImportMetaEnv {
     readonly APP_VERSION: string
+    readonly PACKAGE_NAME: string
 }
   
 interface ImportMeta {

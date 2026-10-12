@@ -31,7 +31,9 @@ export const NAGA_STYLE_TEXT = `
 }
 
 .naga-popup[hidden],
-.naga-trigger[hidden] {
+.naga-trigger[hidden],
+.naga-search-row[hidden],
+.naga-list[hidden] {
   display: none !important;
 }
 
@@ -119,12 +121,33 @@ export const NAGA_STYLE_TEXT = `
 }
 
 /*
+ * 非 dock（PC）で隠す・構造の selector は base に置く（nov26-m3-t3 タスク設計 §1 の 4-2 の定め直し）。
+ * dock 専用の見た目は下の .naga-popup.naga-is-docked スコープに置く。
+ */
+.naga-fold {
+  display: none;
+  flex: none;
+  border: none;
+  background: none;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 12px;
+  cursor: pointer;
+  color: #666;
+  border-left: 1px solid #eee;
+}
+.naga-copy {
+  display: none;
+}
+
+/*
  * 読み入力欄の行（是正設計 v2 §5「区別の付け方」）。
- * PC（non-docked）では display: contents なので、input は従来どおり popup 直下の
- * flex item として並び、行も高さも増えない。ラベルは PC では出さない。
+ * 行は flex（nov26-m3-t3: a11y の木から要素を落としうる contents の箱をやめた）。PC では input が
+ * 行いっぱいに広がり、外余白 8px で従来と同じ位置に来る（e2e の P-8）。ラベルは PC では出さない。
  */
 .naga-search-row {
-  display: contents;
+  display: flex;
+  flex: none;
 }
 .naga-search-label {
   display: none;
@@ -136,7 +159,8 @@ export const NAGA_STYLE_TEXT = `
   font-size: 16px;
   border: 1px solid #ccc;
   border-radius: 6px;
-  flex: none;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .naga-search:focus {
   outline: 2px solid var(--naga-accent);
@@ -217,16 +241,21 @@ export const NAGA_STYLE_TEXT = `
 }
 
 /*
- * モバイル dock（是正設計 v2 §3「使える高さからの逆算」・§4 案 A・§5・§6.2）。
+ * モバイル dock（是正設計 v2 §3・§4 案 A・§5、nov26-m3-t3 タスク設計 §3.1〜§3.3）。
  * ここから下の規則はすべて .naga-popup.naga-is-docked スコープに閉じる（PC 非影響）。
- * 高さの静的な viewport 比指定（旧 dock ルールの vh 値）は廃止した。--naga-dock-max は
- * positionPopup() が visualViewport の実測から毎回設定する（未設定時のみ案 A の既定 224px）。
+ * 高さの静的な viewport 比指定（旧 dock ルールの vh 値）は使わない。--naga-dock-max は
+ * positionPopup() が visualViewport の実測から毎回設定する（未設定時のみ既定 226px）。
+ * 各行の高さは naga-ime.ts の DOCK_*_PX と一致させる（タイトル 34・写し 22・読み欄 36・候補 44・枠 2）。
  */
 .naga-popup.naga-is-docked {
-  border-radius: 12px 12px 0 0;
-  max-height: var(--naga-dock-max, 224px);
+  /* 画面の下に据え付けた板（「ふわふわ浮いて」への対応）: 左右いっぱい・上端のアクセントの線・上向きの影 */
+  border: none;
+  border-top: 2px solid var(--naga-accent);
+  border-radius: 0;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.18);
+  max-height: var(--naga-dock-max, 226px);
 }
-/* 縮むのは内側の list だけ（タブ帯と読み入力欄は潰さない） */
+/* 縮むのは内側の list だけ（タイトル行・写しの行・読み欄は潰さない） */
 .naga-popup.naga-is-docked .naga-list {
   flex: 1 1 auto;
   min-height: 0;
@@ -237,25 +266,56 @@ export const NAGA_STYLE_TEXT = `
 .naga-popup.naga-is-docked .naga-hint {
   display: none;
 }
-/* タブ帯: 背景と下線で「ヘッダー帯」に見せ、候補領域の白と分ける（高さは増やさない） */
+/* タイトル行: 背景と下線で「ヘッダー帯」に見せ、候補領域の白と分ける */
 .naga-popup.naga-is-docked .naga-titlebar {
+  box-sizing: border-box;
+  height: 34px;
   background: #fafafa;
   border-bottom: 1px solid #e2e2e2;
 }
 .naga-popup.naga-is-docked .naga-tab {
-  padding: 9px 12px;
+  padding: 0 10px;
   font-size: 15px;
-  line-height: 1.25;
+  line-height: 20px;
 }
-.naga-popup.naga-is-docked .naga-close {
+.naga-popup.naga-is-docked .naga-close,
+.naga-popup.naga-is-docked .naga-fold {
   padding: 0 14px;
+}
+.naga-popup.naga-is-docked .naga-fold {
+  display: block;
+}
+/* 挿入先の写し: 欄が popup に隠れていても、どこに何が入ったか分かるように */
+.naga-popup.naga-is-docked .naga-copy {
+  display: block;
+  flex: none;
+  box-sizing: border-box;
+  height: 22px;
+  padding: 2px 10px;
+  font-family: var(--naga-special-font);
+  font-size: 13px;
+  line-height: 18px;
+  color: #555;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.naga-popup.naga-is-docked .naga-copy-new {
+  color: var(--naga-accent);
+  font-weight: 700;
+}
+.naga-popup.naga-is-docked .naga-copy-empty {
+  color: #aaa;
+}
+.naga-popup.naga-is-docked .naga-copy-caret {
+  color: var(--naga-accent);
 }
 /* 読み入力欄: アクセント縦線＋「読み」ラベルで本体の入力欄と見分ける（高さは 1 行のまま） */
 .naga-popup.naga-is-docked .naga-search-row {
-  display: flex;
+  box-sizing: border-box;
+  height: 30px;
   align-items: stretch;
-  flex: none;
-  margin: 6px 8px;
+  margin: 3px 8px;
   border: 1px solid #ccc;
   border-left: 3px solid var(--naga-accent);
   border-radius: 6px;
@@ -274,21 +334,21 @@ export const NAGA_STYLE_TEXT = `
   border-right: 1px solid #e4dff2;
 }
 .naga-popup.naga-is-docked .naga-search {
-  flex: 1 1 auto;
-  min-width: 0;
+  box-sizing: border-box;
   margin: 0;
   border: none;
   border-radius: 0;
   font-size: 16px; /* iOS の focus 時自動ズームを避ける下限 */
-  padding: 7px 10px;
+  line-height: 20px;
+  padding: 4px 10px;
 }
 .naga-popup.naga-is-docked .naga-search:focus {
   outline-offset: -2px;
 }
-/* 候補行: 44px/行（設計 §3.3）。max-height 224px で 3 件強が見える */
+/* 候補行: 44px/行（タップの的の大きさ） */
 .naga-popup.naga-is-docked .naga-item {
   box-sizing: border-box;
-  min-height: 44px;
+  height: 44px;
   padding: 5px 10px;
 }
 `;

@@ -20,6 +20,13 @@ export default defineConfig({
     {
       name: 'chromium-desktop',
       use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } },
+      testIgnore: /mobile\.spec\.ts/,
+    },
+    {
+      // nov26-m3-t3 §3.7: スマートフォンの見え方（M-1〜M-5）。viewport は spec の describe ごとに与える
+      name: 'chromium-mobile',
+      use: { ...devices['Pixel 5'], isMobile: true, hasTouch: true },
+      testMatch: /mobile\.spec\.ts/,
     },
   ],
   webServer: {

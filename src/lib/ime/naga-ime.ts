@@ -54,33 +54,39 @@ const ALL_CATEGORIES: readonly NagaCategoryId[] = NAGA_CATEGORIES.map((c) => c.i
 const CATEGORY_IDS = new Set<string>(ALL_CATEGORIES);
 
 /*
- * モバイル dock の割り付け（是正設計 v2 §3.2-3.3・案 A）。この 5 つと下の
- * DOCK_POPUP_MAX_PX が「dock 時の寸法」の唯一の出どころである（CSS 側には
- * --naga-dock-max 未設定時のフォールバックしか置かない）。
- *   popupMax = clamp(DOCK_MIN_PX, vvAvail − DOCK_CONTEXT_MIN_PX, DOCK_POPUP_MAX_PX)
- * 静的な vh（旧 45vh / 30vh）には依存しない。
+ * モバイル dock の割り付け（nov26-m3-t3 タスク設計 §3.1）。下の定数が「dock 時の寸法」の唯一の出どころである
+ * （CSS 側には --naga-dock-max 未設定時のフォールバックしか置かない）。静的な vh には依存しない。
+ *   avail    = vvAvail − DOCK_GAP_PX
+ *   popupMax = min(DOCK_POPUP_MAX_PX, avail − DOCK_BAND_PX)          // 帯 40 を残す
+ *   popupMax < DOCK_MIN_PX なら min(DOCK_MIN_PX, avail)               // 帯より候補 1 行を優先。可視の領域は超えない
+ *   畳んでいるときは DOCK_FOLDED_PX
  */
-/** H_CTX: popup の上に必ず残す「本体の入力欄が見える帯」（設計 §3.2）。 */
-const DOCK_CONTEXT_MIN_PX = 48;
-/** タブ帯の高さ（設計 §3.3）。 */
-const DOCK_TABS_PX = 40;
-/** 読み入力欄の高さ（設計 §3.3。font-size 16px で iOS の自動ズームを避ける）。 */
-const DOCK_SEARCH_PX = 40;
-/** 候補 1 行の高さ（設計 §3.3）。 */
+/** タイトル行（タブ・畳むボタン・閉じるボタン）。 */
+const DOCK_TITLE_PX = 34;
+/** 挿入先の写しの行。 */
+const DOCK_COPY_PX = 22;
+/** 読み欄の行（外余白 3px×2 を含む。font-size 16px で iOS の自動ズームを避ける）。 */
+const DOCK_SEARCH_PX = 36;
+/** 候補 1 行の高さ（タップの的の大きさ）。 */
 const DOCK_ROW_PX = 44;
-/** dock 時に同時に見せる候補の件数（設計 §3.4・案 A）。 */
+/** dock 時に同時に見せる候補の上限。 */
 const DOCK_ROWS = 3;
-/** popup 上下の境界線。 */
+/** popup の上下の枠（上端のアクセントの線 2px・下は無し）。 */
 const DOCK_BORDER_PX = 2;
-/** 行の端数・読み入力欄の外余白などの丸め分。 */
-const DOCK_SLACK_PX = 10;
-/** キーボード上端（可視領域の下端）との間隔。既存実装から不変。 */
+/** キーボード上端（可視領域の下端）との間隔。 */
 const DOCK_GAP_PX = 8;
-/** 案 A の popup 高さ上限 = 40 + 40 + 44×3 + 2 + 10 = 224px（設計 §3.5 の既定値）。 */
-const DOCK_POPUP_MAX_PX =
-  DOCK_TABS_PX + DOCK_SEARCH_PX + DOCK_ROW_PX * DOCK_ROWS + DOCK_BORDER_PX + DOCK_SLACK_PX;
-/** 極端に小さい可視高（横持ち・分割表示）でも popup を潰さない下限。list が内側で scroll する。 */
-const DOCK_MIN_PX = 96;
+/** popup の上に残す帯（本体の入力欄が見える高さ。10 月 (a) で受け入れた 39 を下回らない）。 */
+const DOCK_BAND_PX = 40;
+/** 畳んでも残る固定部分 ＋ 読み欄 = 94px。 */
+const DOCK_FIXED_PX = DOCK_TITLE_PX + DOCK_COPY_PX + DOCK_SEARCH_PX + DOCK_BORDER_PX;
+/** 候補が 1 行まるごと見える下限 = 138px。 */
+const DOCK_MIN_PX = DOCK_FIXED_PX + DOCK_ROW_PX;
+/** popup の高さの上限 = 226px。 */
+const DOCK_POPUP_MAX_PX = DOCK_FIXED_PX + DOCK_ROW_PX * DOCK_ROWS;
+/** 畳んだ高さ（タイトル行＋写しの行＋枠）= 58px。 */
+const DOCK_FOLDED_PX = DOCK_TITLE_PX + DOCK_COPY_PX + DOCK_BORDER_PX;
+/** 写しの行に出すキャレットの直前の文字数。 */
+const COPY_MAX_CHARS = 12;
 
 /** 属性名 → プロパティ名（大文字の前で区切り `-` でつなぐ機械変換。`for` だけは DOM の前例どおり `htmlFor`）。 */
 const ATTRIBUTE_TO_PROPERTY = {
@@ -271,6 +277,10 @@ export class NagaIME extends HTMLElement {
   private openSeq = 0;
   /** 下部ドッキング中か（`.naga-is-docked` と対。dock 限定の振る舞いの唯一の判定源・設計 §6.2-3）。 */
   private docked = false;
+  /** 畳んでいるか（人間の操作でだけ変わる。閉じても・dock でなくなっても保つ。§3.3） */
+  private folded = false;
+  /** 直前の確定で入った文字（写しで強調する。次に開くとき・タブを替えたときに消す。§3.2） */
+  private lastCommitted: string | null = null;
   /** 初回の connectedCallback を終えたか（昇格中の attributeChangedCallback で for を引かない） */
   private initialized = false;
   private pendingForLookup: (() => void) | null = null;
@@ -280,6 +290,9 @@ export class NagaIME extends HTMLElement {
   private tabsEl: HTMLDivElement | null = null;
   private searchEl: HTMLInputElement | null = null;
   private listEl: HTMLDivElement | null = null;
+  private searchRowEl: HTMLDivElement | null = null;
+  private copyEl: HTMLDivElement | null = null;
+  private foldEl: HTMLButtonElement | null = null;
   private globalCleanup: (() => void) | null = null;
 
   constructor(options: NagaIMEOptions = {}) {
@@ -618,12 +631,15 @@ export class NagaIME extends HTMLElement {
     this.trigger?.setAttribute('aria-expanded', 'true');
     this.searchEl.value = '';
     this.selectedIndex = 0;
+    this.lastCommitted = null;
     if (this.recents.length) this.activeTab = 'recent';
     else if (this.activeTab === 'recent') this.activeTab = this.cfgCategories[0];
     this.renderTabs();
     this.refresh();
     this.positionPopup();
-    this.searchEl.focus();
+    this.updateCopy();
+    // NagaIME はページも欄もスクロールしない（M-1）。focus の暗黙のスクロールも止める（MIN-1）
+    this.searchEl.focus({ preventScroll: true });
     this.emit('nagaOpen', { field });
   }
 
@@ -634,7 +650,7 @@ export class NagaIME extends HTMLElement {
     this.composing = false;
     if (this.popup) this.popup.hidden = true;
     this.trigger?.setAttribute('aria-expanded', 'false');
-    if (refocus && this.target) this.target.focus();
+    if (refocus && this.target) this.target.focus({ preventScroll: true });
     if (wasOpen) this.emit('nagaClose', { field: this.target });
   }
 
@@ -692,7 +708,18 @@ export class NagaIME extends HTMLElement {
     closeBtn.textContent = '×';
     closeBtn.addEventListener('mousedown', (e) => e.preventDefault());
     closeBtn.addEventListener('click', () => this.close({ refocus: true }));
-    titlebar.append(tabs, closeBtn);
+    // 畳むボタン（dock のときだけ見える。§3.3）。押しても欄・読み欄のフォーカスを奪わない
+    const foldBtn = document.createElement('button');
+    foldBtn.type = 'button';
+    foldBtn.className = 'naga-fold';
+    foldBtn.addEventListener('mousedown', (e) => e.preventDefault());
+    foldBtn.addEventListener('click', () => this.toggleFold());
+    titlebar.append(tabs, foldBtn, closeBtn);
+
+    // 挿入先の写し（dock のときだけ見える。§3.2）。欄が popup に隠れていても、どこに何が入ったか分かるように
+    const copy = document.createElement('div');
+    copy.className = 'naga-copy';
+    copy.setAttribute('aria-live', 'polite');
 
     const search = document.createElement('input');
     search.type = 'text';
@@ -706,8 +733,8 @@ export class NagaIME extends HTMLElement {
     search.setAttribute('aria-controls', listId);
     search.setAttribute('aria-label', SEARCH_ARIA_LABEL);
 
-    // 読み入力欄の行（設計 §5）。PC では CSS の `display: contents` により
-    // input が従来どおり popup 直下の flex item として並ぶ（見た目は不変）。
+    // 読み入力欄の行（設計 §5）。行は flex（nov26-m3-t3 で display: contents をやめた）。PC では
+    // ラベルを隠し、input が行いっぱいに広がる（見た目は不変・e2e の P-8）。
     // dock 時だけラベルとアクセント縦線が出て、本体の入力欄と見分けられる。
     const searchRow = document.createElement('div');
     searchRow.className = 'naga-search-row';
@@ -726,7 +753,7 @@ export class NagaIME extends HTMLElement {
     hint.className = 'naga-hint';
     hint.textContent = '↑↓:選択 Enter:確定（連続入力可） 1-9:直接選択 Esc:閉じる';
 
-    popup.append(titlebar, searchRow, list, hint);
+    popup.append(titlebar, copy, searchRow, list, hint);
 
     // 検索欄: システム IME の変換中は介入しない
     search.addEventListener('compositionstart', () => {
@@ -754,6 +781,10 @@ export class NagaIME extends HTMLElement {
     this.tabsEl = tabs;
     this.searchEl = search;
     this.listEl = list;
+    this.searchRowEl = searchRow;
+    this.copyEl = copy;
+    this.foldEl = foldBtn;
+    this.applyFold();
     this.rebuildTabs();
 
     const onDocMouseDown = (e: MouseEvent) => {
@@ -808,9 +839,11 @@ export class NagaIME extends HTMLElement {
       b.addEventListener('mousedown', (e) => e.preventDefault());
       b.addEventListener('click', () => {
         this.activeTab = id;
+        this.lastCommitted = null;
         this.renderTabs();
         this.refresh();
-        this.searchEl?.focus();
+        this.updateCopy();
+        this.searchEl?.focus({ preventScroll: true });
       });
       tabs.appendChild(b);
     }
@@ -829,6 +862,9 @@ export class NagaIME extends HTMLElement {
     this.tabsEl = null;
     this.searchEl = null;
     this.listEl = null;
+    this.searchRowEl = null;
+    this.copyEl = null;
+    this.foldEl = null;
     this.target = null;
     this.docked = false;
   }
@@ -957,6 +993,76 @@ export class NagaIME extends HTMLElement {
     if (this.docked === next) return;
     this.docked = next;
     this.applyTabLabels();
+    this.applyFold();
+  }
+
+  /* ------------------------------------------------------------ *
+   * 折りたたみ（§3.3）と挿入先の写し（§3.2）
+   * ------------------------------------------------------------ */
+
+  /** 畳む／開く（人間の操作でだけ呼ぶ）。開くときは読み欄へ戻す（タップの中なのでソフトキーボードが出る）。 */
+  private toggleFold(): void {
+    this.folded = !this.folded;
+    this.applyFold();
+    if (this.openState) this.positionPopup();
+    this.updateCopy();
+    if (!this.folded) this.searchEl?.focus({ preventScroll: true });
+  }
+
+  /** 畳んだ状態を見た目へ出す。dock でないとき（PC）は出さない（状態は保つ）。 */
+  private applyFold(): void {
+    const show = this.folded && this.docked;
+    this.popup?.classList.toggle('naga-is-folded', show);
+    if (this.searchRowEl) this.searchRowEl.hidden = show;
+    if (this.listEl) this.listEl.hidden = show;
+    const fold = this.foldEl;
+    if (fold) {
+      fold.setAttribute('aria-expanded', String(!this.folded));
+      fold.setAttribute('aria-label', this.folded ? 'ひらく' : 'たたむ');
+      fold.title = this.folded ? 'ひらく' : 'たたむ';
+      fold.textContent = this.folded ? '▴' : '▾';
+    }
+  }
+
+  /**
+   * 写しの行を組み直す。テキストノードと textContent だけで組む（欄の値を HTML として解釈させない）。
+   * キャレットの直前の最大 12 文字（Array.from で数える）。改行は ↵、前があれば先頭に …、末尾に ▏。
+   * type="password" の欄は中身を写さない。
+   */
+  private updateCopy(): void {
+    const el = this.copyEl;
+    if (!el) return;
+    el.replaceChildren();
+    const field = this.target;
+    if (!field) return;
+    const span = (cls: string, text: string): HTMLSpanElement => {
+      const s = document.createElement('span');
+      s.className = cls;
+      s.textContent = text;
+      return s;
+    };
+    if (field instanceof HTMLInputElement && field.type === 'password') {
+      el.append(span('naga-copy-empty', '（非表示）'));
+      return;
+    }
+    const caret = field.selectionStart ?? field.value.length;
+    const before = Array.from(field.value.slice(0, caret));
+    if (before.length === 0) {
+      el.append(span('naga-copy-empty', '（先頭）'));
+      return;
+    }
+    const tail = before.slice(-COPY_MAX_CHARS);
+    const show = (chars: string[]): string => chars.join('').replace(/\r?\n/g, '↵');
+    let fresh = 0;
+    if (this.lastCommitted) {
+      const n = Array.from(this.lastCommitted).length;
+      if (n <= tail.length && tail.slice(-n).join('') === this.lastCommitted) fresh = n;
+    }
+    if (before.length > COPY_MAX_CHARS) el.append('…');
+    const old = tail.slice(0, tail.length - fresh);
+    if (old.length) el.append(show(old));
+    if (fresh) el.append(span('naga-copy-new', show(tail.slice(-fresh))));
+    el.append(span('naga-copy-caret', '▏'));
   }
 
   private renderList(): void {
@@ -971,6 +1077,7 @@ export class NagaIME extends HTMLElement {
       this.searchEl?.removeAttribute('aria-activedescendant');
       return;
     }
+    let selectedItem: HTMLElement | null = null;
     this.candidates.forEach((c, i) => {
       const selected = i === this.selectedIndex;
       const item = document.createElement('div');
@@ -1001,9 +1108,24 @@ export class NagaIME extends HTMLElement {
 
       if (selected) {
         this.searchEl?.setAttribute('aria-activedescendant', item.id);
-        if (typeof item.scrollIntoView === 'function') item.scrollIntoView({ block: 'nearest' });
+        selectedItem = item;
       }
     });
+    if (selectedItem) this.revealInList(selectedItem);
+  }
+
+  /**
+   * 選んだ候補が一覧の見える範囲に入るよう、一覧（this.listEl）の scrollTop だけを動かす（M-1・MIN-1）。
+   * 要素を画面へ寄せる DOM の API は使わない（スクロールできる祖先すべて＝ページの viewport も動かしうる）。
+   */
+  private revealInList(item: HTMLElement): void {
+    if (!this.listEl) return;
+    const list = this.listEl;
+    // offsetParent が一覧でなければ（popup が offsetParent）、一覧の offsetTop を引いて一覧の中の位置にする
+    const top = item.offsetTop - (item.offsetParent === list ? 0 : list.offsetTop);
+    const bottom = top + item.offsetHeight;
+    if (top < list.scrollTop) this.listEl.scrollTop = top;
+    else if (bottom > list.scrollTop + list.clientHeight) this.listEl.scrollTop = bottom - list.clientHeight;
   }
 
   private onSearchKeydown(e: KeyboardEvent): void {
@@ -1062,12 +1184,14 @@ export class NagaIME extends HTMLElement {
     );
     this.emit('nagaCommit', { field, candidate: copyCandidate(candidate) });
 
-    // 連続入力: 開いたまま検索語だけクリアし、キャレットへ追従する
+    // 連続入力: 開いたまま検索語だけクリアし、写しを更新する（dock はページも欄も動かさない。M-1）
+    this.lastCommitted = candidate.char;
     if (this.searchEl) this.searchEl.value = '';
     this.selectedIndex = 0;
     this.refresh();
     this.positionPopup();
-    this.searchEl?.focus();
+    this.updateCopy();
+    this.searchEl?.focus({ preventScroll: true });
   }
 
   /* ------------------------------------------------------------ *
@@ -1088,16 +1212,20 @@ export class NagaIME extends HTMLElement {
       pop.classList.add('naga-is-docked');
       this.setDocked(true);
       style.position = 'fixed';
-      style.left = '8px';
-      style.right = '8px';
+      // 画面の左右いっぱいに据え付ける（「ふわふわ浮いて」への対応。§1 の 5）
+      style.left = '0px';
+      style.right = '0px';
       style.width = 'auto';
       style.top = 'auto';
       const bottom = vv ? Math.max(0, window.innerHeight - (vv.height + vv.offsetTop)) + DOCK_GAP_PX : DOCK_GAP_PX;
       style.bottom = `${bottom}px`;
-      // 高さは「使える高さ」から逆算する（設計 §3.2）。静的な vh には依らない。
+      // 高さは「使える高さ」から逆算する（§3.1）。静的な vh には依らない。
       // ソフトキーボードが出ている間の残り可視高 = visualViewport.height。
       const vvAvail = vv ? vv.height : window.innerHeight;
-      const popupMax = Math.max(DOCK_MIN_PX, Math.min(DOCK_POPUP_MAX_PX, vvAvail - DOCK_CONTEXT_MIN_PX));
+      const avail = Math.max(0, vvAvail - DOCK_GAP_PX);
+      let popupMax = Math.min(DOCK_POPUP_MAX_PX, avail - DOCK_BAND_PX);
+      if (popupMax < DOCK_MIN_PX) popupMax = Math.min(DOCK_MIN_PX, avail);
+      if (this.folded) popupMax = Math.min(DOCK_FOLDED_PX, avail);
       style.maxHeight = `${popupMax}px`;
       style.setProperty('--naga-dock-max', `${popupMax}px`);
       style.setProperty('--naga-dock-avail', `${vvAvail}px`);

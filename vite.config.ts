@@ -74,6 +74,7 @@ export default defineConfig({
   publicDir: isPackageBuild ? false : 'public',
   appType: 'spa',
   define: {
+    'import.meta.env.PACKAGE_NAME': JSON.stringify(packageJson.name),
     'import.meta.env.APP_VERSION': JSON.stringify(packageJson.version)
   },
   resolve: {

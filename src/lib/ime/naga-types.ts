@@ -7,7 +7,7 @@
  */
 
 /**
- * NagaIME の候補カテゴリ（タブ）。'recent'（最近使った文字）は常に先頭に付く。
+ * NagaIME の候補カテゴリ（タブ）。'recent'（最近使った文字）は先頭に付く（recentMax が 0 のときは付かない）。
  */
 export type NagaCategoryId = 'hentaigana' | 'siddham' | 'buddha' | 'itaiji' | 'kumimoji';
 
@@ -31,9 +31,12 @@ export interface NagaIMEOptions {
   triggerLabel?: string;
   /** Ctrl+J / Cmd+J で開閉するか。既定は true。 */
   shortcut?: boolean;
-  /** 最近使った文字を保存する localStorage のキー。null で保存しない。既定は 'nagarjuna-naga-recents'。 */
+  /**
+   * 最近使った文字を保存する localStorage のキー。既定は 'nagarjuna-naga-recents'。
+   * null で保存も読み出しもしない（「最近」タブは要素の中だけで働く）。
+   */
   recentStorageKey?: string | null;
-  /** 最近使った文字の最大件数。既定は 14。 */
+  /** 最近使った文字の最大件数（0 以上の整数）。既定は 14。0 で「最近」タブを持たず、localStorage を読みも書きもしない。 */
   recentMax?: number;
   /** 一度に表示する候補の最大件数。既定は 60。 */
   maxCandidates?: number;
@@ -41,4 +44,14 @@ export interface NagaIMEOptions {
   dockBreakpoint?: number;
   /** FontLoader で特殊文字フォントを読み込むか。既定は true。 */
   loadFonts?: boolean;
+}
+
+/** `<naga-ime>` が出すイベント（すべて CustomEvent・bubbles: true・composed: false・cancelable: false）。 */
+export interface NagaIMEEventMap {
+  /** popup が開いた後 */
+  nagaOpen: CustomEvent<{ field: HTMLInputElement | HTMLTextAreaElement }>;
+  /** popup が閉じた後 */
+  nagaClose: CustomEvent<{ field: HTMLInputElement | HTMLTextAreaElement | null }>;
+  /** 候補を欄へ入れ、欄の input を出した後（candidate は複製） */
+  nagaCommit: CustomEvent<{ field: HTMLInputElement | HTMLTextAreaElement; candidate: NagaCandidate }>;
 }

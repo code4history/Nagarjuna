@@ -1,5 +1,5 @@
 {
-  "name": "nagarjuna",
+  "name": "@c4h/nagarjuna",
   "description": "Nagarjuna (龍樹): Tool for Bijakshara (種子), Hentai-kana (変体仮名), Itai-ji (異体字), Kumi-moji (組み文字)",
   "version": "1.1.0",
   "type": "module",

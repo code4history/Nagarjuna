@@ -46,26 +46,26 @@ import url from "node:url";
 const require = createRequire(import.meta.url);
 const results = [];
 const push = (label, ok, detail) => results.push([label, Boolean(ok), String(detail)]);
-const pkgDir = path.join(process.cwd(), "node_modules", "nagarjuna");
+const pkgDir = path.join(process.cwd(), "node_modules", "@c4h/nagarjuna");
 
 // (a) ESM import と CJS require の双方が解決できる
 let esm = null;
 try {
-  esm = await import("nagarjuna");
-  push("S5a ESM import('nagarjuna') が解決する", true, Object.keys(esm).sort().join(","));
+  esm = await import("@c4h/nagarjuna");
+  push("S5a ESM import('@c4h/nagarjuna') が解決する", true, Object.keys(esm).sort().join(","));
 } catch (error) {
-  push("S5a ESM import('nagarjuna') が解決する", false, error.message);
+  push("S5a ESM import('@c4h/nagarjuna') が解決する", false, error.message);
 }
 try {
-  const cjs = require("nagarjuna");
-  push("S5a CJS require('nagarjuna') が解決する", true, Object.keys(cjs).sort().join(","));
+  const cjs = require("@c4h/nagarjuna");
+  push("S5a CJS require('@c4h/nagarjuna') が解決する", true, Object.keys(cjs).sort().join(","));
 } catch (error) {
-  push("S5a CJS require('nagarjuna') が解決する", false, error.message);
+  push("S5a CJS require('@c4h/nagarjuna') が解決する", false, error.message);
 }
 // 解決先が staging（＝配布された tarball の中身）であることを要求する。
 // repo の作業ツリーへ解決されていたら S5 は成立していない（Node の self-reference 経路）。
 try {
-  const resolved = require.resolve("nagarjuna");
+  const resolved = require.resolve("@c4h/nagarjuna");
   push("S5a 解決先が staging の配布物である", resolved.startsWith(process.cwd() + path.sep), resolved);
 } catch (error) {
   push("S5a 解決先が staging の配布物である", false, error.message);
@@ -100,8 +100,8 @@ try {
 // S5c-2: ESM 条件が .js へ、CJS 条件が .cjs へ解決し、いずれも staging 内であること。
 // 解決先が条件ごとに別のファイルへ着地する ∴ exports map の条件分岐そのものを検証している。
 try {
-  const esmResolved = url.fileURLToPath(import.meta.resolve("nagarjuna/ime"));
-  const cjsResolved = require.resolve("nagarjuna/ime");
+  const esmResolved = url.fileURLToPath(import.meta.resolve("@c4h/nagarjuna/ime"));
+  const cjsResolved = require.resolve("@c4h/nagarjuna/ime");
   const prefix = process.cwd() + path.sep;
   const inStaging = esmResolved.startsWith(prefix) && cjsResolved.startsWith(prefix);
   const distJs = path.join("dist", "nagarjuna-ime.js");

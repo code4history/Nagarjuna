@@ -24,8 +24,19 @@ This repository is a JavaScript library that makes those characters easier to ha
 ## Installation
 
 ```bash
-pnpm add nagarjuna
+pnpm add @c4h/nagarjuna
 ```
+
+### Migrating from the unscoped package name
+
+Up to version 1.1.0 this package was published under the unscoped name nagarjuna. From the 2026-11 release it is published as `@c4h/nagarjuna`. The API is unchanged; only the package name differs.
+
+```bash
+pnpm remove nagarjuna
+pnpm add @c4h/nagarjuna
+```
+
+Then change the module specifiers in your imports: nagarjuna becomes `@c4h/nagarjuna`, and nagarjuna/ime becomes `@c4h/nagarjuna/ime`.
 
 ## Usage
 
@@ -39,7 +50,7 @@ pnpm add nagarjuna
 When you only need to display the special characters:
 
 ```javascript
-import { FontLoader } from 'nagarjuna';
+import { FontLoader } from '@c4h/nagarjuna';
 
 const fontLoader = new FontLoader();
 
@@ -64,7 +75,7 @@ element.style.fontFamily = fontLoader.getFontFamilyString({
 When you also need input:
 
 ```javascript
-import { IMEManager } from 'nagarjuna/ime';
+import { IMEManager } from '@c4h/nagarjuna/ime';
 
 // Initialise the IME manager
 const manager = IMEManager.getInstance();

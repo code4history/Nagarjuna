@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>F-DECL</title>
+  <!-- nov26-m3-t1 §3.2: 宣言的な利用。script は登録の副作用だけを期待する -->
+  <style>body{margin:0}</style>
+</head>
+<body>
+  <input id="d1" type="text" style="position:absolute;left:40px;top:120px;width:320px">
+  <input id="d2" type="text" style="position:absolute;left:40px;top:200px;width:320px">
+  <naga-ime for="d1" categories="itaiji kumimoji"></naga-ime>
+  <script type="module">
+    import '/src/lib/ime/naga-ime.ts';
+  </script>
+</body>
+</html>

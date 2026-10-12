@@ -34,7 +34,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "coverage": "vitest run --coverage"
+    "coverage": "vitest run --coverage",
+    "test:e2e": "playwright test"
   },
   "repository": {
     "type": "git",
@@ -55,6 +56,7 @@
   },
   "homepage": "https://github.com/code4history/Nagarjuna#readme",
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/jsdom": "^21.1.7",
     "@types/node": "^25.5.2",
     "@typescript-eslint/eslint-plugin": "^8.66.0",

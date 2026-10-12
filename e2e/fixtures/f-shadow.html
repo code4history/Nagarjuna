@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>F-SHADOW</title>
+  <!-- nov26-m3-t1 §3.2: 自作要素 <x-host> の open shadow root の中の欄に NagaIME を付ける -->
+  <style>body{margin:0}</style>
+</head>
+<body>
+  <x-host id="host"></x-host>
+  <input id="out" type="text" style="position:absolute;left:40px;top:400px;width:320px">
+  <script type="module">
+    window.__docInputs = [];
+    document.addEventListener('input', (e) => {
+      window.__docInputs.push({ type: e.constructor.name, composed: e.composed });
+    });
+    customElements.define('x-host', class extends HTMLElement {
+      constructor() {
+        super();
+        const root = this.attachShadow({ mode: 'open' });
+        const field = 'position:absolute;left:40px;width:320px;margin:0;box-sizing:border-box;'
+          + 'padding:4px 8px;border:1px solid #888;font:16px/22px monospace;';
+        root.innerHTML = `<input id="s1" type="text" style="${field}top:120px;height:32px">`
+          + `<textarea id="s2" style="${field}top:200px;height:96px"></textarea>`;
+      }
+    });
+    // origin/master の NagaIME は公開 API に無い ∴ ソースを直に読む
+    const { NagaIME } = await import('/src/lib/ime/naga-ime.ts');
+    const root = document.getElementById('host').shadowRoot;
+    const ime = new NagaIME({ loadFonts: false });
+    ime.attach([root.getElementById('s1'), root.getElementById('s2')]);
+    window.__naga = ime;
+  </script>
+</body>
+</html>

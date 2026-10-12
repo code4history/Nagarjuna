@@ -840,7 +840,7 @@ export class NagaIME extends HTMLElement {
       const special = this.fontLoader
         ? this.fontLoader.getFontFamilyString(FONT_SETTINGS)
         : [fontFamilies.hentaigana, fontFamilies.siddham, fontFamilies.itaiji, 'serif'].join(', ');
-      let current = '';
+      let current: string;
       try {
         current = getComputedStyle(field).fontFamily;
       } catch {
@@ -1113,7 +1113,7 @@ export class NagaIME extends HTMLElement {
     style.position = 'fixed';
     style.width = `${Math.min(360, vw - 16)}px`;
 
-    let anchor: { x: number; y: number; lineHeight: number } | null = null;
+    let anchor: { x: number; y: number; lineHeight: number } | null;
     try {
       anchor = this.measureCaret(field);
     } catch {

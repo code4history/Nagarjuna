@@ -1225,6 +1225,7 @@ export class NagaIME extends HTMLElement {
 }
 
 /** `<naga-ime>` のイベントの型（`addEventListener('nagaCommit', e => e.detail…)`）。 */
+// eslint-disable-next-line no-redeclare -- TS の class と interface の宣言の合併（実行時の再宣言ではない）
 export interface NagaIME {
   addEventListener<K extends keyof NagaIMEEventMap>(
     type: K,

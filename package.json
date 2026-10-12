@@ -32,6 +32,7 @@
     "deploy": "pnpm run build:dictionary && tsc && vite build",
     "pretest": "pnpm run build:dictionary",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint src tests scripts",
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
@@ -56,6 +57,7 @@
   },
   "homepage": "https://github.com/code4history/Nagarjuna#readme",
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.1",
     "@types/jsdom": "^21.1.7",
     "@types/node": "^25.5.2",
@@ -64,6 +66,7 @@
     "@vitest/coverage-v8": "^4.1.11",
     "cross-env": "^10.1.0",
     "eslint": "^10.10.0",
+    "eslint-config-prettier": "^10.1.8",
     "jsdom": "^30.0.1",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.2",

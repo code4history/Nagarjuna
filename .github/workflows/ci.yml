@@ -37,6 +37,8 @@ jobs:
       # typecheck はどちらより前に走るためこの step が要る。
       - name: Build dictionary
         run: pnpm run build:dictionary
+      - name: Lint
+        run: pnpm run lint
       - name: Typecheck
         run: pnpm run typecheck
       - name: Test

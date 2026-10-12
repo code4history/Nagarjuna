@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig, configDefaults } from 'vitest/config';
 import { resolve } from 'path';
 
 export default defineConfig({
@@ -10,6 +10,7 @@ export default defineConfig({
       }
     },
     setupFiles: ['./tests/setup.ts'],
+    exclude: [...configDefaults.exclude, 'e2e/**'],
     testTimeout: 1000,
     coverage: {
       provider: 'v8',

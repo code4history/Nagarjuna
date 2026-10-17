@@ -3,6 +3,12 @@
 このプロジェクトの主な変更を記録します。版数は [Semantic Versioning](https://semver.org/) に従います。
 Notable changes to this project are documented here. This project follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### 変更 / Changed
+
+- **パッケージ名の変更 / Package name change**: `nagarjuna` から `@c4h/nagarjuna` へ変更しました。インストールは `pnpm add @c4h/nagarjuna` に書き換えてください。API は同じです（import するパッケージ名だけが変わります）。 / The package name changed from `nagarjuna` to `@c4h/nagarjuna`. Install it with `pnpm add @c4h/nagarjuna`; the API is unchanged (only the package name in imports changes).
+
 ## [1.1.0] - 2026-10-05
 
 1.1.0-rc.3 と同じ内容の正式版です（版番号のみ変更）。変更点は 1.1.0-rc.3 までの各項を参照してください。

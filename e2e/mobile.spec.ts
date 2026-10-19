@@ -7,11 +7,19 @@ import { PART, gotoFixture, nagaIsOpen, waitShown } from './helpers';
 //
 // 操作はすべて page.touchscreen.tap(x, y) で行う（ElementHandle.tap は押す前に要素を画面へスクロールしうる。
 // それでは M-1 の「NagaIME がスクロールしない」を測れない）。
+//
+// 【NOV26-IM-NAGA-POPUP-ANCHOR-0432】popup は画面の下に据え付ける fixed をやめ、欄のすぐ下に付ける
+// 文書の座標（position: absolute）になった ∴ M-2〜M-4 の「帯（popup の上に残る高さ）」「下端は可視域の
+// 下端から 8px」という前提は意味を失った。置き場所の回帰は e2e/ios-popup.spec.ts の X-1〜X-4 が見る。
+// ここ（M-*）は、欄のすぐ下に付いた popup の寸法・畳み・操作でスクロールしないことを測る。
 
 const HEIGHTS = [188, 216, 320] as const;
-/** 帯（popup の上に残す高さ。M-3）と、可視の領域の下端との間（設計 §3.1）。 */
-const BAND = 40;
+/** キーボードの上に残る高さから引く余白（設計 §3.1 の DOCK_GAP_PX）。 */
 const GAP = 8;
+/** 候補 1 行がまるごと見える下限（設計 §3.1 の DOCK_MIN_PX）。 */
+const DOCK_MIN = 138;
+/** popup を欄のすぐ下に付ける間隔（0432）。 */
+const POPUP_GAP = 4;
 /** 畳んだ高さ（タイトル行＋写しの行＋枠。設計 §3.1）。 */
 const FOLDED = 58;
 const TOL = 0.5;
@@ -41,24 +49,6 @@ async function tapPart(page: Page, selector: string): Promise<void> {
   const r = await partRect(page, selector);
   if (!r) throw new Error(`見つからない: ${selector}`);
   await page.touchscreen.tap(r.left + r.width / 2, r.top + r.height / 2);
-}
-
-/** 一覧の中にまるごと入っている最初の候補をタップする。 */
-async function tapVisibleItem(page: Page): Promise<string> {
-  const hit = await page.evaluate(() => {
-    const root = document.querySelector('naga-ime')!.shadowRoot!;
-    const list = root.querySelector('.naga-list')!.getBoundingClientRect();
-    for (const item of Array.from(root.querySelectorAll<HTMLElement>('.naga-item'))) {
-      const r = item.getBoundingClientRect();
-      if (r.top >= list.top - 0.5 && r.bottom <= list.bottom + 0.5) {
-        return { x: r.left + r.width / 2, y: r.top + r.height / 2, char: item.dataset.char ?? '' };
-      }
-    }
-    return null;
-  });
-  if (!hit) throw new Error('一覧の中に見えている候補が無い');
-  await page.touchscreen.tap(hit.x, hit.y);
-  return hit.char;
 }
 
 interface ScrollState {
@@ -142,7 +132,16 @@ for (const h of HEIGHTS) {
 
     test(`M-1 [${h}]: 開く・確定・タブ切替・畳む・開く・閉じるのどれでもページも欄もスクロールしない`, async ({ page }) => {
       for (const fieldId of ['m1', 'm2'] as const) {
-        const before = await setup(page, fieldId);
+        await setup(page, fieldId);
+        // 0432: popup は欄のすぐ下に付く ∴ 短い viewport でもタイトル行（タブ・畳む・閉じる）が
+        // 可視域に入るよう、欄を可視域の上端から 40px へ寄せてから基準を取る（梵ボタンは欄の上に
+        // 出るので 0 まで寄せない。寄せるのはこの試験だけで、以後の操作でスクロールしないことを測る基準）
+        await page.evaluate((fid) => {
+          const el = document.getElementById(fid)!;
+          window.scrollTo(0, window.scrollY + el.getBoundingClientRect().top - 40);
+        }, fieldId);
+        await frame(page);
+        const before = await scrollState(page);
         const valueBefore = await page.evaluate((fid) => (document.getElementById(fid) as HTMLInputElement).value, fieldId);
         const check = async (step: string) => {
           await frame(page);
@@ -153,9 +152,11 @@ for (const h of HEIGHTS) {
         expect(await nagaIsOpen(page), `[measure:M-1] ${fieldId} 開いた`).toBe(true);
         await check('開く');
 
-        await tapVisibleItem(page);
+        // 0432: popup は欄のすぐ下に付く ∴ 短い viewport では候補の行が可視域の外に出る。
+        // タップの代わりに、読み欄の数字キー（1-9 の直接選択）で確定する（同じ commit の経路）
+        await page.keyboard.press('1');
         await check('確定 1');
-        await tapVisibleItem(page);
+        await page.keyboard.press('2');
         await check('確定 2');
         const valueAfter = await page.evaluate((fid) => (document.getElementById(fid) as HTMLInputElement).value, fieldId);
         expect(Array.from(valueAfter).length, `[measure:M-1] ${fieldId} 2 文字入った（陽性対照）`).toBe(Array.from(valueBefore).length + 2);
@@ -175,18 +176,32 @@ for (const h of HEIGHTS) {
       }
     });
 
-    test(`M-2 [${h}]: タブ・読み欄・写しの行・候補 1 行以上がまるごと見える`, async ({ page }) => {
+    test(`M-2 [${h}]: popup は欄のすぐ下に付き、タブ・読み欄・写しの行・候補 1 行以上がその中に見える`, async ({
+      page,
+    }) => {
       await setup(page, 'm1');
       await openByTap(page);
       const vp = await visualViewport(page);
+      const field = await page.evaluate(() => {
+        const r = document.getElementById('m1')!.getBoundingClientRect();
+        return { bottom: r.bottom, height: r.height };
+      });
+      const pop = (await partRect(page, PART.popup))!;
+      expect(Math.abs(pop.top - field.bottom - POPUP_GAP), '[measure:M-2] popup は欄のすぐ下').toBeLessThanOrEqual(TOL);
+      expect(pop.left, '[measure:M-2] popup の左端は可視域の左端').toBeGreaterThanOrEqual(-TOL);
+      expect(pop.right, '[measure:M-2] popup の右端は可視域の右端').toBeLessThanOrEqual(vp.innerWidth + TOL);
       for (const sel of ['.naga-tab.naga-is-active', '.naga-search', '.naga-copy']) {
         const r = await partRect(page, sel);
         expect(r, `[measure:M-2] ${sel} がある`).not.toBeNull();
         expect(r!.height, `[measure:M-2] ${sel} の高さ`).toBeGreaterThan(0);
+        // popup の内側に収まっている（欄のすぐ下に付いた板の中身）
+        expect(r!.left, `[measure:M-2] ${sel} left は popup の内側`).toBeGreaterThanOrEqual(pop.left - TOL);
+        expect(r!.right, `[measure:M-2] ${sel} right は popup の内側`).toBeLessThanOrEqual(pop.right + TOL);
+        expect(r!.top, `[measure:M-2] ${sel} top は popup の内側`).toBeGreaterThanOrEqual(pop.top - TOL);
+        // 横は可視域の中（縦は欄の位置しだい。0432）
         expect(r!.left, `[measure:M-2] ${sel} left`).toBeGreaterThanOrEqual(-TOL);
-        expect(r!.top, `[measure:M-2] ${sel} top`).toBeGreaterThanOrEqual(-TOL);
         expect(r!.right, `[measure:M-2] ${sel} right`).toBeLessThanOrEqual(vp.innerWidth + TOL);
-        expect(r!.bottom, `[measure:M-2] ${sel} bottom`).toBeLessThanOrEqual(vp.innerHeight + TOL);
+        expect(r!.bottom, `[measure:M-2] ${sel} の下端は popup の下端の内側`).toBeLessThanOrEqual(pop.bottom + TOL);
       }
       const whole = await page.evaluate(() => {
         const root = document.querySelector('naga-ime')!.shadowRoot!;
@@ -199,30 +214,47 @@ for (const h of HEIGHTS) {
       expect(whole, '[measure:M-2] 一覧の中にまるごと入る候補の数').toBeGreaterThanOrEqual(1);
     });
 
-    test(`M-3 [${h}]: popup の上の帯が 40px 以上・下端は可視の領域の下端から 8px 以上`, async ({ page }) => {
+    test(`M-3 [${h}]: popup は position: absolute で欄のすぐ下に付き、高さは残り可視高 − 欄 − 余白を超えない`, async ({
+      page,
+    }) => {
       await setup(page, 'm1');
       await openByTap(page);
       const vp = await visualViewport(page);
+      const field = await page.evaluate(() => {
+        const r = document.getElementById('m1')!.getBoundingClientRect();
+        return { bottom: r.bottom, height: r.height };
+      });
+      const position = await page.evaluate(() => {
+        const el = document.querySelector('naga-ime')!.shadowRoot!.querySelector('.naga-popup') as HTMLElement;
+        return el.style.position;
+      });
+      expect(position, '[measure:M-3] fixed ではなく absolute（文書の座標）').toBe('absolute');
       const pop = (await partRect(page, PART.popup))!;
-      expect(pop.top - vp.offsetTop, '[measure:M-3] 帯').toBeGreaterThanOrEqual(BAND - TOL);
-      expect(vp.offsetTop + vp.height - pop.bottom, '[measure:M-3] 下端との間').toBeGreaterThanOrEqual(GAP - TOL);
+      // 欄のすぐ下に付く（画面の下に据え付けない）
+      expect(pop.top - field.bottom, '[measure:M-3] 欄のすぐ下（間隔 4px）').toBeGreaterThanOrEqual(POPUP_GAP - TOL);
+      expect(pop.top - field.bottom, '[measure:M-3] 欄のすぐ下（間隔 4px）').toBeLessThanOrEqual(POPUP_GAP + TOL);
+      // 高さの上限 = キーボードの上に残る高さ − 余白 − 欄の高さ（DOCK_MIN を下回らない）
+      const avail = vp.height - GAP - field.height;
+      const cap = Math.max(Math.min(DOCK_MIN, avail), Math.min(226, avail));
+      expect(pop.height, '[measure:M-3] 高さは残り可視高 − 欄 − 余白を超えない').toBeLessThanOrEqual(cap + TOL);
     });
 
-    test(`M-4 [${h}]: 畳むと高さがタイトル行と写しの行だけになり帯が広がる。開くと戻る`, async ({ page }) => {
+    test(`M-4 [${h}]: 畳むと高さがタイトル行と写しの行だけになり、上端は欄のすぐ下のまま。開くと戻る`, async ({ page }) => {
       await setup(page, 'm1');
       await openByTap(page);
-      const vp = await visualViewport(page);
       const open1 = (await partRect(page, PART.popup))!;
       await tapPart(page, '.naga-fold');
       await frame(page);
       const folded = (await partRect(page, PART.popup))!;
       expect(folded.height, '[measure:M-4] 畳んだ高さ').toBeLessThanOrEqual(FOLDED + TOL);
-      expect(folded.top - vp.offsetTop, '[measure:M-4] 畳むと帯が広がる').toBeGreaterThan(open1.top - vp.offsetTop);
+      expect(folded.height, '[measure:M-4] 畳むと縮む（陽性対照）').toBeLessThan(open1.height);
+      // 0432: popup は欄に付いている ∴ 畳んでも上端は動かない（帯を広げるのではなく高さが縮む）
+      expect(Math.abs(folded.top - open1.top), '[measure:M-4] 畳んでも上端は欄のすぐ下のまま').toBeLessThanOrEqual(TOL);
       await tapPart(page, '.naga-fold');
       await frame(page);
       const open2 = (await partRect(page, PART.popup))!;
       expect(Math.abs(open2.height - open1.height), '[measure:M-4] 開くと高さが戻る').toBeLessThanOrEqual(TOL);
-      expect(Math.abs(open2.top - open1.top), '[measure:M-4] 開くと帯が戻る').toBeLessThanOrEqual(TOL);
+      expect(Math.abs(open2.top - open1.top), '[measure:M-4] 開いても上端は欄のすぐ下のまま').toBeLessThanOrEqual(TOL);
     });
   });
 }

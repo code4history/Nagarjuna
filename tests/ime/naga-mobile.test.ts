@@ -6,11 +6,13 @@
  * jsdom は layout を持たないため、ここで測るのは「レイアウトの実物」ではなく
  * 「仕組み」（style へ書かれる値・class・textContent・hidden・focus の引数）である。実の矩形は e2e の M-1〜M-5 が見る。
  *
- * 割り付け（nov26-m3-t3 タスク設計 §3.1）: タイトル行 34 ＋ 写しの行 22 ＋ 読み欄 36 ＋ 枠 2 ＝ 固定部分 94、
- * 候補 1 行 44、上限 3 行。popup の上に残す帯 40、キーボード上端との間 8。
- *   avail = vvAvail − 8
- *   popupMax = min(226, avail − 40)。それが 138（固定部分＋候補 1 行）未満なら min(138, avail)
+ * 割り付け（nov26-m3-t3 タスク設計 §3.1・0432 で高さの式だけ変更）: タイトル行 34 ＋ 写しの行 22 ＋
+ * 読み欄 36 ＋ 枠 2 ＝ 固定部分 94、候補 1 行 44、上限 3 行。キーボード上端との間 8。
+ *   avail = vvAvail − 8 − 欄の高さ
+ *   popupMax = min(226, avail)。それが 138（固定部分＋候補 1 行）未満なら min(138, avail)
  * 畳んだ高さは 58（タイトル行＋写しの行＋枠）。
+ * 位置は 0432 から文書の座標（`position: absolute`・欄のすぐ下。tests/ime/naga-popup-position.test.ts）∴
+ * ここでは高さの上限と、dock かどうかの見た目だけを測る。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NagaIME } from '@/lib/ime/naga-ime';
@@ -22,7 +24,6 @@ const DICTIONARY_TEST_TIMEOUT_MS = 8000;
 
 /** 設計 §3.1 の割り付け（実装の private const と一致していることを外から確かめる値）。 */
 const DOCK_GAP = 8;
-const DOCK_BAND = 40;
 const DOCK_MIN = 138;
 const DOCK_MAX = 226;
 const DOCK_FOLDED = 58;
@@ -81,10 +82,30 @@ function copyText(): string {
   return part('.naga-copy').textContent ?? '';
 }
 
-/** 書かれた style から帯（popup の上に残る高さ）を計算する（4-4: 恒真式をやめる）。 */
-function bandOf(pop: HTMLElement): number {
-  const vv = window.visualViewport!;
-  return window.innerHeight - parseFloat(pop.style.bottom) - parseFloat(pop.style.maxHeight) - vv.offsetTop;
+/** 欄の getBoundingClientRect を決め打ちにする（jsdom の矩形はすべて 0 のため。0432）。 */
+function stubRect(el: Element, rect: { top: number; right: number; bottom: number; left: number }): void {
+  el.getBoundingClientRect = () =>
+    ({
+      ...rect,
+      width: rect.right - rect.left,
+      height: rect.bottom - rect.top,
+      x: rect.left,
+      y: rect.top,
+      toJSON: () => rect,
+    }) as DOMRect;
+}
+
+/** 欄の下端（0432: popup はこのすぐ下に付く）。 */
+const FIELD_BOTTOM = 432;
+/** 欄のすぐ下に付ける間隔（実装の POPUP_GAP_PX）。 */
+const POPUP_GAP = 4;
+
+/** dock の高さの上限を、キーボード上に残る高さと欄の高さから計算する（実装の式と同じ・0432）。 */
+function expectedDockMax(vvAvail: number, fieldHeight: number, folded = false): number {
+  const avail = Math.max(0, vvAvail - DOCK_GAP - fieldHeight);
+  if (folded) return Math.min(DOCK_FOLDED, avail);
+  const max = Math.min(DOCK_MAX, avail);
+  return max < DOCK_MIN ? Math.min(DOCK_MIN, avail) : max;
 }
 
 /** iPhone 標準級（390×844）でかなキーボードが出ている状態。残り可視高 480px。 */
@@ -100,6 +121,8 @@ describe('NagaIME モバイル dock（AC10）', () => {
     field = document.createElement('input');
     field.type = 'text';
     document.body.append(field);
+    // 0432: popup は欄のすぐ下に付き、高さの上限に欄の高さが入る ∴ 矩形を決め打ちにする
+    stubRect(field, { top: 400, right: 376, bottom: FIELD_BOTTOM, left: 16 });
     ime = new NagaIME({ loadFonts: false });
   });
 
@@ -123,68 +146,72 @@ describe('NagaIME モバイル dock（AC10）', () => {
     expect(NAGA_STYLE_TEXT).toMatch(/\.naga-list\s*\{[^}]*max-height:\s*260px/);
   });
 
-  describe('AC10-c: 帯 40 を残し、候補 1 行を優先し、可視の領域を超えない（4-1・4-4）', () => {
+  describe('AC10-c: 候補 1 行を優先し、キーボードの上に残る高さを超えない（4-1・4-4。0432 で高さの式を変更）', () => {
+    const FIELD_HEIGHT = 32;
     const cases = [
-      { vvAvail: 188, popupMax: 140 },
-      { vvAvail: 216, popupMax: 168 },
+      { vvAvail: 188, popupMax: 148 },
+      { vvAvail: 216, popupMax: 176 },
       { vvAvail: 320, popupMax: DOCK_MAX },
       { vvAvail: 480, popupMax: DOCK_MAX },
     ];
     for (const c of cases) {
       it(
-        `使える高さ ${c.vvAvail}: popupMax ${c.popupMax}・帯 ≥ ${DOCK_BAND}・候補 1 行以上`,
+        `使える高さ ${c.vvAvail}: popupMax ${c.popupMax}・候補 1 行以上`,
         async () => {
           stubViewport({ width: 375, height: c.vvAvail, offsetTop: 0, innerHeight: 844 });
           ime.attach(field);
           await ime.open(field);
           const pop = popupOf();
           expect(pop.classList.contains('naga-is-docked')).toBe(true);
-          expect(pop.style.position).toBe('fixed');
-          // bottom はキーボード上端＋8
-          expect(pop.style.bottom).toBe(`${844 - c.vvAvail + DOCK_GAP}px`);
+          // 0432: fixed ではなく absolute（文書の座標）で、欄のすぐ下に付ける
+          expect(pop.style.position).toBe('absolute');
+          expect(pop.style.top).toBe(`${FIELD_BOTTOM + POPUP_GAP}px`);
+          expect(pop.style.bottom, 'bottom は使わない').toBe('');
           expect(pop.style.maxHeight).toBe(`${c.popupMax}px`);
+          expect(pop.style.maxHeight).toBe(`${expectedDockMax(c.vvAvail, FIELD_HEIGHT)}px`);
           expect(pop.style.getPropertyValue('--naga-dock-max')).toBe(`${c.popupMax}px`);
           expect(pop.style.getPropertyValue('--naga-dock-avail')).toBe(`${c.vvAvail}px`);
-          // 帯は書かれた値から計算する
-          expect(bandOf(pop)).toBeGreaterThanOrEqual(DOCK_BAND);
           expect(parseFloat(pop.style.maxHeight)).toBeGreaterThanOrEqual(DOCK_MIN);
+          // 高さの上限は「キーボードの上に残る高さ − 欄の高さ − 余白」を超えない
+          expect(parseFloat(pop.style.maxHeight)).toBeLessThanOrEqual(c.vvAvail - DOCK_GAP - FIELD_HEIGHT);
         },
         DICTIONARY_TEST_TIMEOUT_MS,
       );
     }
 
     const tiny = [
-      { vvAvail: 150, popupMax: DOCK_MIN },
-      { vvAvail: 120, popupMax: 112 },
-      { vvAvail: 100, popupMax: 92 },
+      { vvAvail: 150, popupMax: 110 },
+      { vvAvail: 120, popupMax: 80 },
+      { vvAvail: 100, popupMax: 60 },
     ];
     for (const c of tiny) {
       it(
-        `使える高さ ${c.vvAvail}（M-2 の対象外）: popup は可視の領域（vvAvail − 8）を超えない`,
+        `使える高さ ${c.vvAvail}（M-2 の対象外）: popup はキーボードの上に残る高さ − 欄 − 余白を超えない`,
         async () => {
           stubViewport({ width: 375, height: c.vvAvail, offsetTop: 0, innerHeight: 844 });
           ime.attach(field);
           await ime.open(field);
           const pop = popupOf();
           expect(pop.style.maxHeight).toBe(`${c.popupMax}px`);
-          expect(parseFloat(pop.style.maxHeight)).toBeLessThanOrEqual(c.vvAvail - DOCK_GAP);
-          expect(bandOf(pop)).toBeGreaterThanOrEqual(0);
+          expect(parseFloat(pop.style.maxHeight)).toBeLessThanOrEqual(c.vvAvail - DOCK_GAP - FIELD_HEIGHT);
+          expect(pop.style.maxHeight).toBe(`${expectedDockMax(c.vvAvail, FIELD_HEIGHT)}px`);
         },
         DICTIONARY_TEST_TIMEOUT_MS,
       );
     }
 
     it(
-      'visualViewport.offsetTop があっても帯は可視の領域の上端から数える',
+      'visualViewport.offsetTop があっても、位置にも高さの式にも offset を使わない（0432）',
       async () => {
         stubViewport({ width: 375, height: 216, offsetTop: 30, innerHeight: 844 });
         ime.attach(field);
         await ime.open(field);
         const pop = popupOf();
-        // H_kb = 844 − (216 + 30) = 598 → bottom = 606
-        expect(pop.style.bottom).toBe(`${844 - 216 - 30 + DOCK_GAP}px`);
-        expect(pop.style.maxHeight).toBe('168px');
-        expect(bandOf(pop)).toBe(DOCK_BAND);
+        // 位置は文書の座標（欄のすぐ下）。visualViewport の offset は足さない
+        expect(pop.style.top).toBe(`${FIELD_BOTTOM + POPUP_GAP}px`);
+        // 高さは残り可視高（216）− 余白 8 − 欄 32 = 176。offsetTop は引かない
+        expect(pop.style.maxHeight).toBe(`${expectedDockMax(216, FIELD_HEIGHT)}px`);
+        expect(pop.style.maxHeight).toBe('176px');
       },
       DICTIONARY_TEST_TIMEOUT_MS,
     );
@@ -202,14 +229,15 @@ describe('NagaIME モバイル dock（AC10）', () => {
       stubViewport({ width: 390, height: 844, offsetTop: 0, innerHeight: 844 });
       window.dispatchEvent(new Event('resize'));
       const pop = popupOf();
-      expect(pop.style.bottom).toBe(`${DOCK_GAP}px`);
       expect(pop.style.maxHeight).toBe(`${DOCK_MAX}px`);
+      // 0432: 位置は欄のすぐ下のまま（キーボードの開閉で動かない）
+      expect(pop.style.top).toBe(`${FIELD_BOTTOM + POPUP_GAP}px`);
 
-      // より大きなキーボード（残り可視高 240px → avail 232 − 帯 40 = 192）
+      // より大きなキーボード（残り可視高 240px → avail 240 − 余白 8 − 欄 32 = 200）
       stubViewport({ width: 390, height: 240, offsetTop: 0, innerHeight: 844 });
       window.dispatchEvent(new Event('resize'));
-      expect(popupOf().style.maxHeight).toBe('192px');
-      expect(bandOf(popupOf())).toBe(DOCK_BAND);
+      expect(popupOf().style.maxHeight).toBe('200px');
+      expect(popupOf().style.top).toBe(`${FIELD_BOTTOM + POPUP_GAP}px`);
     },
     DICTIONARY_TEST_TIMEOUT_MS,
   );
@@ -288,8 +316,8 @@ describe('NagaIME モバイル dock（AC10）', () => {
 
       const pop = popupOf();
       expect(pop.classList.contains('naga-is-docked')).toBe(false);
-      // nov26-m3-t2（マイルストーン設計 §5.2）: viewport 基準の fixed。見え方の非後退は e2e の P-1〜P-8 が見る
-      expect(pop.style.position).toBe('fixed');
+      // 0432: PC も文書の座標（absolute）。キャレットの行の下に出る見え方の非後退は e2e の P-1〜P-8 が見る
+      expect(pop.style.position).toBe('absolute');
       expect(pop.style.maxHeight).toBe('');
       expect(pop.style.getPropertyValue('--naga-dock-max')).toBe('');
       expect(pop.style.getPropertyValue('--naga-dock-avail')).toBe('');
@@ -346,7 +374,8 @@ describe('NagaIME モバイル dock（AC10）', () => {
     expect(NAGA_STYLE_TEXT).toContain('.naga-popup.naga-is-docked .naga-search-label');
     // タブ帯: 背景で候補領域の白と分ける
     expect(NAGA_STYLE_TEXT).toMatch(/\.naga-popup\.naga-is-docked\s+\.naga-titlebar\s*\{[^}]*background/);
-    // 「ふわふわ浮いて」（§1 の 5）: 画面の下に据え付けた板（上端のアクセントの線・上向きの影）
+    // 「ふわふわ浮いて」（§1 の 5）: 見た目は欄のすぐ下に付けた板のまま（上端のアクセントの線・上向きの影）。
+    // 0432 で位置の決め方だけを変えた（fixed → absolute）∴ 見た目の規則は残す
     expect(NAGA_STYLE_TEXT).toMatch(/\.naga-popup\.naga-is-docked\s*\{[^}]*border-top:\s*2px solid var\(--naga-accent\)/);
     expect(NAGA_STYLE_TEXT).toMatch(/\.naga-popup\.naga-is-docked\s*\{[^}]*box-shadow:\s*0 -4px 16px/);
   });
@@ -374,13 +403,16 @@ describe('NagaIME モバイル dock（AC10）', () => {
   );
 
   it(
-    'dock の popup は画面の左右いっぱい（left / right 0）',
+    'dock の popup は文書の可視幅いっぱい（left は文書の左端・right は使わない）',
     async () => {
       stubViewport(PHONE_KEYBOARD);
       ime.attach(field);
       await ime.open(field);
-      expect(popupOf().style.left).toBe('0px');
-      expect(popupOf().style.right).toBe('0px');
+      const pop = popupOf();
+      expect(pop.style.left, '文書の可視域の左端').toBe('0px');
+      expect(pop.style.right, '0432: right は使わない').toBe('');
+      // jsdom は layout を持たない ∴ documentElement.clientWidth は 0。実装はそのとき innerWidth に落ちる
+      expect(pop.style.width).toBe(`${document.documentElement.clientWidth || window.innerWidth}px`);
     },
     DICTIONARY_TEST_TIMEOUT_MS,
   );
@@ -559,6 +591,8 @@ describe('NagaIME 折りたたみ（§3.3・t3/AC4）', () => {
     field = document.createElement('input');
     field.type = 'text';
     document.body.append(field);
+    // 0432: 高さの上限に欄の高さが入る ∴ 矩形を決め打ちにする
+    stubRect(field, { top: 400, right: 376, bottom: FIELD_BOTTOM, left: 16 });
     ime = new NagaIME({ loadFonts: false });
   });
 
@@ -611,8 +645,9 @@ describe('NagaIME 折りたたみ（§3.3・t3/AC4）', () => {
       expect(fold.textContent).toBe('▴');
       expect(pop.classList.contains('naga-is-folded')).toBe(true);
       expect(focusSpy).not.toHaveBeenCalled();
-      // 帯が広がる（書かれた値から）
-      expect(bandOf(pop)).toBe(188 - DOCK_GAP - DOCK_FOLDED);
+      // 0432: 上端は欄のすぐ下のまま（帯ではなく高さが縮む）
+      expect(pop.style.top).toBe(`${FIELD_BOTTOM + POPUP_GAP}px`);
+      expect(pop.style.maxHeight).toBe(`${expectedDockMax(188, 32, true)}px`);
     },
     DICTIONARY_TEST_TIMEOUT_MS,
   );
@@ -633,7 +668,8 @@ describe('NagaIME 折りたたみ（§3.3・t3/AC4）', () => {
       const focusSpy = vi.spyOn(search, 'focus');
       part<HTMLButtonElement>('.naga-fold').click();
       expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true });
-      expect(popupOf().style.maxHeight).toBe('140px');
+      // 0432: 残り可視高 188 − 余白 8 − 欄 32 = 148
+      expect(popupOf().style.maxHeight).toBe('148px');
       expect(part('.naga-search-row').hidden).toBe(false);
       expect(part('.naga-list').hidden).toBe(false);
       expect(part('.naga-fold').getAttribute('aria-expanded')).toBe('true');

@@ -20,13 +20,20 @@ export default defineConfig({
     {
       name: 'chromium-desktop',
       use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } },
-      testIgnore: /mobile\.spec\.ts/,
+      testIgnore: /mobile\.spec\.ts|ios-trigger\.spec\.ts/,
     },
     {
       // nov26-m3-t3 §3.7: スマートフォンの見え方（M-1〜M-5）。viewport は spec の describe ごとに与える
       name: 'chromium-mobile',
       use: { ...devices['Pixel 5'], isMobile: true, hasTouch: true },
       testMatch: /mobile\.spec\.ts/,
+    },
+    {
+      // 【NOV26-IM-NAGA-IOS-TRIGGER-0426】iOS は Safari・Edge とも WebKit。起動ボタンの置き直しを
+      // WebKit に iPhone を模した端末で測る（chromium の模擬では再現しない。実機は測れない）
+      name: 'webkit-iphone',
+      use: { ...devices['iPhone 15'] },
+      testMatch: /ios-trigger\.spec\.ts/,
     },
   ],
   webServer: {

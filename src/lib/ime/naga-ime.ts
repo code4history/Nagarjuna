@@ -49,6 +49,10 @@ const SEARCH_ARIA_LABEL = '読みを入力';
 const RECENT_LABEL = '最近';
 const RECENT_SHORT = '近';
 const TRIGGER_SIZE_PX = 26;
+/** 起動ボタンと欄の間隔（上下とも）。 */
+const TRIGGER_GAP_PX = 4;
+/** 起動ボタンを可視域の端から離す余白。 */
+const TRIGGER_MARGIN_PX = 4;
 const FONT_SETTINGS: FontSettings = { hentaigana: true, siddham: true, itaiji: true };
 const ALL_CATEGORIES: readonly NagaCategoryId[] = NAGA_CATEGORIES.map((c) => c.id);
 const CATEGORY_IDS = new Set<string>(ALL_CATEGORIES);
@@ -294,6 +298,10 @@ export class NagaIME extends HTMLElement {
   private copyEl: HTMLDivElement | null = null;
   private foldEl: HTMLButtonElement | null = null;
   private globalCleanup: (() => void) | null = null;
+  /** 起動ボタンの置き直しの購読を外す関数（購読していないときは null）。 */
+  private triggerCleanup: (() => void) | null = null;
+  /** 置き直しを間引く rAF の id（0 は予約していない）。 */
+  private triggerRaf = 0;
 
   constructor(options: NagaIMEOptions = {}) {
     // 別の実装が naga-ime を登録済みなら、ブラウザの Illegal constructor に任せず理由を言って投げる（§5.2）
@@ -596,7 +604,7 @@ export class NagaIME extends HTMLElement {
     if (this.target === el) {
       this.close();
       this.target = null;
-      if (this.trigger) this.trigger.hidden = true;
+      this.hideTrigger();
     }
   }
 
@@ -651,6 +659,10 @@ export class NagaIME extends HTMLElement {
     if (this.popup) this.popup.hidden = true;
     this.trigger?.setAttribute('aria-expanded', 'false');
     if (refocus && this.target) this.target.focus({ preventScroll: true });
+    // 置き直しの購読を外す。欄が focus のままでボタンが見えている（Escape で閉じた等）ときは、
+    // 可視を正本に張り直す（閉じたあともボタンは欄の右上に居続ける）
+    this.stopTriggerTracking();
+    this.syncTriggerTracking();
     if (wasOpen) this.emit('nagaClose', { field: this.target });
   }
 
@@ -796,12 +808,11 @@ export class NagaIME extends HTMLElement {
     };
     const onResize = () => {
       if (this.openState) this.positionPopup();
-      if (this.target && this.trigger && !this.trigger.hidden) this.positionTrigger(this.target);
     };
-    // fixed（viewport 基準）なので、ページのスクロールで popup と trigger を置き直す
+    // fixed（viewport 基準）なので、ページのスクロールで popup を置き直す。
+    // 起動ボタンの置き直しは focus 中だけの購読（syncTriggerTracking）が受け持つ
     const onScroll = () => {
       if (this.openState && this.popup && !this.popup.classList.contains('naga-is-docked')) this.positionPopup();
-      if (this.target && this.trigger && !this.trigger.hidden) this.positionTrigger(this.target);
     };
     const vv = window.visualViewport;
     document.addEventListener('mousedown', onDocMouseDown);
@@ -853,6 +864,7 @@ export class NagaIME extends HTMLElement {
 
   private teardownDom(): void {
     this.close();
+    this.stopTriggerTracking();
     this.globalCleanup?.();
     this.globalCleanup = null;
     this.trigger?.remove();
@@ -896,7 +908,7 @@ export class NagaIME extends HTMLElement {
       if (this.openState) return;
       const ae = deepActiveElement();
       if (ae !== this.trigger && !(isTarget(ae) && this.fields.has(ae))) {
-        if (this.trigger) this.trigger.hidden = true;
+        this.hideTrigger();
       }
     };
     const onKeydown = (e: KeyboardEvent) => {
@@ -936,14 +948,98 @@ export class NagaIME extends HTMLElement {
     if (!this.trigger) return;
     this.positionTrigger(field);
     this.trigger.hidden = false;
+    this.syncTriggerTracking();
   }
 
-  /** 起動ボタンを欄の右上に置く（fixed・viewport の座標）。 */
+  /** 起動ボタンを隠す（置き直しの購読も外す）。 */
+  private hideTrigger(): void {
+    if (this.trigger) this.trigger.hidden = true;
+    this.syncTriggerTracking();
+  }
+
+  /**
+   * 起動ボタンを欄の右上に置く（fixed。top/left は layout viewport の座標）。
+   *
+   * 【NOV26-IM-NAGA-IOS-TRIGGER-0426】iOS（Safari・Edge とも WebKit）は欄の focus の後にキーボードを出し、
+   * 欄が見える位置へページをスクロールさせ、さらに visual viewport をパンする（`offsetTop` が 0 でなくなる）。
+   * fixed のボタンは layout viewport に貼り付くので、可視域（visual viewport）を考えずに置くと
+   * 欄の上に余白が無い位置（欄が画面上端に寄ったとき）で画面の外＝見えない場所に残る。
+   * ∴ 置き場所は可視域を基準に決める（`positionPopup()` と同じく `visualViewport` を見る）。
+   * 欄のすぐ上に場所が無ければ欄のすぐ下へ回し、それも入らなければ可視域の上端に寄せる。
+   * 可視域の offset が 0 の環境（PC・パンの無い状態）では従来と同じ位置になる。
+   */
   private positionTrigger(field: NagaTarget): void {
-    if (!this.trigger) return;
+    const trigger = this.trigger;
+    if (!trigger) return;
+    const vv = window.visualViewport;
+    const ox = vv ? vv.offsetLeft : 0;
+    const oy = vv ? vv.offsetTop : 0;
+    const vw = vv ? vv.width : window.innerWidth;
+    const vh = vv ? vv.height : window.innerHeight;
     const r = field.getBoundingClientRect();
-    this.trigger.style.top = `${r.top - TRIGGER_SIZE_PX - 4}px`;
-    this.trigger.style.left = `${r.right - TRIGGER_SIZE_PX}px`;
+
+    // 可視域の端（layout viewport の座標で表したもの）
+    const minX = ox + TRIGGER_MARGIN_PX;
+    const maxX = ox + vw - TRIGGER_SIZE_PX - TRIGGER_MARGIN_PX;
+    const minY = oy + TRIGGER_MARGIN_PX;
+    const maxY = oy + vh - TRIGGER_SIZE_PX - TRIGGER_MARGIN_PX;
+
+    let top = r.top - TRIGGER_SIZE_PX - TRIGGER_GAP_PX;
+    if (top < minY) {
+      // 欄のすぐ上が可視域の外（iOS が欄を画面上端へ寄せた）。欄のすぐ下へ回す
+      const below = r.bottom + TRIGGER_GAP_PX;
+      top = below <= maxY ? below : minY;
+    }
+    if (top > maxY) top = Math.max(minY, maxY);
+    let left = r.right - TRIGGER_SIZE_PX;
+    if (left > maxX) left = maxX;
+    if (left < minX) left = minX;
+
+    trigger.style.top = `${top}px`;
+    trigger.style.left = `${left}px`;
+  }
+
+  /**
+   * 【NOV26-IM-NAGA-IOS-TRIGGER-0426】起動ボタンが見えている間だけ、置き直しの購読を張る（見えなければ外す）。
+   *
+   * 欄の focus の後に iOS が起こす位置の変化は、window の scroll（ページのスクロール）と
+   * visualViewport の scroll・resize（キーボードによる可視域の縮小とパン）で届く。
+   * 可視域のパンでは window の scroll は起きない ∴ visualViewport の scroll を必ず購読する。
+   * スクロールは 1 フレームに何度も届くので、置き直しは requestAnimationFrame で間引く。
+   */
+  private syncTriggerTracking(): void {
+    const visible = Boolean(this.trigger && !this.trigger.hidden && this.target);
+    if (!visible) {
+      this.stopTriggerTracking();
+      return;
+    }
+    if (this.triggerCleanup) return;
+    const request = () => {
+      if (this.triggerRaf) return;
+      this.triggerRaf = requestAnimationFrame(() => {
+        this.triggerRaf = 0;
+        if (!this.trigger || this.trigger.hidden || !this.target) return;
+        this.positionTrigger(this.target);
+      });
+    };
+    const vv = window.visualViewport;
+    window.addEventListener('scroll', request, { capture: true, passive: true });
+    window.addEventListener('resize', request, { passive: true });
+    vv?.addEventListener('scroll', request, { passive: true });
+    vv?.addEventListener('resize', request, { passive: true });
+    this.triggerCleanup = () => {
+      window.removeEventListener('scroll', request, true);
+      window.removeEventListener('resize', request);
+      vv?.removeEventListener('scroll', request);
+      vv?.removeEventListener('resize', request);
+      if (this.triggerRaf) cancelAnimationFrame(this.triggerRaf);
+      this.triggerRaf = 0;
+    };
+  }
+
+  private stopTriggerTracking(): void {
+    this.triggerCleanup?.();
+    this.triggerCleanup = null;
   }
 
   /* ------------------------------------------------------------ *

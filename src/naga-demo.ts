@@ -30,6 +30,17 @@ if (new URLSearchParams(location.search).get('debugViewport') === '1') {
   if (lead) lead.after(panel);
   else document.body.prepend(panel);
 
+  // 欄の focus・blur の順序（直近 8 件）。欄は capture で拾う
+  const focusLog: string[] = [];
+  const logEv = (e: Event): void => {
+    const t = e.target as Element | null;
+    if (!t || !(t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement)) return;
+    focusLog.push(`${e.type}:${t.id || t.tagName.toLowerCase()}`);
+    if (focusLog.length > 8) focusLog.shift();
+  };
+  document.addEventListener('focus', logEv, true);
+  document.addEventListener('blur', logEv, true);
+
   const render = (): void => {
     const vv = window.visualViewport;
     const vvAvail = vv ? Math.round(vv.height) : window.innerHeight;
@@ -41,7 +52,20 @@ if (new URLSearchParams(location.search).get('debugViewport') === '1') {
     const maxH = shown ? pop.style.maxHeight || '(未設定)' : '-';
     // popup の上に残っている帯（本体の入力欄が見える高さ）
     const clearance = rect ? Math.round(rect.top - offsetTop) : null;
+    // 【NOV26-M3-NAGA-IOS-DEBUG-0428】iPhone で梵ボタンが出ない件の切り分け用（trigger の状態と focus の記録）
+    const trig = document.querySelector('naga-ime')?.shadowRoot?.querySelector('.naga-trigger') as HTMLElement | null;
+    const tr = trig ? trig.getBoundingClientRect() : null;
+    const ae = document.activeElement;
     panel.textContent = [
+      `naga-ime 定義= ${customElements.get('naga-ime') ? 'あり' : 'なし'}`,
+      `trigger     = ${trig ? 'あり' : 'なし'}`,
+      `trig.hidden = ${trig ? trig.hidden : '-'}`,
+      `trig.display= ${trig ? getComputedStyle(trig).display : '-'}`,
+      `trig.style  = ${trig ? `${trig.style.top} / ${trig.style.left}` : '-'}`,
+      `trig.rect   = ${tr ? `${Math.round(tr.left)},${Math.round(tr.top)} ${Math.round(tr.width)}x${Math.round(tr.height)}` : '-'}`,
+      `active      = ${ae ? `${ae.tagName.toLowerCase()}${ae.id ? '#' + ae.id : ''}` : '-'}`,
+      `scrollY     = ${Math.round(window.scrollY)}`,
+      `events      = ${focusLog.join(' ')}`,
       `vv.height   = ${vvAvail}`,
       `vv.offsetTop= ${offsetTop}`,
       `innerHeight = ${window.innerHeight}`,

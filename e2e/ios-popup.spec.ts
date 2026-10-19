@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { PART, fieldRect, gotoFixture, nagaIsOpen, partInfo, waitShown, type Rect } from './helpers';
+import { fieldRect, gotoFixture, nagaIsOpen, partInfo, PART, waitShown, type Rect } from './helpers';
 
 // 【NOV26-IM-NAGA-POPUP-ANCHOR-0432】popup の置き場所の回帰試験（iOS のキーボードとスクロール）。
 //
@@ -10,11 +10,21 @@ import { PART, fieldRect, gotoFixture, nagaIsOpen, partInfo, waitShown, type Rec
 // 計算し、ページのスクロールのたびに置き直していた。実機の iPhone ではキーボード表示中に fixed が
 // visual viewport とずれ、popup が欄と無関係に動いて「ふわふわ」していた。0432 で梵ボタンと同じく
 // 文書の座標（position: absolute）で欄のすぐ下に置き、ページのスクロールでは置き直さない。
-// ∴ ここでは「popup の上端と欄の下端の差が、どのスクロール位置・どの visual viewport のパンでも
-// 一定であること」を測る。
+// 【NOV26-IM-NAGA-POPUP-CARET-0434】0432 の「欄のすぐ下」は複数行の欄（textarea）でキャレットの行から
+// 遠すぎ、高さの上限も欄の高さに縮んで候補の行がキーボードの下に欠けた ∴ 狭幅もキャレットの行のすぐ下に
+// 置き、上限は「popup の上端から可視域の下端（キーボードの上）まで」で決める。
+// ∴ ここでは X-1〜X-3 で「popup の上端とキャレットの行・欄との差が、どのスクロール位置・どの visual
+// viewport のパンでも一定であること」を測り、X-5 で複数行の欄のキャレットと、縮んだ可視域の中の候補 1 行目を測る。
 // WebKit を Playwright で動かすかぎり本当のソフトキーボードは出ない ∴ visualViewport のパンは
 // 読み取り値を差し替えて模す（getter を上書きする。実物の VisualViewport のままなのでイベントは
 // 本物の購読経路で届く）。
+
+/** f-mobile の #m1 の組版（CSS で宣言している値。実装とは別に出どころを書いておく）。 */
+const M1 = { border: 1, paddingTop: 4, lineHeight: 22 } as const;
+/** f-mobile の #m2 の組版（textarea・8 行）。 */
+const M2 = { border: 1, paddingTop: 2, lineHeight: 20 } as const;
+/** キャレットの行の下端と popup の上端の間隔（0434 の POPUP_CARET_GAP_PX）。 */
+const CARET_GAP = 2;
 
 /** visual viewport の offset を上書きして「キーボードで可視域が縮んでパンした」状態を模す。 */
 async function mockVisualViewport(page: Page, v: { offsetTop: number; offsetLeft: number; height: number }): Promise<void> {
@@ -80,11 +90,16 @@ async function openByTrigger(page: Page): Promise<void> {
   await settle(page);
 }
 
-/** popup の上端 − 欄の下端（この差が一定であることが「欄に付いている」の意味）。 */
-async function gapOf(page: Page): Promise<number> {
-  const field = await fieldRect(page, 'm1');
+/** #m1 のキャレットの行（1 行）の下端（layout viewport）。f-mobile の CSS から数える。 */
+function m1CaretBottom(field: Rect): number {
+  return field.top + M1.border + M1.paddingTop + M1.lineHeight;
+}
+
+/** popup の上端 − 欄の上端（この差が一定であることが「欄に付いている」の意味。0434 も同じ）。 */
+async function offsetFromFieldTop(page: Page, id = 'm1'): Promise<number> {
+  const field = await fieldRect(page, id);
   const pop = await popupRect(page);
-  return pop.top - field.bottom;
+  return pop.top - field.top;
 }
 
 test.beforeEach(async ({ page }) => {
@@ -94,22 +109,30 @@ test.beforeEach(async ({ page }) => {
   expect(await nagaIsOpen(page), '前提: popup が開いた').toBe(true);
 });
 
-test('X-1: popup は position: absolute で欄のすぐ下に付き、ページをスクロールしても欄との差が変わらない', async ({
+test('X-1: popup は position: absolute でキャレットの行のすぐ下に付き、ページをスクロールしても差が変わらない', async ({
   page,
 }) => {
   const style = await popupStyle(page);
   expect(style.position, '[measure:X-1] position は absolute（fixed ではない）').toBe('absolute');
 
-  const gaps: number[] = [];
+  const field = await fieldRect(page, 'm1');
+  const pop = await popupRect(page);
+  const caretBottom = m1CaretBottom(field);
+  expect(Math.abs(pop.top - (caretBottom + CARET_GAP)), '[measure:X-1] popup はキャレットの行のすぐ下（±2px）').toBeLessThanOrEqual(2);
+  expect(pop.top, '[measure:X-1] popup は欄の下端より上（キャレットの行の下）').toBeLessThan(field.bottom);
+
+  const offsets: number[] = [];
   for (const y of [0, 40, 80, 120, 160]) {
     await page.evaluate((top) => window.scrollTo(0, top), y);
     await settle(page);
     expect(await page.evaluate(() => window.scrollY), `前提: ${y} までスクロールした`).toBe(y);
-    gaps.push(await gapOf(page));
+    offsets.push(await offsetFromFieldTop(page));
   }
-  expect(Math.max(...gaps) - Math.min(...gaps), '[measure:X-1] 欄との差が一定（±1px）').toBeLessThanOrEqual(1);
-  expect(gaps[0], '[measure:X-1] popup は欄のすぐ下（間隔 4px）').toBeGreaterThanOrEqual(3);
-  expect(gaps[0], '[measure:X-1] popup は欄のすぐ下（間隔 4px）').toBeLessThanOrEqual(5);
+  expect(Math.max(...offsets) - Math.min(...offsets), '[measure:X-1] 欄との差が一定（±1px）').toBeLessThanOrEqual(1);
+  // popup の上端はキャレットの行の下端 ＋ 2（#m1 は 1 行）
+  const expectedOffset = caretBottom - field.top + CARET_GAP;
+  expect(offsets[0], `[measure:X-1] popup の上端は欄の上端から ${expectedOffset}px`).toBeGreaterThanOrEqual(expectedOffset - 1);
+  expect(offsets[0], `[measure:X-1] popup の上端は欄の上端から ${expectedOffset}px`).toBeLessThanOrEqual(expectedOffset + 1);
 
   // スクロールしても popup の inline style（文書の座標）は書き換えない
   const after = await popupStyle(page);
@@ -119,7 +142,7 @@ test('X-1: popup は position: absolute で欄のすぐ下に付き、ページ�
 
 test('X-2: visualViewport がパンしても（キーボード）、popup の欄との差は一定のまま', async ({ page }) => {
   const styleBefore = await popupStyle(page);
-  const gapBefore = await gapOf(page);
+  const offsetBefore = await offsetFromFieldTop(page);
 
   // キーボードで可視域が縮み（高さ 852 → 480）、パンする（offsetTop = 0 → 150）。欄の layout 座標は変わらない
   await mockVisualViewport(page, { offsetTop: 150, offsetLeft: 0, height: 480 });
@@ -133,27 +156,32 @@ test('X-2: visualViewport がパンしても（キーボード）、popup の欄
   const styleAfter = await popupStyle(page);
   expect(styleAfter.top, '[measure:X-2] visualViewport の offset を位置に使わない').toBe(styleBefore.top);
   expect(styleAfter.left, '[measure:X-2] visualViewport の offset を位置に使わない').toBe(styleBefore.left);
-  expect(Math.abs((await gapOf(page)) - gapBefore), '[measure:X-2] パンのあとも欄との差は一定').toBeLessThanOrEqual(1);
+  expect(Math.abs((await offsetFromFieldTop(page)) - offsetBefore), '[measure:X-2] パンのあとも欄との差は一定').toBeLessThanOrEqual(1);
 
   // パンのあとにページをスクロールしても、欄との差は一定のまま
   await page.evaluate(() => window.scrollTo(0, 60));
   await settle(page);
-  expect(Math.abs((await gapOf(page)) - gapBefore), '[measure:X-2] パン＋スクロールでも差は一定').toBeLessThanOrEqual(1);
+  expect(Math.abs((await offsetFromFieldTop(page)) - offsetBefore), '[measure:X-2] パン＋スクロールでも差は一定').toBeLessThanOrEqual(1);
 });
 
 test('X-3: スクロールコンテナ（overflow: auto）をスクロールすると、popup が欄に付いてくる', async ({ page }) => {
   // #m1 は #scroller の中にある。要素のスクロールで欄が箱の中を動く ∴ popup は置き直す
-  const gaps: number[] = [];
+  const offsets: number[] = [];
   for (const y of [0, 15, 30]) {
     await page.evaluate((top) => {
       document.getElementById('scroller')!.scrollTop = top;
     }, y);
     await settle(page);
-    gaps.push(await gapOf(page));
+    offsets.push(await offsetFromFieldTop(page));
   }
-  expect(Math.max(...gaps) - Math.min(...gaps), '[measure:X-3] 欄との差が一定（±1px）').toBeLessThanOrEqual(1);
-  expect(gaps[0], '[measure:X-3] popup は欄のすぐ下（間隔 4px）').toBeGreaterThanOrEqual(3);
-  expect(gaps[0], '[measure:X-3] popup は欄のすぐ下（間隔 4px）').toBeLessThanOrEqual(5);
+  expect(Math.max(...offsets) - Math.min(...offsets), '[measure:X-3] 欄との差が一定（±1px）').toBeLessThanOrEqual(1);
+  const field = await fieldRect(page, 'm1');
+  expect(offsets[0], '[measure:X-3] popup の上端はキャレットの行のすぐ下').toBeGreaterThanOrEqual(
+    m1CaretBottom(field) - field.top - 1,
+  );
+  expect(offsets[0], '[measure:X-3] popup の上端はキャレットの行のすぐ下').toBeLessThanOrEqual(
+    m1CaretBottom(field) - field.top + CARET_GAP + 1,
+  );
 });
 
 test('X-4: popup の横は文書の可視幅いっぱい（left 0・width は可視幅）', async ({ page }) => {
@@ -166,4 +194,73 @@ test('X-4: popup の横は文書の可視幅いっぱい（left 0・width は可
   expect(pop.left, '[measure:X-4] 左端は可視域の左端').toBeLessThanOrEqual(1);
   expect(Math.abs(pop.width - vw.docWidth), '[measure:X-4] 幅は文書の可視幅').toBeLessThanOrEqual(1);
   expect(pop.right, '[measure:X-4] 右端は可視域の右端を超えない').toBeLessThanOrEqual(vw.innerWidth + 1);
+});
+
+/**
+ * 【NOV26-IM-NAGA-POPUP-CARET-0434】複数行の欄（#m2 textarea）の 3 行目にキャレットを置いて開く。
+ * - popup の上端がキャレットの行の下端の近く（±4px）で、欄の下端より上
+ * - 候補の 1 行目が可視域（模擬した visualViewport の下端）の中
+ */
+test('X-5: textarea の 3 行目では、キャレットの行のすぐ下に開き、縮んだ可視域にも候補 1 行目が見える', async ({ page }) => {
+  /** #m2 の 3 行目の末尾にキャレットを置く（行内のスクロール位置は 11px に固定して 3 行目を可視に保つ）。 */
+  const placeCaretOnLine3 = async (): Promise<void> => {
+    await page.evaluate(() => {
+      const m2 = document.getElementById('m2') as HTMLTextAreaElement;
+      m2.scrollTop = 11;
+      m2.focus({ preventScroll: true });
+      const at = m2.value.split('\n').slice(0, 3).join('\n').length; // 3 行目の末尾
+      m2.setSelectionRange(at, at);
+    });
+    await waitShown(page, PART.trigger);
+    await settle(page);
+  };
+
+  /** 開いたあとの「キャレットの行の下端・欄の下端・popup・候補 1 行目・可視域の下端」を測る。 */
+  const measure = async () => {
+    const m2 = await page.evaluate(() => {
+      const el = document.getElementById('m2') as HTMLTextAreaElement;
+      const r = el.getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom, scrollTop: el.scrollTop };
+    });
+    const caretBottom = m2.top + M2.border + M2.paddingTop + 3 * M2.lineHeight - m2.scrollTop;
+    const pop = await popupRect(page);
+    const first = await partInfo(page, '.naga-item');
+    if (!first) throw new Error('候補（.naga-item）が無い');
+    const visibleBottom = await page.evaluate(() => {
+      const vv = window.visualViewport;
+      return vv ? vv.offsetTop + vv.height : window.innerHeight;
+    });
+    return { m2, caretBottom, pop, first: first.rect, visibleBottom };
+  };
+
+  // 前提の #m1 の popup を閉じ、#m2 の 3 行目へキャレットを移す
+  await page.evaluate(() => (window as unknown as { __naga: { close: () => void } }).__naga.close());
+  await settle(page);
+  await placeCaretOnLine3();
+
+  // (1) キーボードが出ていない状態（可視域 852）: キャレットの行のすぐ下・候補は当然見える
+  await openByTrigger(page);
+  const open1 = await measure();
+  expect(Math.abs(open1.pop.top - open1.caretBottom), '[measure:X-5] popup の上端はキャレットの行の下端の近く（±4px）').toBeLessThanOrEqual(4);
+  expect(open1.pop.top, '[measure:X-5] popup は欄の下端より上').toBeLessThan(open1.m2.bottom);
+  expect(open1.first.top, '[measure:X-5] 候補 1 行目の上端が可視域の中').toBeGreaterThanOrEqual(0);
+  expect(open1.first.bottom, '[measure:X-5] 候補 1 行目の下端が可視域の中').toBeLessThanOrEqual(open1.visibleBottom + 1);
+
+  // (2) キーボードで可視域が縮んだ状態（下端 320）で開き直す: 上限が縮んでも候補 1 行目は見える
+  await page.evaluate(() => (window as unknown as { __naga: { close: () => void } }).__naga.close());
+  await settle(page);
+  await mockVisualViewport(page, { offsetTop: 0, offsetLeft: 0, height: 320 });
+  await placeCaretOnLine3();
+  await openByTrigger(page);
+  const open2 = await measure();
+  expect(Math.abs(open2.pop.top - open2.caretBottom), '[measure:X-5] 縮んだ可視域でも popup はキャレットの行の下端の近く').toBeLessThanOrEqual(4);
+  expect(open2.pop.top, '[measure:X-5] 縮んだ可視域でも popup は欄の下端より上').toBeLessThan(open2.m2.bottom);
+  expect(open2.first.top, '[measure:X-5] 縮んだ可視域でも候補 1 行目の上端が見える').toBeGreaterThanOrEqual(0);
+  expect(open2.first.bottom, '[measure:X-5] 縮んだ可視域でも候補 1 行目の下端が見える').toBeLessThanOrEqual(open2.visibleBottom + 1);
+
+  // 可視域に入れるためにページを寄せたなら 1 回だけ（スクロールで置き直さない方針は変えない）
+  const scrolled = await page.evaluate(() => window.scrollY);
+  await page.evaluate(() => window.visualViewport?.dispatchEvent(new Event('resize')));
+  await settle(page);
+  expect(await page.evaluate(() => window.scrollY), '[measure:X-5] 2 回目以降は寄せない').toBe(scrolled);
 });

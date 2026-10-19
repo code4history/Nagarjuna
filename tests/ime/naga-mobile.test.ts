@@ -6,13 +6,15 @@
  * jsdom は layout を持たないため、ここで測るのは「レイアウトの実物」ではなく
  * 「仕組み」（style へ書かれる値・class・textContent・hidden・focus の引数）である。実の矩形は e2e の M-1〜M-5 が見る。
  *
- * 割り付け（nov26-m3-t3 タスク設計 §3.1・0432 で高さの式だけ変更）: タイトル行 34 ＋ 写しの行 22 ＋
- * 読み欄 36 ＋ 枠 2 ＝ 固定部分 94、候補 1 行 44、上限 3 行。キーボード上端との間 8。
- *   avail = vvAvail − 8 − 欄の高さ
- *   popupMax = min(226, avail)。それが 138（固定部分＋候補 1 行）未満なら min(138, avail)
+ * 割り付け（nov26-m3-t3 タスク設計 §3.1・0432 で高さの式だけ変更・0434 で位置と式を変更）:
+ * タイトル行 34 ＋ 写しの行 22 ＋ 読み欄 36 ＋ 枠 2 ＝ 固定部分 94、候補 1 行 44、上限 3 行。
+ * キーボード上端（可視域の下端）との間 8。
+ *   room     = (vv.offsetTop + vv.height) − popup の上端（viewport） − 8
+ *   popupMax = min(226, room)。138（固定部分＋候補 1 行）未満なら 138（開いた直後に 1 回だけページを寄せる）
  * 畳んだ高さは 58（タイトル行＋写しの行＋枠）。
- * 位置は 0432 から文書の座標（`position: absolute`・欄のすぐ下。tests/ime/naga-popup-position.test.ts）∴
- * ここでは高さの上限と、dock かどうかの見た目だけを測る。
+ * 位置は 0434 から文書の座標でキャレットの行のすぐ下（キャレットを測れない欄では欄のすぐ下）。
+ * tests/ime/naga-popup-position.test.ts がキャレットの計測を含む置き場所を、ここは高さの上限と
+ * dock かどうかの見た目を測る。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NagaIME } from '@/lib/ime/naga-ime';
@@ -95,17 +97,38 @@ function stubRect(el: Element, rect: { top: number; right: number; bottom: numbe
     }) as DOMRect;
 }
 
-/** 欄の下端（0432: popup はこのすぐ下に付く）。 */
-const FIELD_BOTTOM = 432;
-/** 欄のすぐ下に付ける間隔（実装の POPUP_GAP_PX）。 */
-const POPUP_GAP = 4;
+/**
+ * キャレットの計測を stub する（jsdom は layout を持たない）。null は「測れない」＝ 例外。
+ * 【0434】狭幅もキャレットの行のすぐ下に置くようになった ∴ 欄の下端を基準にする経路（測れないときの
+ * 落とし所）は、この stub で明示したときだけ通る。高さの上限は欄の位置に依る ∴ ここでは欄の下端に固定する。
+ */
+function stubCaret(anchor: { x: number; y: number; lineHeight: number } | null): void {
+  vi.spyOn(
+    ime as unknown as { measureCaret: () => { x: number; y: number; lineHeight: number } },
+    'measureCaret',
+  ).mockImplementation(() => {
+    if (!anchor) throw new Error('キャレットを測れない');
+    return anchor;
+  });
+}
 
-/** dock の高さの上限を、キーボード上に残る高さと欄の高さから計算する（実装の式と同じ・0432）。 */
-function expectedDockMax(vvAvail: number, fieldHeight: number, folded = false): number {
-  const avail = Math.max(0, vvAvail - DOCK_GAP - fieldHeight);
-  if (folded) return Math.min(DOCK_FOLDED, avail);
-  const max = Math.min(DOCK_MAX, avail);
-  return max < DOCK_MIN ? Math.min(DOCK_MIN, avail) : max;
+/** 可視域に収めるための 1 回のスクロール（0434 の例外）を数える。jsdom の scrollBy は空振りするので差し替える。 */
+let scrollBySpy: ReturnType<typeof vi.spyOn>;
+
+/** 欄の下端（0432: キャレットを測れないときの落とし所）。 */
+const FIELD_BOTTOM = 232;
+/** キャレットを測れないときの欄のすぐ下に付ける間隔（実装の POPUP_GAP_PX）。 */
+const POPUP_GAP = 4;
+/** キャレットを測れないときの popup の上端（viewport）。 */
+const POPUP_TOP = FIELD_BOTTOM + POPUP_GAP;
+
+/** dock の高さの上限（0434）: 可視域の下端（vv.offsetTop + vv.height）− popup の上端 − 余白。 */
+function expectedDockMax(visibleBottom: number, popupTopViewport: number, folded = false): number {
+  const room = visibleBottom - popupTopViewport - DOCK_GAP;
+  let max = Math.min(DOCK_MAX, Math.max(0, room));
+  if (max < DOCK_MIN) max = DOCK_MIN;
+  if (folded) max = Math.min(DOCK_FOLDED, max);
+  return max;
 }
 
 /** iPhone 標準級（390×844）でかなキーボードが出ている状態。残り可視高 480px。 */
@@ -121,9 +144,12 @@ describe('NagaIME モバイル dock（AC10）', () => {
     field = document.createElement('input');
     field.type = 'text';
     document.body.append(field);
-    // 0432: popup は欄のすぐ下に付き、高さの上限に欄の高さが入る ∴ 矩形を決め打ちにする
-    stubRect(field, { top: 400, right: 376, bottom: FIELD_BOTTOM, left: 16 });
+    // 0434: 高さの上限は「キャレットの行の下から可視域の下端まで」 ∴ 欄とキャレットの位置を決め打ちにする。
+    // ここではキャレットを測れない欄（欄の下端 232 のすぐ下に置く経路）として測る
+    stubRect(field, { top: 200, right: 376, bottom: FIELD_BOTTOM, left: 16 });
     ime = new NagaIME({ loadFonts: false });
+    stubCaret(null);
+    scrollBySpy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -146,13 +172,16 @@ describe('NagaIME モバイル dock（AC10）', () => {
     expect(NAGA_STYLE_TEXT).toMatch(/\.naga-list\s*\{[^}]*max-height:\s*260px/);
   });
 
-  describe('AC10-c: 候補 1 行を優先し、キーボードの上に残る高さを超えない（4-1・4-4。0432 で高さの式を変更）', () => {
-    const FIELD_HEIGHT = 32;
+  describe('AC10-c: 候補 1 行を優先し、上限は「キャレットの行の下から可視域の下端まで」（4-1・4-4。0434 で式を変更）', () => {
+    // popup の上端（viewport）は欄の下端 232 ＋ 4 = 236（キャレットを測れない欄の経路）
+    //   room = 可視域の下端 − 236 − 余白 8
     const cases = [
-      { vvAvail: 188, popupMax: 148 },
-      { vvAvail: 216, popupMax: 176 },
-      { vvAvail: 320, popupMax: DOCK_MAX },
-      { vvAvail: 480, popupMax: DOCK_MAX },
+      { vvAvail: 852, popupMax: DOCK_MAX }, // room 608（キーボードなし）
+      { vvAvail: 480, popupMax: DOCK_MAX }, // room 236
+      { vvAvail: 460, popupMax: 216 }, // room 216
+      { vvAvail: 400, popupMax: 156 }, // room 156
+      { vvAvail: 380, popupMax: DOCK_MIN }, // room 136 < 138 → 候補 1 行を優先（下端はまだ見えている）
+      { vvAvail: 300, popupMax: DOCK_MIN }, // room 56 → 上限 DOCK_MIN ＋ 開いた直後に 1 回寄せる
     ];
     for (const c of cases) {
       it(
@@ -163,55 +192,79 @@ describe('NagaIME モバイル dock（AC10）', () => {
           await ime.open(field);
           const pop = popupOf();
           expect(pop.classList.contains('naga-is-docked')).toBe(true);
-          // 0432: fixed ではなく absolute（文書の座標）で、欄のすぐ下に付ける
+          // 0434: fixed ではなく absolute（文書の座標）で、キャレットの行のすぐ下に付ける
           expect(pop.style.position).toBe('absolute');
-          expect(pop.style.top).toBe(`${FIELD_BOTTOM + POPUP_GAP}px`);
+          expect(pop.style.top).toBe(`${POPUP_TOP}px`);
           expect(pop.style.bottom, 'bottom は使わない').toBe('');
           expect(pop.style.maxHeight).toBe(`${c.popupMax}px`);
-          expect(pop.style.maxHeight).toBe(`${expectedDockMax(c.vvAvail, FIELD_HEIGHT)}px`);
+          // 上限は「可視域の下端 − popup の上端 − 余白」。0432 のように欄の高さを引かない
+          expect(pop.style.maxHeight).toBe(`${expectedDockMax(c.vvAvail, POPUP_TOP)}px`);
           expect(pop.style.getPropertyValue('--naga-dock-max')).toBe(`${c.popupMax}px`);
           expect(pop.style.getPropertyValue('--naga-dock-avail')).toBe(`${c.vvAvail}px`);
           expect(parseFloat(pop.style.maxHeight)).toBeGreaterThanOrEqual(DOCK_MIN);
-          // 高さの上限は「キーボードの上に残る高さ − 欄の高さ − 余白」を超えない
-          expect(parseFloat(pop.style.maxHeight)).toBeLessThanOrEqual(c.vvAvail - DOCK_GAP - FIELD_HEIGHT);
-        },
-        DICTIONARY_TEST_TIMEOUT_MS,
-      );
-    }
-
-    const tiny = [
-      { vvAvail: 150, popupMax: 110 },
-      { vvAvail: 120, popupMax: 80 },
-      { vvAvail: 100, popupMax: 60 },
-    ];
-    for (const c of tiny) {
-      it(
-        `使える高さ ${c.vvAvail}（M-2 の対象外）: popup はキーボードの上に残る高さ − 欄 − 余白を超えない`,
-        async () => {
-          stubViewport({ width: 375, height: c.vvAvail, offsetTop: 0, innerHeight: 844 });
-          ime.attach(field);
-          await ime.open(field);
-          const pop = popupOf();
-          expect(pop.style.maxHeight).toBe(`${c.popupMax}px`);
-          expect(parseFloat(pop.style.maxHeight)).toBeLessThanOrEqual(c.vvAvail - DOCK_GAP - FIELD_HEIGHT);
-          expect(pop.style.maxHeight).toBe(`${expectedDockMax(c.vvAvail, FIELD_HEIGHT)}px`);
+          // 可視域に収まっている（DOCK_MIN に満たないときは寄せたあとの可視域で見る）
+          const need = Math.max(0, POPUP_TOP + c.popupMax - c.vvAvail);
+          expect(scrollBySpy.mock.calls.length).toBe(need > 0 ? 1 : 0);
+          if (need > 0) {
+            expect(scrollBySpy).toHaveBeenCalledWith(0, need);
+            expect(POPUP_TOP + c.popupMax - need).toBeLessThanOrEqual(c.vvAvail);
+          }
         },
         DICTIONARY_TEST_TIMEOUT_MS,
       );
     }
 
     it(
-      'visualViewport.offsetTop があっても、位置にも高さの式にも offset を使わない（0432）',
+      '高い欄（textarea の高さ 200）でも、キャレットの行の下から可視域の下端までで上限が決まる',
+      async () => {
+        // 同じキャレット・同じ下端で、欄の高さだけを 32 → 200 に変える（0432 の式は欄の高さを引いていた）
+        stubRect(field, { top: 32, right: 376, bottom: FIELD_BOTTOM, left: 16 });
+        stubViewport({ width: 375, height: 400, offsetTop: 0, innerHeight: 844 });
+        ime.attach(field);
+        await ime.open(field);
+        expect(popupOf().style.top).toBe(`${POPUP_TOP}px`);
+        expect(popupOf().style.maxHeight).toBe(`${expectedDockMax(400, POPUP_TOP)}px`);
+        expect(popupOf().style.maxHeight).toBe('156px');
+      },
+      DICTIONARY_TEST_TIMEOUT_MS,
+    );
+
+    const tiny = [
+      { vvAvail: 150 },
+      { vvAvail: 120 },
+      { vvAvail: 100 },
+    ];
+    for (const c of tiny) {
+      it(
+        `使える高さ ${c.vvAvail}（M-2 の対象外）: 上限は DOCK_MIN で、開いた直後に 1 回だけ寄せる`,
+        async () => {
+          stubViewport({ width: 375, height: c.vvAvail, offsetTop: 0, innerHeight: 844 });
+          ime.attach(field);
+          await ime.open(field);
+          const pop = popupOf();
+          expect(pop.style.maxHeight).toBe(`${DOCK_MIN}px`);
+          expect(pop.style.maxHeight).toBe(`${expectedDockMax(c.vvAvail, POPUP_TOP)}px`);
+          expect(scrollBySpy).toHaveBeenCalledTimes(1);
+          expect(scrollBySpy).toHaveBeenCalledWith(0, POPUP_TOP + DOCK_MIN - c.vvAvail);
+          // 寄せたあとは popup の下端が可視域の下端に一致する（候補 1 行が見える）
+          expect(POPUP_TOP + DOCK_MIN - (POPUP_TOP + DOCK_MIN - c.vvAvail)).toBe(c.vvAvail);
+        },
+        DICTIONARY_TEST_TIMEOUT_MS,
+      );
+    }
+
+    it(
+      'visualViewport の offsetTop は位置には使わず、可視域の下端（大きさ）にだけ使う（0434）',
       async () => {
         stubViewport({ width: 375, height: 216, offsetTop: 30, innerHeight: 844 });
         ime.attach(field);
         await ime.open(field);
         const pop = popupOf();
-        // 位置は文書の座標（欄のすぐ下）。visualViewport の offset は足さない
-        expect(pop.style.top).toBe(`${FIELD_BOTTOM + POPUP_GAP}px`);
-        // 高さは残り可視高（216）− 余白 8 − 欄 32 = 176。offsetTop は引かない
-        expect(pop.style.maxHeight).toBe(`${expectedDockMax(216, FIELD_HEIGHT)}px`);
-        expect(pop.style.maxHeight).toBe('176px');
+        // 位置は文書の座標（キャレットの行のすぐ下）。visualViewport の offset は足さない
+        expect(pop.style.top).toBe(`${POPUP_TOP}px`);
+        // 可視域の下端 = 30 + 216 = 246 → 246 − 236 − 8 = 2 < 138 ∴ 上限 138・寄せ 0
+        expect(pop.style.maxHeight).toBe(`${expectedDockMax(30 + 216, POPUP_TOP)}px`);
+        expect(pop.style.maxHeight).toBe(`${DOCK_MIN}px`);
       },
       DICTIONARY_TEST_TIMEOUT_MS,
     );
@@ -225,19 +278,22 @@ describe('NagaIME モバイル dock（AC10）', () => {
       await ime.open(field);
       expect(popupOf().style.maxHeight).toBe(`${DOCK_MAX}px`);
 
-      // キーボードが閉じた（残り可視高が 844 に戻る）
+      // キーボードが閉じた（可視域の下端が 844 に戻る → room 844 − 236 − 8 = 600）
       stubViewport({ width: 390, height: 844, offsetTop: 0, innerHeight: 844 });
       window.dispatchEvent(new Event('resize'));
       const pop = popupOf();
       expect(pop.style.maxHeight).toBe(`${DOCK_MAX}px`);
-      // 0432: 位置は欄のすぐ下のまま（キーボードの開閉で動かない）
-      expect(pop.style.top).toBe(`${FIELD_BOTTOM + POPUP_GAP}px`);
+      // 0434: 位置はキャレットの行のすぐ下のまま（キーボードの開閉で動かない）
+      expect(pop.style.top).toBe(`${POPUP_TOP}px`);
 
-      // より大きなキーボード（残り可視高 240px → avail 240 − 余白 8 − 欄 32 = 200）
+      // より大きなキーボード（可視域の下端 240 → room 240 − 236 − 8 = −4 < 138 ∴ 上限 DOCK_MIN）
       stubViewport({ width: 390, height: 240, offsetTop: 0, innerHeight: 844 });
       window.dispatchEvent(new Event('resize'));
-      expect(popupOf().style.maxHeight).toBe('200px');
-      expect(popupOf().style.top).toBe(`${FIELD_BOTTOM + POPUP_GAP}px`);
+      expect(popupOf().style.maxHeight).toBe(`${DOCK_MIN}px`);
+      expect(popupOf().style.maxHeight).toBe(`${expectedDockMax(240, POPUP_TOP)}px`);
+      expect(popupOf().style.top).toBe(`${POPUP_TOP}px`);
+      // resize では寄せない（寄せるのは開いた直後の 1 回だけ）
+      expect(scrollBySpy).not.toHaveBeenCalled();
     },
     DICTIONARY_TEST_TIMEOUT_MS,
   );
@@ -591,9 +647,11 @@ describe('NagaIME 折りたたみ（§3.3・t3/AC4）', () => {
     field = document.createElement('input');
     field.type = 'text';
     document.body.append(field);
-    // 0432: 高さの上限に欄の高さが入る ∴ 矩形を決め打ちにする
-    stubRect(field, { top: 400, right: 376, bottom: FIELD_BOTTOM, left: 16 });
+    // 0434: 高さの上限は「キャレットの行の下から可視域の下端まで」 ∴ 欄の位置を決め打ちにする
+    stubRect(field, { top: 200, right: 376, bottom: FIELD_BOTTOM, left: 16 });
     ime = new NagaIME({ loadFonts: false });
+    stubCaret(null);
+    scrollBySpy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -645,9 +703,9 @@ describe('NagaIME 折りたたみ（§3.3・t3/AC4）', () => {
       expect(fold.textContent).toBe('▴');
       expect(pop.classList.contains('naga-is-folded')).toBe(true);
       expect(focusSpy).not.toHaveBeenCalled();
-      // 0432: 上端は欄のすぐ下のまま（帯ではなく高さが縮む）
-      expect(pop.style.top).toBe(`${FIELD_BOTTOM + POPUP_GAP}px`);
-      expect(pop.style.maxHeight).toBe(`${expectedDockMax(188, 32, true)}px`);
+      // 0434: 上端はキャレットの行のすぐ下のまま（帯ではなく高さが縮む）
+      expect(pop.style.top).toBe(`${POPUP_TOP}px`);
+      expect(pop.style.maxHeight).toBe(`${expectedDockMax(188, POPUP_TOP, true)}px`);
     },
     DICTIONARY_TEST_TIMEOUT_MS,
   );
@@ -668,8 +726,8 @@ describe('NagaIME 折りたたみ（§3.3・t3/AC4）', () => {
       const focusSpy = vi.spyOn(search, 'focus');
       part<HTMLButtonElement>('.naga-fold').click();
       expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true });
-      // 0432: 残り可視高 188 − 余白 8 − 欄 32 = 148
-      expect(popupOf().style.maxHeight).toBe('148px');
+      // 0434: 可視域の下端 188 − popup の上端 236 − 余白 8 < 0 ∴ 上限 DOCK_MIN(138)
+      expect(popupOf().style.maxHeight).toBe(`${DOCK_MIN}px`);
       expect(part('.naga-search-row').hidden).toBe(false);
       expect(part('.naga-list').hidden).toBe(false);
       expect(part('.naga-fold').getAttribute('aria-expanded')).toBe('true');
@@ -709,7 +767,7 @@ describe('NagaIME 折りたたみ（§3.3・t3/AC4）', () => {
   });
 });
 
-describe('NagaIME はページも欄もスクロールしない（M-1・MIN-1・t3/AC1）', () => {
+describe('NagaIME はページも欄もスクロールしない（M-1・MIN-1・t3/AC1。0434 の例外は 1 回だけ）', () => {
   let field: HTMLInputElement;
 
   beforeEach(() => {
@@ -727,6 +785,28 @@ describe('NagaIME はページも欄もスクロールしない（M-1・MIN-1・
     vi.restoreAllMocks();
     Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
   });
+
+  it(
+    '可視域に残る高さが DOCK_MIN に満たないときだけ、開いた直後に 1 回 scrollBy する（0434 の例外）',
+    async () => {
+      stubRect(field, { top: 200, right: 376, bottom: FIELD_BOTTOM, left: 16 });
+      stubCaret(null);
+      scrollBySpy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
+      stubViewport({ width: 375, height: 300, offsetTop: 0, innerHeight: 844 });
+      ime.attach(field);
+      await ime.open(field);
+      // popup の下端（236 + 138 = 374）が可視域の下端（300）に入るまで寄せる
+      expect(scrollBySpy, '開いた直後に 1 回だけ寄せる').toHaveBeenCalledTimes(1);
+      expect(scrollBySpy).toHaveBeenCalledWith(0, POPUP_TOP + DOCK_MIN - 300);
+
+      // 確定・タブ切替・resize では寄せない（ページを勝手に動かさない方針は変えない）
+      itemsOf()[0].click();
+      (popupOf().querySelector('.naga-tab[data-category="siddham"]') as HTMLButtonElement).click();
+      window.dispatchEvent(new Event('resize'));
+      expect(scrollBySpy).toHaveBeenCalledTimes(1);
+    },
+    DICTIONARY_TEST_TIMEOUT_MS,
+  );
 
   it(
     'focus はすべて { preventScroll: true }（開く・タブ切替・確定・閉じて欄へ戻す）',

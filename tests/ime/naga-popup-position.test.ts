@@ -7,6 +7,10 @@
  * （起動ボタンと同じ種類の不具合）。
  * いまは起動ボタンと同じく文書の座標（`position: absolute`）で置く ∴ ページのスクロールではブラウザが
  * 本文と一緒に動かし、置き直しの購読は resize と「スクロールコンテナ要素の scroll」だけになる。
+ * 【NOV26-IM-NAGA-POPUP-CARET-0434】0432 は狭幅だけ欄の下端のすぐ下に置いていた ∴ 複数行の欄では
+ * キャレットの行から遠く、高さの上限も欄の高さに縮んでいた。狭幅も広幅と同じくキャレットの行のすぐ下に
+ * 置き、上限は「popup の上端から可視域の下端（キーボードの上）まで」で決める。可視域に DOCK_MIN が
+ * 残らないときだけ、開いた直後に 1 回だけページを寄せる（例外）。
  *
  * ここでは jsdom に layout が無いことを逆手に取り、`getBoundingClientRect` と `window.scrollX/scrollY` を
  * 決め打ちにして、style へ書かれる値と購読の寿命だけを測る（実の矩形は e2e/ios-popup.spec.ts が
@@ -32,6 +36,9 @@ class FakeVisualViewport extends EventTarget {
 
 /** 実装の private const と一致していることを外から確かめる値（naga-ime.ts の DOCK_*_PX）。 */
 const GAP_TO_FIELD = 4;
+const CARET_GAP = 2;
+const DOCK_GAP = 8;
+const DOCK_MIN = 138;
 const DOCK_MAX = 226;
 const DOCK_FOLDED = 58;
 const TOL = 1;
@@ -81,6 +88,7 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
   let ime: NagaIME;
   let vv: FakeVisualViewport;
   let runFrames: () => void;
+  let scrollBySpy: ReturnType<typeof vi.spyOn>;
 
   function popupOf(): HTMLElement {
     return ime.shadowRoot!.querySelector('.naga-popup') as HTMLElement;
@@ -96,6 +104,25 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
     vv.width = width;
   }
 
+  /**
+   * キャレットの計測を stub する（jsdom は layout を持たない）。null は「測れない」＝ 例外。
+   * 【NOV26-IM-NAGA-POPUP-CARET-0434】狭幅もキャレットの行のすぐ下に置くようになった ∴ 欄の下端を
+   * 基準にする経路（測れないときの落とし所）は、この stub で明示したときだけ通る。
+   */
+  function stubCaret(anchor: { x: number; y: number; lineHeight: number } | null): (next: typeof anchor) => void {
+    let current = anchor;
+    vi.spyOn(
+      ime as unknown as { measureCaret: () => { x: number; y: number; lineHeight: number } },
+      'measureCaret',
+    ).mockImplementation(() => {
+      if (!current) throw new Error('キャレットを測れない');
+      return current;
+    });
+    return (next) => {
+      current = next;
+    };
+  }
+
   /** dock の対象にならない広幅にする。 */
   function useWide(): void {
     vv.width = 1280;
@@ -109,6 +136,8 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
     vv = new FakeVisualViewport();
     Object.defineProperty(window, 'visualViewport', { configurable: true, writable: true, value: vv });
     runFrames = useManualFrames();
+    // 【0434】可視域に収めるための 1 回のスクロール（例外）を数える。jsdom の scrollBy は空振りするので差し替える
+    scrollBySpy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
     stubScroll(0, 0);
     stubInnerHeight(852);
     field = document.createElement('input');
@@ -127,28 +156,54 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
   });
 
   /* ---------------------------------------------------------- *
-   * 狭幅（dock）: 欄のすぐ下に付ける
+   * 狭幅（dock）: キャレットの行のすぐ下に付ける（0434）
    * ---------------------------------------------------------- */
 
   it(
-    '狭幅では position: absolute で欄のすぐ下に置き、横は文書の可視幅いっぱい（文書の座標）',
+    '狭幅では position: absolute でキャレットの行のすぐ下に置き、横は文書の可視幅いっぱい（文書の座標）',
     async () => {
       useNarrow();
       stubScroll(120, 500);
-      stubRect(field, { top: 400, right: 376, bottom: 432, left: 16 });
+      // 高い textarea（高さ 200）。キャレットは 3 行目（欄の上端から 60px）にある
+      stubRect(field, { top: 400, right: 376, bottom: 600, left: 16 });
+      stubCaret({ x: 30, y: 460, lineHeight: 22 });
       ime.attach(field);
       await ime.open(field);
 
       const pop = popupOf();
       expect(pop.classList.contains('naga-is-docked'), '前提: 狭幅は dock').toBe(true);
       expect(pop.style.position, 'fixed ではなく absolute（文書の座標）').toBe('absolute');
-      expect(pop.style.top, '欄の下端 ＋ 間隔（文書の縦座標）').toBe(`${432 + 500 + GAP_TO_FIELD}px`);
+      expect(pop.style.top, 'キャレットの行の下端 ＋ 2 ＋ scrollY（文書の縦座標）').toBe(
+        `${460 + 22 + CARET_GAP + 500}px`,
+      );
+      expect(parseFloat(pop.style.top), '欄の下端より上に出る（複数行の欄）').toBeLessThan(600 + 500);
       expect(pop.style.left, '文書の可視域の左端').toBe(`${120}px`);
       // jsdom は layout を持たない ∴ documentElement.clientWidth は 0。実装はそのとき innerWidth に落ちる
       const docWidth = document.documentElement.clientWidth || window.innerWidth;
       expect(pop.style.width, '文書の可視幅いっぱい').toBe(`${docWidth}px`);
       expect(pop.style.right, 'right は使わない').toBe('');
       expect(pop.style.bottom, 'bottom は使わない').toBe('');
+      expect(pop.style.maxHeight, '可視域に収まっているので上限は DOCK_MAX').toBe(`${DOCK_MAX}px`);
+      expect(scrollBySpy, '収まっているのでページを寄せない').not.toHaveBeenCalled();
+    },
+    8000,
+  );
+
+  it(
+    'キャレットを測れない欄では、狭幅でも従来どおり欄の下端のすぐ下に置く',
+    async () => {
+      useNarrow();
+      stubScroll(120, 500);
+      stubRect(field, { top: 400, right: 376, bottom: 432, left: 16 });
+      stubCaret(null);
+      ime.attach(field);
+      await ime.open(field);
+
+      const pop = popupOf();
+      expect(pop.style.top, '欄の下端 ＋ 間隔（文書の縦座標）').toBe(`${432 + 500 + GAP_TO_FIELD}px`);
+      expect(pop.style.left, '文書の可視域の左端').toBe(`${120}px`);
+      expect(pop.style.maxHeight).toBe(`${DOCK_MAX}px`);
+      expect(scrollBySpy).not.toHaveBeenCalled();
     },
     8000,
   );
@@ -159,6 +214,7 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
       useNarrow();
       stubScroll(0, 200);
       stubRect(field, { top: 400, right: 376, bottom: 432, left: 16 });
+      stubCaret({ x: 16, y: 400, lineHeight: 20 });
       ime.attach(field);
       await ime.open(field);
       runFrames();
@@ -178,26 +234,57 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
   );
 
   it(
-    '高さの上限は「キーボードの上に残る高さ − 欄の高さ − 余白」で、DOCK_MIN を下回らない',
+    '高さの上限は「キャレットの行の下から可視域の下端（キーボードの上）まで」で、欄の高さを引かない',
     async () => {
       useNarrow();
-      stubRect(field, { top: 400, right: 376, bottom: 432, left: 16 });
-
-      // 残り可視高 852 − 余白 8 − 欄 32 = 812 → 上限 226
+      // 高い textarea（高さ 400）。キャレットは 1 行目 ∴ popup の上端（viewport）は 132
+      stubRect(field, { top: 100, right: 376, bottom: 500, left: 16 });
+      stubCaret({ x: 16, y: 110, lineHeight: 20 });
       ime.attach(field);
       await ime.open(field);
+      // 852 − 132 − 8 = 712 → 上限 226（0432 の式は 400 − 8 − 欄 400 = 0 まで縮んでいた）
       expect(popupOf().style.maxHeight).toBe(`${DOCK_MAX}px`);
 
-      // 残り可視高 188 − 8 − 32 = 148（帯 40 を引かない。欄は popup の上に全部見えている）
-      vv.height = 188;
+      // 可視域の下端が 300 まで縮んだ → 300 − 132 − 8 = 160（欄の高さ 400 でも 0 にならない）
+      vv.height = 300;
       window.dispatchEvent(new Event('resize'));
-      expect(popupOf().style.maxHeight).toBe('148px');
+      expect(popupOf().style.maxHeight).toBe(`${300 - 132 - DOCK_GAP}px`);
+      expect(popupOf().style.getPropertyValue('--naga-dock-max')).toBe(`${300 - 132 - DOCK_GAP}px`);
 
-      // 残り可視高 150 − 8 − 32 = 110 < DOCK_MIN(138) → 可視の領域を超えないよう 110
-      vv.height = 150;
+      // 380 まで縮んだ → 380 − 132 − 8 = 240 → 上限 226
+      vv.height = 380;
       window.dispatchEvent(new Event('resize'));
-      expect(popupOf().style.maxHeight).toBe('110px');
-      expect(popupOf().style.getPropertyValue('--naga-dock-max')).toBe('110px');
+      expect(popupOf().style.maxHeight).toBe(`${DOCK_MAX}px`);
+      expect(scrollBySpy, '上限が DOCK_MIN 以上ならページを寄せない').not.toHaveBeenCalled();
+    },
+    8000,
+  );
+
+  it(
+    '可視域に残る高さが DOCK_MIN に満たないときは DOCK_MIN をとり、開いた直後にページを 1 回だけ寄せる',
+    async () => {
+      useNarrow();
+      stubRect(field, { top: 100, right: 376, bottom: 500, left: 16 });
+      stubCaret({ x: 16, y: 400, lineHeight: 20 }); // popup の上端（viewport）= 422
+      vv.height = 300; // room = 300 − 422 − 8 = −130 < DOCK_MIN(138)
+      ime.attach(field);
+      await ime.open(field);
+
+      const pop = popupOf();
+      expect(pop.style.maxHeight, '候補 1 行は見せる（DOCK_MIN）').toBe(`${DOCK_MIN}px`);
+      expect(scrollBySpy, '開いた直後に 1 回だけ寄せる').toHaveBeenCalledTimes(1);
+      // popup の下端（422 + 138 = 560）が可視域の下端（300）に入るまで寄せる
+      expect(scrollBySpy).toHaveBeenCalledWith(0, 422 + DOCK_MIN - 300);
+      expect(pop.style.top, '寄せても位置（文書の座標）は変わらない').toBe(`${422}px`);
+
+      // 2 回目以降（開いた直後の置き直し・resize）では寄せない
+      runFrames();
+      vv.height = 280;
+      window.dispatchEvent(new Event('resize'));
+      vv.dispatchEvent(new Event('resize'));
+      runFrames();
+      expect(scrollBySpy, '寄せるのは開いた直後の 1 回だけ').toHaveBeenCalledTimes(1);
+      expect(popupOf().style.maxHeight).toBe(`${DOCK_MIN}px`);
     },
     8000,
   );
@@ -207,6 +294,7 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
     async () => {
       useNarrow();
       stubRect(field, { top: 400, right: 376, bottom: 432, left: 16 });
+      stubCaret(null);
       ime.attach(field);
       await ime.open(field);
       (popupOf().querySelector('.naga-fold') as HTMLButtonElement).click();
@@ -225,6 +313,7 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
     async () => {
       useNarrow();
       stubRect(field, { top: 400, right: 376, bottom: 432, left: 16 });
+      stubCaret({ x: 16, y: 400, lineHeight: 20 });
       ime.attach(field);
       await ime.open(field);
       runFrames(); // 開いた直後の 1 回を流す
@@ -252,6 +341,7 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
     async () => {
       useNarrow();
       stubRect(field, { top: 400, right: 376, bottom: 432, left: 16 });
+      stubCaret(null);
       ime.attach(field);
       await ime.open(field);
       runFrames();
@@ -281,6 +371,7 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
     async () => {
       useNarrow();
       stubRect(field, { top: 400, right: 376, bottom: 432, left: 16 });
+      stubCaret(null);
       ime.attach(field);
       await ime.open(field);
       runFrames();
@@ -301,6 +392,7 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
     async () => {
       useNarrow();
       stubRect(field, { top: 400, right: 376, bottom: 432, left: 16 });
+      stubCaret(null);
       ime.attach(field);
       await ime.open(field);
       runFrames();
@@ -340,6 +432,7 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
 
       stubScroll(0, 200);
       stubRect(field, { top: 400, right: 376, bottom: 432, left: 16 });
+      stubCaret(null);
       ime.attach(field);
       await ime.open(field);
       // 包含ブロックをこの要素にする（jsdom は offsetParent を持たないので決め打ち）
@@ -430,6 +523,7 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
       stubScroll(0, 0);
       stubRect(field, { top: 100, right: 300, bottom: 130, left: 20 });
       field.style.lineHeight = '20px';
+      const setCaret = stubCaret(null); // キャレットを測れない欄（広幅は欄の下端、狭幅も欄の下端に落ちる）
       ime.attach(field);
       Object.defineProperty(popupOf(), 'offsetHeight', { configurable: true, value: 200 });
       await ime.open(field);
@@ -437,12 +531,14 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
       expect(popupOf().classList.contains('naga-is-docked')).toBe(false);
 
       useNarrow();
+      setCaret({ x: 20, y: 60, lineHeight: 20 }); // 狭幅はキャレットの行のすぐ下（0434）
       window.dispatchEvent(new Event('resize'));
       expect(popupOf().classList.contains('naga-is-docked')).toBe(true);
-      expect(popupOf().style.top).toBe(`${130 + GAP_TO_FIELD}px`);
+      expect(popupOf().style.top).toBe(`${60 + 20 + CARET_GAP}px`);
       expect(Math.abs(parseFloat(popupOf().style.top) - parseFloat(wideTop))).toBeGreaterThan(TOL);
 
       useWide();
+      setCaret(null);
       window.dispatchEvent(new Event('resize'));
       expect(popupOf().classList.contains('naga-is-docked')).toBe(false);
       expect(popupOf().style.top).toBe(wideTop);

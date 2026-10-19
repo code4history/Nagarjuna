@@ -63,8 +63,12 @@ export const NAGA_STYLE_TEXT = `
   opacity: 1;
 }
 
+/* popup も文書の座標で置く（positionPopup が top/left に文書座標を書く）。
+   狭幅は欄のすぐ下、広幅はキャレットの行の下。fixed ＋ visualViewport の offset は iOS のキーボードで
+   ずれる（NOV26-IM-NAGA-POPUP-ANCHOR-0432）。包含ブロックは .naga-root が display: contents なので、
+   position を持つ祖先が無ければ文書になる。 */
 .naga-popup {
-  position: fixed;
+  position: absolute;
   z-index: 9999;
   box-sizing: border-box;
   background: #fff;

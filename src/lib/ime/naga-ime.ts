@@ -53,6 +53,8 @@ const TRIGGER_SIZE_PX = 26;
 const TRIGGER_GAP_PX = 4;
 /** 起動ボタンが横にはみ出すときに、可視域の左端から空ける余白（0430: 縦の clamp はしない）。 */
 const TRIGGER_MARGIN_PX = 4;
+/** 狭幅の popup を欄のすぐ下に付けるときの間隔（0432）。 */
+const POPUP_GAP_PX = 4;
 const FONT_SETTINGS: FontSettings = { hentaigana: true, siddham: true, itaiji: true };
 const ALL_CATEGORIES: readonly NagaCategoryId[] = NAGA_CATEGORIES.map((c) => c.id);
 const CATEGORY_IDS = new Set<string>(ALL_CATEGORIES);
@@ -60,9 +62,10 @@ const CATEGORY_IDS = new Set<string>(ALL_CATEGORIES);
 /*
  * モバイル dock の割り付け（nov26-m3-t3 タスク設計 §3.1）。下の定数が「dock 時の寸法」の唯一の出どころである
  * （CSS 側には --naga-dock-max 未設定時のフォールバックしか置かない）。静的な vh には依存しない。
- *   avail    = vvAvail − DOCK_GAP_PX
- *   popupMax = min(DOCK_POPUP_MAX_PX, avail − DOCK_BAND_PX)          // 帯 40 を残す
- *   popupMax < DOCK_MIN_PX なら min(DOCK_MIN_PX, avail)               // 帯より候補 1 行を優先。可視の領域は超えない
+ * 位置は文書の座標（欄のすぐ下。0432）。
+ *   avail    = vvAvail − DOCK_GAP_PX − 欄の高さ
+ *   popupMax = min(DOCK_POPUP_MAX_PX, avail)
+ *   popupMax < DOCK_MIN_PX なら min(DOCK_MIN_PX, avail)               // 候補 1 行を優先。可視の領域は超えない
  *   畳んでいるときは DOCK_FOLDED_PX
  */
 /** タイトル行（タブ・畳むボタン・閉じるボタン）。 */
@@ -79,8 +82,6 @@ const DOCK_ROWS = 3;
 const DOCK_BORDER_PX = 2;
 /** キーボード上端（可視領域の下端）との間隔。 */
 const DOCK_GAP_PX = 8;
-/** popup の上に残す帯（本体の入力欄が見える高さ。10 月 (a) で受け入れた 39 を下回らない）。 */
-const DOCK_BAND_PX = 40;
 /** 畳んでも残る固定部分 ＋ 読み欄 = 94px。 */
 const DOCK_FIXED_PX = DOCK_TITLE_PX + DOCK_COPY_PX + DOCK_SEARCH_PX + DOCK_BORDER_PX;
 /** 候補が 1 行まるごと見える下限 = 138px。 */
@@ -302,6 +303,10 @@ export class NagaIME extends HTMLElement {
   private triggerCleanup: (() => void) | null = null;
   /** 置き直しを間引く rAF の id（0 は予約していない）。 */
   private triggerRaf = 0;
+  /** popup の置き直しの購読を外す関数（開いていないときは null）。0432 */
+  private popupCleanup: (() => void) | null = null;
+  /** popup の置き直しを間引く rAF の id（0 は予約していない）。0432 */
+  private popupRaf = 0;
 
   constructor(options: NagaIMEOptions = {}) {
     // 別の実装が naga-ime を登録済みなら、ブラウザの Illegal constructor に任せず理由を言って投げる（§5.2）
@@ -645,6 +650,8 @@ export class NagaIME extends HTMLElement {
     this.renderTabs();
     this.refresh();
     this.positionPopup();
+    // 置き直しの購読を張り、レイアウトが落ち着いてから 1 回置き直す（0432）
+    this.syncPopupTracking();
     this.updateCopy();
     // NagaIME はページも欄もスクロールしない（M-1）。focus の暗黙のスクロールも止める（MIN-1）
     this.searchEl.focus({ preventScroll: true });
@@ -661,6 +668,7 @@ export class NagaIME extends HTMLElement {
     if (refocus && this.target) this.target.focus({ preventScroll: true });
     // 置き直しの購読を外す。欄が focus のままでボタンが見えている（Escape で閉じた等）ときは、
     // 可視を正本に張り直す（閉じたあともボタンは欄の右上に居続ける）
+    this.stopPopupTracking();
     this.stopTriggerTracking();
     this.syncTriggerTracking();
     if (wasOpen) this.emit('nagaClose', { field: this.target });
@@ -809,20 +817,16 @@ export class NagaIME extends HTMLElement {
     const onResize = () => {
       if (this.openState) this.positionPopup();
     };
-    // fixed（viewport 基準）なので、ページのスクロールで popup を置き直す。
-    // 起動ボタンの置き直しは focus 中だけの購読（syncTriggerTracking）が受け持つ
-    const onScroll = () => {
-      if (this.openState && this.popup && !this.popup.classList.contains('naga-is-docked')) this.positionPopup();
-    };
+    // 【NOV26-IM-NAGA-POPUP-ANCHOR-0432】popup は文書の座標で置く ∴ ページのスクロールでは置き直さない
+    // （ブラウザが本文と一緒に動かす）。開いている間の置き直しは syncPopupTracking() が受け持つ
+    // （スクロールコンテナ要素の scroll と、開いた直後の 1 回）。resize はここで拾う。
     const vv = window.visualViewport;
     document.addEventListener('mousedown', onDocMouseDown);
     window.addEventListener('resize', onResize);
-    window.addEventListener('scroll', onScroll, true);
     vv?.addEventListener('resize', onResize);
     this.globalCleanup = () => {
       document.removeEventListener('mousedown', onDocMouseDown);
       window.removeEventListener('resize', onResize);
-      window.removeEventListener('scroll', onScroll, true);
       vv?.removeEventListener('resize', onResize);
     };
   }
@@ -958,6 +962,44 @@ export class NagaIME extends HTMLElement {
   }
 
   /**
+   * 文書の座標を、要素の包含ブロック（`offsetParent`）の padding box を原点とする座標へ直す量を返す。
+   * 包含ブロックが文書（初期包含ブロック）なら補正しない（0 を返す）。
+   *
+   * `<naga-ime>` の host と `.naga-root` は `display: contents`（naga-styles.ts）で箱を作らず、その間に
+   * position を持つ祖先も無ければ包含ブロックは文書になる ∴ ふつうは補正が要らない。
+   * 利用者が `<naga-ime>` を position 付きの要素の中に置いた場合だけ、その要素の矩形とスクロール量を
+   * 引く（absolute の基準は padding box なので border の幅も引く）。
+   * `position: fixed` の祖先の中に置かれた場合は対象外（そのときは要素も画面に固定され、
+   * ページのスクロールには追随しない）。
+   *
+   * 【NOV26-IM-NAGA-TRIGGER-ABSOLUTE-0430】で起動ボタンのために書き、【0432】で popup と共通にした。
+   */
+  private containingBlockOffset(el: HTMLElement): { top: number; left: number } {
+    const op = el.offsetParent as HTMLElement | null;
+    if (!op || op === document.body || op === document.documentElement) return { top: 0, left: 0 };
+    const cs = getComputedStyle(op);
+    const borderTop = Number.parseFloat(cs.borderTopWidth) || 0;
+    const borderLeft = Number.parseFloat(cs.borderLeftWidth) || 0;
+    const o = op.getBoundingClientRect();
+    // padding box の文書座標（スクロールした分だけ中身は上へずれる）
+    const originTop = o.top + window.scrollY + borderTop - (op.scrollTop || 0);
+    const originLeft = o.left + window.scrollX + borderLeft - (op.scrollLeft || 0);
+    return { top: originTop, left: originLeft };
+  }
+
+  /** 文書の座標の top / left を要素の style に書く（包含ブロックが文書でなければ補正する）。 */
+  private placeInDocument(el: HTMLElement, top: number, left: number): void {
+    const origin = this.containingBlockOffset(el);
+    el.style.top = `${top - origin.top}px`;
+    el.style.left = `${left - origin.left}px`;
+  }
+
+  /** 文書の可視幅（初期包含ブロックの幅。スクロールバーの分は含めない）。0432 */
+  private documentWidth(): number {
+    return document.documentElement.clientWidth || window.innerWidth;
+  }
+
+  /**
    * 起動ボタンを欄の右上に置く（`position: absolute`。top/left は文書の座標）。
    *
    * 【NOV26-IM-NAGA-TRIGGER-ABSOLUTE-0430】0426 では fixed（layout viewport 基準）で置き、
@@ -967,14 +1009,7 @@ export class NagaIME extends HTMLElement {
    * ∴ ボタンは文書の座標で置く。ページのスクロールはブラウザが本文と一緒に動かすので、
    * スクロールでの置き直しは要らず、`visualViewport` の offset は位置に使わない。
    *
-   * 包含ブロックは初期包含ブロック（文書）になる: `<naga-ime>` の host と `.naga-root` は
-   * `display: contents`（naga-styles.ts）で箱を作らず、その間に position を持つ祖先も無いため
-   * （デモ naga.html は `<naga-ime>` を body の直下に置いている）。
-   * 利用者が `<naga-ime>` を position 付きの要素の中に置いた場合は、その要素が包含ブロックになる
-   * ∴ `trigger.offsetParent` が body/html 以外なら、その矩形とスクロール量を引いて文書座標から
-   * 要素の座標へ直す（absolute の基準は padding box なので border の幅も引く）。
-   * `position: fixed` の祖先の中に置かれた場合は対象外（そのときボタンも固定され、ページの
-   * スクロールには追随しない）。
+   * 包含ブロックの補正は `containingBlockOffset()`（0432 で popup と共通にした）。
    *
    * 欄の上が文書の先頭より上（top < 0）になるなら欄のすぐ下へ回す。それ以外の clamp はしない
    * （可視域の端へ貼り付けない）。横に溢れる（欄の右端が画面より左）ときだけ、左端を可視域の
@@ -996,22 +1031,7 @@ export class NagaIME extends HTMLElement {
     let left = r.right + scrollX - TRIGGER_SIZE_PX;
     if (left < scrollX) left = scrollX + TRIGGER_MARGIN_PX;
 
-    // 包含ブロックが文書でない（利用者が position 付きの要素の中に置いた）。その要素の座標へ直す
-    const op = trigger.offsetParent as HTMLElement | null;
-    if (op && op !== document.body && op !== document.documentElement) {
-      const cs = getComputedStyle(op);
-      const borderTop = Number.parseFloat(cs.borderTopWidth) || 0;
-      const borderLeft = Number.parseFloat(cs.borderLeftWidth) || 0;
-      const o = op.getBoundingClientRect();
-      // padding box の文書座標（スクロールした分だけ中身は上へずれる）
-      const originTop = o.top + scrollY + borderTop - (op.scrollTop || 0);
-      const originLeft = o.left + scrollX + borderLeft - (op.scrollLeft || 0);
-      top -= originTop;
-      left -= originLeft;
-    }
-
-    trigger.style.top = `${top}px`;
-    trigger.style.left = `${left}px`;
+    this.placeInDocument(trigger, top, left);
   }
 
   /**
@@ -1320,40 +1340,58 @@ export class NagaIME extends HTMLElement {
   }
 
   /* ------------------------------------------------------------ *
-   * 位置（PC は fixed・viewport の座標）
+   * 位置（文書の座標・`position: absolute`）
    * ------------------------------------------------------------ */
 
+  /**
+   * popup を文書の座標で置く。
+   *
+   * 【NOV26-IM-NAGA-POPUP-ANCHOR-0432】0431 まで狭幅（dock）は `position: fixed` で画面の下に据え付け、
+   * `bottom` を visualViewport の offset から計算し、ページのスクロールのたびに置き直していた。実機の
+   * iPhone ではキーボード表示中は fixed が visual viewport とずれ、スクロールやキーボードの出入りで
+   * popup が欄と無関係に「ふわふわ」動いた（起動ボタンと同じ種類の不具合）。
+   * ∴ 起動ボタンと同じく文書の座標（`position: absolute`）で置く。
+   * - 狭幅: 欄のすぐ下（`top = 欄の下端 ＋ 4`）、横は文書の可視幅いっぱい。ページのスクロールは
+   *   ブラウザが本文と一緒に動かすので置き直さない。
+   *   読み欄に focus が移ると iOS がその欄をキーボードの上へスクロールして見せる ∴ 画面の下に
+   *   据え付ける必要は無い。
+   * - 広幅（PC）: キャレットの行の下。可視域の下端（`scrollY + innerHeight`）に入らなければ上に出す。
+   *
+   * visualViewport の値を高さの上限にだけ使う（大きさは可視域の offset に依存しない）。
+   * 包含ブロックの補正は `containingBlockOffset()`（起動ボタンと同じ関数）。
+   */
   private positionPopup(): void {
     const field = this.target;
     const pop = this.popup;
     if (!field || !pop) return;
     const r = field.getBoundingClientRect();
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
     const vv = window.visualViewport;
     const vw = vv ? vv.width : window.innerWidth;
     const style = pop.style;
 
-    // 狭幅（またはソフトキーボードで縮んだ viewport）は下部ドッキング
+    // 狭幅（またはソフトキーボードで縮んだ viewport）は欄のすぐ下に付ける
     if (vw < this.cfgDockBreakpoint) {
       pop.classList.add('naga-is-docked');
       this.setDocked(true);
-      style.position = 'fixed';
-      // 画面の左右いっぱいに据え付ける（「ふわふわ浮いて」への対応。§1 の 5）
-      style.left = '0px';
-      style.right = '0px';
-      style.width = 'auto';
-      style.top = 'auto';
-      const bottom = vv ? Math.max(0, window.innerHeight - (vv.height + vv.offsetTop)) + DOCK_GAP_PX : DOCK_GAP_PX;
-      style.bottom = `${bottom}px`;
-      // 高さは「使える高さ」から逆算する（§3.1）。静的な vh には依らない。
+      style.position = 'absolute';
+      // 横は文書の可視幅いっぱい（right は使わない）
+      style.right = '';
+      style.bottom = '';
+      style.width = `${this.documentWidth()}px`;
+      // 高さの上限は「キーボードの上に残る高さ − 欄の高さ − 余白」から逆算する（§3.1）。
       // ソフトキーボードが出ている間の残り可視高 = visualViewport.height。
       const vvAvail = vv ? vv.height : window.innerHeight;
-      const avail = Math.max(0, vvAvail - DOCK_GAP_PX);
-      let popupMax = Math.min(DOCK_POPUP_MAX_PX, avail - DOCK_BAND_PX);
+      const avail = Math.max(0, vvAvail - DOCK_GAP_PX - r.height);
+      let popupMax = Math.min(DOCK_POPUP_MAX_PX, avail);
       if (popupMax < DOCK_MIN_PX) popupMax = Math.min(DOCK_MIN_PX, avail);
       if (this.folded) popupMax = Math.min(DOCK_FOLDED_PX, avail);
       style.maxHeight = `${popupMax}px`;
       style.setProperty('--naga-dock-max', `${popupMax}px`);
       style.setProperty('--naga-dock-avail', `${vvAvail}px`);
+      // 縦は欄のすぐ下（文書の座標）、横は文書の可視域の左端
+      this.placeInDocument(pop, r.bottom + scrollY + POPUP_GAP_PX, scrollX);
       return;
     }
 
@@ -1363,8 +1401,10 @@ export class NagaIME extends HTMLElement {
     if (style.maxHeight) style.maxHeight = '';
     style.removeProperty('--naga-dock-max');
     style.removeProperty('--naga-dock-avail');
-    style.position = 'fixed';
+    style.position = 'absolute';
     style.width = `${Math.min(360, vw - 16)}px`;
+    style.bottom = 'auto';
+    style.right = 'auto';
 
     let anchor: { x: number; y: number; lineHeight: number } | null;
     try {
@@ -1375,26 +1415,75 @@ export class NagaIME extends HTMLElement {
 
     const h = pop.offsetHeight || 320;
     const w = pop.offsetWidth || 360;
-    const vpBottom = vv ? vv.height + vv.offsetTop : window.innerHeight;
+    // 可視域の下端（文書の座標）。visualViewport の offset は使わない
+    const vpBottom = scrollY + window.innerHeight;
     let top: number;
     let left: number;
     if (anchor) {
-      top = anchor.y + anchor.lineHeight + 2;
-      left = anchor.x;
+      top = anchor.y + scrollY + anchor.lineHeight + 2;
+      left = anchor.x + scrollX;
     } else {
-      top = r.bottom + 4;
-      left = r.left;
+      top = r.bottom + scrollY + POPUP_GAP_PX;
+      left = r.left + scrollX;
     }
     if (top + h > vpBottom) {
-      top = anchor ? anchor.y - h - 2 : r.top - h - 4;
+      top = anchor ? anchor.y + scrollY - h - 2 : r.top + scrollY - h - POPUP_GAP_PX;
     }
-    if (left + w > vw) left = vw - w - 8;
-    if (left < 4) left = 4;
+    if (left + w > scrollX + vw) left = scrollX + vw - w - 8;
+    if (left < scrollX + 4) left = scrollX + 4;
 
-    style.top = `${top}px`;
-    style.left = `${left}px`;
-    style.bottom = 'auto';
-    style.right = 'auto';
+    this.placeInDocument(pop, top, left);
+  }
+
+  /**
+   * 【NOV26-IM-NAGA-POPUP-ANCHOR-0432】popup を開いている間だけ、置き直しの購読を張る（閉じたら外す）。
+   *
+   * popup は起動ボタンと同じく文書の座標で置くので、ページのスクロール（window・visualViewport とも）では
+   * 置き直さない —— ブラウザが本文と一緒に動かす。欄や popup の位置が変わるのは
+   * resize（キーボードの出入り・回転・窓の大きさ。ensureDom の購読が拾う）と、欄が overflow の
+   * スクロールコンテナの中にあるときのその要素のスクロール ∴ そこだけ購読する。
+   * 開いた直後の 1 回は focus やフォントの適用でレイアウトが変わる場合に備える（購読ではない）。
+   * 同じフレームに何度届いても置き直しは 1 回に間引く。
+   */
+  private syncPopupTracking(): void {
+    if (!this.openState || !this.popup) {
+      this.stopPopupTracking();
+      return;
+    }
+    if (this.popupCleanup) {
+      this.requestPopupPosition();
+      return;
+    }
+    const request = () => this.requestPopupPosition();
+    const onElementScroll = (e: Event) => {
+      const t = e.target;
+      // ページ（document）のスクロールは無視する（本文と一緒に popup も動くので置き直さない）
+      if (t === document || t === window || t === document.documentElement || t === document.body) return;
+      request();
+    };
+    document.addEventListener('scroll', onElementScroll, { capture: true, passive: true });
+    this.popupCleanup = () => {
+      document.removeEventListener('scroll', onElementScroll, { capture: true });
+      if (this.popupRaf) cancelAnimationFrame(this.popupRaf);
+      this.popupRaf = 0;
+    };
+    // 開いた直後の 1 回（購読を張ったときだけ）
+    this.requestPopupPosition();
+  }
+
+  /** 次のフレームで 1 回だけ置き直す（同じフレームに何度呼ばれても 1 回）。 */
+  private requestPopupPosition(): void {
+    if (this.popupRaf) return;
+    this.popupRaf = requestAnimationFrame(() => {
+      this.popupRaf = 0;
+      if (!this.openState || !this.popup) return;
+      this.positionPopup();
+    });
+  }
+
+  private stopPopupTracking(): void {
+    this.popupCleanup?.();
+    this.popupCleanup = null;
   }
 
   /**

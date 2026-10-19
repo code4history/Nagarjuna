@@ -1033,12 +1033,22 @@ export class NagaIME extends HTMLElement {
       return;
     }
     const request = () => this.requestTriggerPosition();
+    // 【NOV26-IR-NAGA-TRIGGER-ABSOLUTE-0431 MAJOR-1】欄が overflow のスクロールコンテナの中にあると、
+    // その要素のスクロールでは文書座標のボタンが付いてこない。要素のスクロールだけを capture で拾い、
+    // ページ（document）のスクロールは無視する（ページではボタンが本文と一緒に動くので置き直さない）。
+    const onElementScroll = (e: Event) => {
+      const t = e.target;
+      if (t === document || t === window || t === document.documentElement || t === document.body) return;
+      request();
+    };
     const vv = window.visualViewport;
     window.addEventListener('resize', request, { passive: true });
     vv?.addEventListener('resize', request, { passive: true });
+    document.addEventListener('scroll', onElementScroll, { capture: true, passive: true });
     this.triggerCleanup = () => {
       window.removeEventListener('resize', request);
       vv?.removeEventListener('resize', request);
+      document.removeEventListener('scroll', onElementScroll, { capture: true });
       if (this.triggerRaf) cancelAnimationFrame(this.triggerRaf);
       this.triggerRaf = 0;
     };

@@ -185,3 +185,22 @@ test('I-5: 欄から離れる（blur）と梵ボタンは消え、置き直し�
   expect(after.top, '[measure:I-5] blur の後は置き直さない').toBe(blurred.top);
   expect(after.left, '[measure:I-5] blur の後は置き直さない').toBe(blurred.left);
 });
+
+test('I-6: スクロールコンテナ（overflow: auto）の中の欄では、その要素をスクロールしても梵ボタンが欄に付いてくる', async ({
+  page,
+}) => {
+  // 【NOV26-IR-NAGA-TRIGGER-ABSOLUTE-0431 MAJOR-1】#m1 は #scroller の中にある
+  await focusM1(page);
+  const gaps: number[] = [];
+  for (const y of [0, 15, 30]) {
+    await page.evaluate((top) => {
+      document.getElementById('scroller')!.scrollTop = top;
+    }, y);
+    await settle(page);
+    const field = await fieldRect(page, 'm1');
+    const trig = await triggerRect(page);
+    expect(Math.abs(trig.right - field.right), `[measure:I-6] scrollTop=${y} 右端が欄の右端に揃う`).toBeLessThanOrEqual(1);
+    gaps.push(field.top - trig.bottom);
+  }
+  expect(Math.max(...gaps) - Math.min(...gaps), '[measure:I-6] 欄との差が一定（±1px）').toBeLessThanOrEqual(1);
+});

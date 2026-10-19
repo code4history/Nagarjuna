@@ -1,11 +1,15 @@
 /**
- * 【NOV26-IM-NAGA-IOS-TRIGGER-0426】起動ボタン「梵」の置き直しの単体テスト。
+ * 【NOV26-IM-NAGA-TRIGGER-ABSOLUTE-0430】起動ボタン「梵」の置き場所の単体テスト。
  *
- * iOS（Safari・Edge とも WebKit）は欄の focus の後にキーボードを出し、欄が見える位置へページを動かし、
- * visual viewport をパンする。fixed のボタンは layout viewport 基準なので、置き直さないと画面の外へ行く。
- * ここでは jsdom に visualViewport が無いことを逆手に取り、可視域（offsetTop・高さ）を与えた偽物を
- * window.visualViewport として挿して、座標の計算と購読の寿命を決め打ちの数値で測る
- * （画面を伴う確認は e2e/ios-trigger.spec.ts が WebKit の iPhone 模擬で行う）。
+ * 以前（0426）はボタンを `position: fixed` で置き、window と visualViewport の scroll・resize のたびに
+ * 置き直していた。実機の iPhone ではキーボードを出したままスクロールすると、visualViewport の offset と
+ * ページのスクロールが混ざってボタンが欄から離れ、欄が画面外に出ると可視域の端に貼り付いた。
+ * いまは文書の座標（`position: absolute`）で置く ∴ ページのスクロールではブラウザが本文と一緒に動かし、
+ * 置き直しの購読は resize（キーボードの出入り・回転）と focus の直後の 1 回だけになる。
+ *
+ * ここでは jsdom に layout が無いことを逆手に取り、`getBoundingClientRect` と `window.scrollX/scrollY` を
+ * 決め打ちにして、style へ書かれる値と購読の寿命だけを測る（実の矩形は e2e/ios-trigger.spec.ts が
+ * WebKit の iPhone 模擬で見る）。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NagaIME } from '@/lib/ime/naga-ime';
@@ -30,7 +34,7 @@ const GAP = 4;
 const MARGIN = 4;
 
 /** 欄の getBoundingClientRect を決め打ちにする（jsdom の矩形はすべて 0 のため）。 */
-function stubRect(el: HTMLElement, rect: StubRect): void {
+function stubRect(el: Element, rect: StubRect): void {
   el.getBoundingClientRect = () =>
     ({
       ...rect,
@@ -40,6 +44,12 @@ function stubRect(el: HTMLElement, rect: StubRect): void {
       y: rect.top,
       toJSON: () => rect,
     }) as DOMRect;
+}
+
+/** window.scrollX/scrollY を決め打ちにする（jsdom はスクロールを持たない）。 */
+function stubScroll(x: number, y: number): void {
+  Object.defineProperty(window, 'scrollX', { configurable: true, get: () => x });
+  Object.defineProperty(window, 'scrollY', { configurable: true, get: () => y });
 }
 
 /** rAF を手で回す（間引きの有無を決め打ちで測る）。 */
@@ -86,7 +96,7 @@ function countListeners(target: EventTarget): { counts: Map<string, number>; res
   return { counts, restore };
 }
 
-describe('起動ボタンの置き直し（iOS のキーボードとスクロール）', () => {
+describe('起動ボタンの置き場所（文書の座標・position: absolute）', () => {
   let field: HTMLInputElement;
   let ime: NagaIME;
   let vv: FakeVisualViewport;
@@ -100,12 +110,18 @@ describe('起動ボタンの置き直し（iOS のキーボードとスクロー
     throw new Error('起動ボタンが無い');
   }
 
+  /** 表示中のボタンの置き直しを数える（private の positionTrigger を包む）。 */
+  function spyPosition(): ReturnType<typeof vi.spyOn> {
+    return vi.spyOn(ime as unknown as { positionTrigger: () => void }, 'positionTrigger');
+  }
+
   beforeEach(() => {
     localStorage.clear();
     Object.defineProperty(window, 'visualViewport', { configurable: true, writable: true, value: undefined });
     vv = new FakeVisualViewport();
     Object.defineProperty(window, 'visualViewport', { configurable: true, writable: true, value: vv });
     runFrames = useManualFrames();
+    stubScroll(0, 0);
     field = document.createElement('input');
     field.type = 'text';
     document.body.append(field);
@@ -116,90 +132,163 @@ describe('起動ボタンの置き直し（iOS のキーボードとスクロー
     ime.destroy();
     field.remove();
     vi.unstubAllGlobals();
+    Reflect.deleteProperty(window, 'scrollX');
+    Reflect.deleteProperty(window, 'scrollY');
     Object.defineProperty(window, 'visualViewport', { configurable: true, writable: true, value: undefined });
     vi.restoreAllMocks();
   });
 
-  it('可視域をパンしていなければ従来どおり欄の右上に置く（offset を二重に効かせない）', () => {
-    // パンの無い状態（PC・iOS でもキーボードが出る前と同じ）
+  it('文書の座標で欄の右上に置く（scrollX / scrollY を足す）', () => {
+    stubScroll(120, 500);
     stubRect(field, { top: 400, right: 376, bottom: 432, left: 16 });
-    vv.offsetTop = 150; // パンしているが、欄の上に十分な余白がある
-    vv.height = 480;
     ime.attach(field);
     field.focus();
-    const trigger = triggerOf();
-    expect(trigger.hidden).toBe(false);
-    expect(trigger.style.top).toBe(`${400 - SIZE - GAP}px`);
-    expect(trigger.style.left).toBe(`${376 - SIZE}px`);
+    const trig = triggerOf();
+    expect(trig.hidden).toBe(false);
+    expect(trig.style.top, '文書の縦座標（欄の上端 − 高さ − 間隔）').toBe(`${400 + 500 - SIZE - GAP}px`);
+    expect(trig.style.left, '文書の横座標（欄の右端 − 高さ）').toBe(`${376 + 120 - SIZE}px`);
   });
 
-  it('欄のすぐ上が可視域の外なら、ボタンを欄のすぐ下へ回す（画面の外に残さない）', () => {
-    // iOS が欄を画面上端へ寄せた状態: 可視域は 150〜630（高さ 480）、欄は layout 座標で 121〜153
-    vv.offsetTop = 150;
-    vv.height = 480;
-    stubRect(field, { top: 121, right: 376, bottom: 153, left: 16 });
+  it('欄の上が文書の先頭より上なら、ボタンを欄のすぐ下へ回す（可視域の端へは貼らない）', () => {
+    stubScroll(0, 0);
+    stubRect(field, { top: 10, right: 376, bottom: 42, left: 16 });
     ime.attach(field);
     field.focus();
-    const trigger = triggerOf();
-    const top = Number.parseFloat(trigger.style.top);
-    // 画面上の座標（layout 座標 − offsetTop）で可視域の中に居る
-    expect(top - vv.offsetTop).toBeGreaterThanOrEqual(MARGIN);
-    expect(top - vv.offsetTop + SIZE).toBeLessThanOrEqual(vv.offsetTop - vv.offsetTop + vv.height);
-    // 欄のすぐ下（欄の上の余白には置かない）
-    expect(top).toBe(153 + GAP);
-    expect(trigger.style.left).toBe(`${376 - SIZE}px`);
+    const trig = triggerOf();
+    expect(trig.style.top, '欄の下端 ＋ 間隔').toBe(`${42 + GAP}px`);
+    expect(trig.style.left).toBe(`${376 - SIZE}px`);
   });
 
-  it('visualViewport の scroll で置き直す（可視域のパンでは window の scroll が来ない）', () => {
-    vv.offsetTop = 0;
-    vv.height = 852;
-    stubRect(field, { top: 160, right: 376, bottom: 192, left: 16 });
+  it('visualViewport の offset を変えても、ボタンの style は変わらない', () => {
+    stubScroll(0, 200);
+    stubRect(field, { top: 400, right: 376, bottom: 432, left: 16 });
     ime.attach(field);
     field.focus();
-    expect(triggerOf().style.top).toBe(`${160 - SIZE - GAP}px`);
+    runFrames();
+    const before = triggerOf().style.top;
+    expect(before).toBe(`${400 + 200 - SIZE - GAP}px`);
 
-    // キーボードで可視域が縮み（0〜852 → 150〜630）、パンした（欄の layout 座標は変わらない）
+    // キーボードで可視域が縮み（高さ 852 → 480）、パンした（offsetTop 150）
     vv.offsetTop = 150;
+    vv.offsetLeft = 20;
     vv.height = 480;
+    vv.width = 300;
+    vv.dispatchEvent(new Event('scroll'));
+    vv.dispatchEvent(new Event('resize'));
+    runFrames();
+    expect(triggerOf().style.top, 'visualViewport の offset は使わない').toBe(before);
+  });
+
+  it('window / visualViewport の scroll では置き直さない（文書の座標なのでブラウザが動かす）', () => {
+    stubScroll(0, 0);
+    stubRect(field, { top: 400, right: 376, bottom: 432, left: 16 });
+    ime.attach(field);
+    field.focus();
+    runFrames(); // focus の直後の 1 回を流す
+    const before = triggerOf().style.top;
+
+    const spy = spyPosition();
+    // スクロールして欄は画面の上のほうへ動いた（矩形が変わる）
+    stubScroll(0, 300);
+    stubRect(field, { top: 100, right: 376, bottom: 132, left: 16 });
+    window.dispatchEvent(new Event('scroll'));
+    window.dispatchEvent(new Event('scroll'));
     vv.dispatchEvent(new Event('scroll'));
     runFrames();
-    const top = Number.parseFloat(triggerOf().style.top);
-    // 画面上の欄の上端（160 − 150 = 10）の上にはボタンの居場所が無い ∴ 欄のすぐ下へ回る
-    expect(top - vv.offsetTop).toBeGreaterThanOrEqual(MARGIN);
-    expect(top).toBe(192 + GAP);
+    expect(spy, 'scroll では置き直さない').not.toHaveBeenCalled();
+    expect(triggerOf().style.top, '置き場所は文書の座標のまま').toBe(before);
+    spy.mockRestore();
   });
 
-  it('window の scroll でも置き直し、1 フレームに何度届いても置き直しは 1 回に間引く', () => {
+  it('window / visualViewport の resize で置き直す（1 フレームに 1 回へ間引く）', () => {
+    stubScroll(0, 0);
     stubRect(field, { top: 400, right: 376, bottom: 432, left: 16 });
     ime.attach(field);
     field.focus();
-    const spy = vi.spyOn(ime as unknown as { positionTrigger: () => void }, 'positionTrigger');
-    window.dispatchEvent(new Event('scroll'));
-    window.dispatchEvent(new Event('scroll'));
+    runFrames();
+
+    const spy = spyPosition();
+    stubRect(field, { top: 200, right: 376, bottom: 232, left: 16 });
     window.dispatchEvent(new Event('resize'));
+    vv.dispatchEvent(new Event('resize'));
     expect(spy).not.toHaveBeenCalled();
     runFrames();
-    expect(spy).toHaveBeenCalledTimes(1);
-    spy.mockRestore();
-    // 置き直しの結果が欄に追随している
-    stubRect(field, { top: 200, right: 376, bottom: 232, left: 16 });
-    window.dispatchEvent(new Event('scroll'));
-    runFrames();
+    expect(spy, '何度届いても 1 回').toHaveBeenCalledTimes(1);
     expect(triggerOf().style.top).toBe(`${200 - SIZE - GAP}px`);
+    spy.mockRestore();
+  });
+
+  it('focus の直後に 1 回だけ置き直す（欄の中身やフォントでレイアウトが変わった場合）', () => {
+    stubScroll(0, 0);
+    stubRect(field, { top: 400, right: 376, bottom: 432, left: 16 });
+    ime.attach(field);
+    field.focus();
+    // focus の時点では古い矩形で置いてある。直後の 1 回が新しい矩形を拾う
+    stubRect(field, { top: 404, right: 376, bottom: 440, left: 16 });
+    runFrames();
+    expect(triggerOf().style.top).toBe(`${404 - SIZE - GAP}px`);
+  });
+
+  it('欄の右端が画面より左（横に溢れる）なら、左端を可視域の左端＋余白に留める', () => {
+    stubScroll(0, 0);
+    stubRect(field, { top: 400, right: 10, bottom: 432, left: -20 });
+    ime.attach(field);
+    field.focus();
+    expect(triggerOf().style.left).toBe(`${0 + MARGIN}px`);
+  });
+
+  it('position 付きの要素の中に置かれたら、offsetParent の矩形とスクロールを引いて補正する', () => {
+    const wrapper = document.createElement('div');
+    wrapper.style.position = 'relative';
+    Object.defineProperty(wrapper, 'scrollTop', { configurable: true, value: 30 });
+    Object.defineProperty(wrapper, 'scrollLeft', { configurable: true, value: 10 });
+    document.body.append(wrapper);
+    stubRect(wrapper, { top: 100, left: 40, bottom: 900, right: 400 });
+
+    stubScroll(0, 200);
+    stubRect(field, { top: 400, right: 376, bottom: 432, left: 16 });
+    ime.attach(field);
+    field.focus();
+    // 包含ブロックをこの要素にする（jsdom は offsetParent を持たないので決め打ち）
+    Object.defineProperty(triggerOf(), 'offsetParent', { configurable: true, value: wrapper });
+
+    window.dispatchEvent(new Event('resize'));
+    runFrames();
+    const trig = triggerOf();
+    // 文書座標 570 / 350 から、要素の padding box の文書座標（100+200−30, 40+0−10）を引く
+    expect(trig.style.top).toBe(`${400 + 200 - SIZE - GAP - (100 + 200 - 30)}px`);
+    expect(trig.style.left).toBe(`${376 - SIZE - (40 - 10)}px`);
+    wrapper.remove();
   });
 
   it('blur で購読を外し、スクロールしても置き直さない', () => {
     stubRect(field, { top: 400, right: 376, bottom: 432, left: 16 });
     ime.attach(field);
     field.focus();
+    runFrames();
     const before = triggerOf().style.top;
     field.blur();
     expect(triggerOf().hidden).toBe(true);
-    stubRect(field, { top: 200, right: 376, bottom: 232, left: 16 });
+    stubScroll(0, 300);
+    stubRect(field, { top: 100, right: 376, bottom: 132, left: 16 });
     window.dispatchEvent(new Event('scroll'));
     vv.dispatchEvent(new Event('scroll'));
+    vv.dispatchEvent(new Event('resize'));
     runFrames();
     expect(triggerOf().style.top).toBe(before);
+  });
+
+  it('visualViewport の scroll は購読しない（購読は resize だけ）', () => {
+    const viewport = countListeners(vv);
+    try {
+      stubRect(field, { top: 400, right: 376, bottom: 432, left: 16 });
+      ime.attach(field);
+      field.focus();
+      expect(viewport.counts.get('resize') ?? 0, 'visualViewport の resize は購読する').toBeGreaterThan(0);
+      expect(viewport.counts.get('scroll') ?? 0, 'visualViewport の scroll は購読しない').toBe(0);
+    } finally {
+      viewport.restore();
+    }
   });
 
   it('detach で購読をすべて外す（window と visualViewport に listener を残さない）', () => {
@@ -210,9 +299,7 @@ describe('起動ボタンの置き直し（iOS のキーボードとスクロー
       stubRect(field, { top: 400, right: 376, bottom: 432, left: 16 });
       ime.attach(field);
       field.focus();
-      expect(win.counts.get('scroll') ?? 0).toBeGreaterThan(0);
       expect(win.counts.get('resize') ?? 0).toBeGreaterThan(0);
-      expect(viewport.counts.get('scroll') ?? 0).toBeGreaterThan(0);
       expect(viewport.counts.get('resize') ?? 0).toBeGreaterThan(0);
 
       ime.detach();
@@ -233,7 +320,7 @@ describe('起動ボタンの置き直し（iOS のキーボードとスクロー
     ime.close();
     expect(triggerOf().hidden).toBe(false);
     stubRect(field, { top: 250, right: 376, bottom: 282, left: 16 });
-    window.dispatchEvent(new Event('scroll'));
+    window.dispatchEvent(new Event('resize'));
     runFrames();
     expect(triggerOf().style.top).toBe(`${250 - SIZE - GAP}px`);
   });

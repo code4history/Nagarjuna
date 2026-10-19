@@ -37,8 +37,11 @@ export const NAGA_STYLE_TEXT = `
   display: none !important;
 }
 
+/* 起動ボタンは文書の座標で置く（positionTrigger が top/left に文書座標を書く）。
+   fixed ＋ JS 追随は iOS の visual viewport とずれる（NOV26-IM-NAGA-TRIGGER-ABSOLUTE-0430）。
+   host と .naga-root が display: contents なので、position を持つ祖先が無ければ包含ブロックは文書になる。 */
 .naga-trigger {
-  position: fixed;
+  position: absolute;
   z-index: 9998;
   width: 26px;
   height: 26px;

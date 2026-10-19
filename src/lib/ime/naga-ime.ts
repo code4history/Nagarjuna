@@ -51,7 +51,7 @@ const RECENT_SHORT = '近';
 const TRIGGER_SIZE_PX = 26;
 /** 起動ボタンと欄の間隔（上下とも）。 */
 const TRIGGER_GAP_PX = 4;
-/** 起動ボタンを可視域の端から離す余白。 */
+/** 起動ボタンが横にはみ出すときに、可視域の左端から空ける余白（0430: 縦の clamp はしない）。 */
 const TRIGGER_MARGIN_PX = 4;
 const FONT_SETTINGS: FontSettings = { hentaigana: true, siddham: true, itaiji: true };
 const ALL_CATEGORIES: readonly NagaCategoryId[] = NAGA_CATEGORIES.map((c) => c.id);
@@ -958,54 +958,69 @@ export class NagaIME extends HTMLElement {
   }
 
   /**
-   * 起動ボタンを欄の右上に置く（fixed。top/left は layout viewport の座標）。
+   * 起動ボタンを欄の右上に置く（`position: absolute`。top/left は文書の座標）。
    *
-   * 【NOV26-IM-NAGA-IOS-TRIGGER-0426】iOS（Safari・Edge とも WebKit）は欄の focus の後にキーボードを出し、
-   * 欄が見える位置へページをスクロールさせ、さらに visual viewport をパンする（`offsetTop` が 0 でなくなる）。
-   * fixed のボタンは layout viewport に貼り付くので、可視域（visual viewport）を考えずに置くと
-   * 欄の上に余白が無い位置（欄が画面上端に寄ったとき）で画面の外＝見えない場所に残る。
-   * ∴ 置き場所は可視域を基準に決める（`positionPopup()` と同じく `visualViewport` を見る）。
-   * 欄のすぐ上に場所が無ければ欄のすぐ下へ回し、それも入らなければ可視域の上端に寄せる。
-   * 可視域の offset が 0 の環境（PC・パンの無い状態）では従来と同じ位置になる。
+   * 【NOV26-IM-NAGA-TRIGGER-ABSOLUTE-0430】0426 では fixed（layout viewport 基準）で置き、
+   * scroll のたびに座標を計算し直していた。実機の iPhone では、キーボードを出したままスクロールすると
+   * ボタンが欄から離れて「明後日の場所」に出て、欄とは違う速さで通り過ぎ、欄が画面外に出ると
+   * 可視域の端に貼り付いた（fixed を JS で visual viewport に追随させるかぎり、iOS の可視域とはずれる）。
+   * ∴ ボタンは文書の座標で置く。ページのスクロールはブラウザが本文と一緒に動かすので、
+   * スクロールでの置き直しは要らず、`visualViewport` の offset は位置に使わない。
+   *
+   * 包含ブロックは初期包含ブロック（文書）になる: `<naga-ime>` の host と `.naga-root` は
+   * `display: contents`（naga-styles.ts）で箱を作らず、その間に position を持つ祖先も無いため
+   * （デモ naga.html は `<naga-ime>` を body の直下に置いている）。
+   * 利用者が `<naga-ime>` を position 付きの要素の中に置いた場合は、その要素が包含ブロックになる
+   * ∴ `trigger.offsetParent` が body/html 以外なら、その矩形とスクロール量を引いて文書座標から
+   * 要素の座標へ直す（absolute の基準は padding box なので border の幅も引く）。
+   * `position: fixed` の祖先の中に置かれた場合は対象外（そのときボタンも固定され、ページの
+   * スクロールには追随しない）。
+   *
+   * 欄の上が文書の先頭より上（top < 0）になるなら欄のすぐ下へ回す。それ以外の clamp はしない
+   * （可視域の端へ貼り付けない）。横に溢れる（欄の右端が画面より左）ときだけ、左端を可視域の
+   * 左端＋余白に留める。
    */
   private positionTrigger(field: NagaTarget): void {
     const trigger = this.trigger;
     if (!trigger) return;
-    const vv = window.visualViewport;
-    const ox = vv ? vv.offsetLeft : 0;
-    const oy = vv ? vv.offsetTop : 0;
-    const vw = vv ? vv.width : window.innerWidth;
-    const vh = vv ? vv.height : window.innerHeight;
     const r = field.getBoundingClientRect();
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
 
-    // 可視域の端（layout viewport の座標で表したもの）
-    const minX = ox + TRIGGER_MARGIN_PX;
-    const maxX = ox + vw - TRIGGER_SIZE_PX - TRIGGER_MARGIN_PX;
-    const minY = oy + TRIGGER_MARGIN_PX;
-    const maxY = oy + vh - TRIGGER_SIZE_PX - TRIGGER_MARGIN_PX;
-
-    let top = r.top - TRIGGER_SIZE_PX - TRIGGER_GAP_PX;
-    if (top < minY) {
-      // 欄のすぐ上が可視域の外（iOS が欄を画面上端へ寄せた）。欄のすぐ下へ回す
-      const below = r.bottom + TRIGGER_GAP_PX;
-      top = below <= maxY ? below : minY;
+    // 文書の座標（初期包含ブロック＝文書が基準）
+    let top = r.top + scrollY - TRIGGER_SIZE_PX - TRIGGER_GAP_PX;
+    if (top < 0) {
+      // 欄が文書の先頭にある。欄のすぐ上には置けない ∴ 欄のすぐ下へ回す
+      top = r.bottom + scrollY + TRIGGER_GAP_PX;
     }
-    if (top > maxY) top = Math.max(minY, maxY);
-    let left = r.right - TRIGGER_SIZE_PX;
-    if (left > maxX) left = maxX;
-    if (left < minX) left = minX;
+    let left = r.right + scrollX - TRIGGER_SIZE_PX;
+    if (left < scrollX) left = scrollX + TRIGGER_MARGIN_PX;
+
+    // 包含ブロックが文書でない（利用者が position 付きの要素の中に置いた）。その要素の座標へ直す
+    const op = trigger.offsetParent as HTMLElement | null;
+    if (op && op !== document.body && op !== document.documentElement) {
+      const cs = getComputedStyle(op);
+      const borderTop = Number.parseFloat(cs.borderTopWidth) || 0;
+      const borderLeft = Number.parseFloat(cs.borderLeftWidth) || 0;
+      const o = op.getBoundingClientRect();
+      // padding box の文書座標（スクロールした分だけ中身は上へずれる）
+      const originTop = o.top + scrollY + borderTop - (op.scrollTop || 0);
+      const originLeft = o.left + scrollX + borderLeft - (op.scrollLeft || 0);
+      top -= originTop;
+      left -= originLeft;
+    }
 
     trigger.style.top = `${top}px`;
     trigger.style.left = `${left}px`;
   }
 
   /**
-   * 【NOV26-IM-NAGA-IOS-TRIGGER-0426】起動ボタンが見えている間だけ、置き直しの購読を張る（見えなければ外す）。
+   * 【NOV26-IM-NAGA-TRIGGER-ABSOLUTE-0430】起動ボタンが見えている間だけ、置き直しの購読を張る（見えなければ外す）。
    *
-   * 欄の focus の後に iOS が起こす位置の変化は、window の scroll（ページのスクロール）と
-   * visualViewport の scroll・resize（キーボードによる可視域の縮小とパン）で届く。
-   * 可視域のパンでは window の scroll は起きない ∴ visualViewport の scroll を必ず購読する。
-   * スクロールは 1 フレームに何度も届くので、置き直しは requestAnimationFrame で間引く。
+   * ボタンは文書の座標で置くので、ページのスクロール（window・visualViewport とも）では置き直さない
+   * —— ブラウザが本文と一緒に動かす。欄の位置が変わるのは resize（キーボードの出入り・回転・窓の大きさ）
+   * ∴ そこだけ購読する。欄の中身やフォントの適用でレイアウトが変わる場合に備えて、focus の直後に
+   * 1 回だけ置き直す（購読ではない）。同じフレームに何度届いても置き直しは 1 回に間引く。
    */
   private syncTriggerTracking(): void {
     const visible = Boolean(this.trigger && !this.trigger.hidden && this.target);
@@ -1013,28 +1028,32 @@ export class NagaIME extends HTMLElement {
       this.stopTriggerTracking();
       return;
     }
-    if (this.triggerCleanup) return;
-    const request = () => {
-      if (this.triggerRaf) return;
-      this.triggerRaf = requestAnimationFrame(() => {
-        this.triggerRaf = 0;
-        if (!this.trigger || this.trigger.hidden || !this.target) return;
-        this.positionTrigger(this.target);
-      });
-    };
+    if (this.triggerCleanup) {
+      this.requestTriggerPosition();
+      return;
+    }
+    const request = () => this.requestTriggerPosition();
     const vv = window.visualViewport;
-    window.addEventListener('scroll', request, { capture: true, passive: true });
     window.addEventListener('resize', request, { passive: true });
-    vv?.addEventListener('scroll', request, { passive: true });
     vv?.addEventListener('resize', request, { passive: true });
     this.triggerCleanup = () => {
-      window.removeEventListener('scroll', request, true);
       window.removeEventListener('resize', request);
-      vv?.removeEventListener('scroll', request);
       vv?.removeEventListener('resize', request);
       if (this.triggerRaf) cancelAnimationFrame(this.triggerRaf);
       this.triggerRaf = 0;
     };
+    // focus の直後の 1 回（購読を張ったときだけ）
+    this.requestTriggerPosition();
+  }
+
+  /** 次のフレームで 1 回だけ置き直す（同じフレームに何度呼ばれても 1 回）。 */
+  private requestTriggerPosition(): void {
+    if (this.triggerRaf) return;
+    this.triggerRaf = requestAnimationFrame(() => {
+      this.triggerRaf = 0;
+      if (!this.trigger || this.trigger.hidden || !this.target) return;
+      this.positionTrigger(this.target);
+    });
   }
 
   private stopTriggerTracking(): void {

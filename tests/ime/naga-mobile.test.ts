@@ -6,13 +6,15 @@
  * jsdom は layout を持たないため、ここで測るのは「レイアウトの実物」ではなく
  * 「仕組み」（style へ書かれる値・class・textContent・hidden・focus の引数）である。実の矩形は e2e の M-1〜M-5 が見る。
  *
- * 割り付け（nov26-m3-t3 タスク設計 §3.1・0432 で高さの式だけ変更・0434 で位置と式を変更）:
- * タイトル行 34 ＋ 写しの行 22 ＋ 読み欄 36 ＋ 枠 2 ＝ 固定部分 94、候補 1 行 44、上限 3 行。
+ * 割り付け（nov26-m3-t3 タスク設計 §3.1・0432 で高さの式だけ変更・0434 で位置と式を変更・
+ * 0436 で写しの行 22px を外した・0437 で写しそのものを撤去した）:
+ * タイトル行 34 ＋ 読み欄 36 ＋ 枠 2 ＝ 固定部分 72、候補 1 行 44、上限 3 行。
  * キーボード上端（可視域の下端）との間 8。
  *   room     = (vv.offsetTop + vv.height) − popup の上端（viewport） − 8
- *   popupMax = min(226, room)。138（固定部分＋候補 1 行）未満なら 138（開いた直後に 1 回だけページを寄せる）
- * 畳んだ高さは 58（タイトル行＋写しの行＋枠）。
+ *   popupMax = min(204, room)。116（固定部分＋候補 1 行）未満なら 116（開いた直後に 1 回だけページを寄せる）
+ * 畳んだ高さは 36（タイトル行＋枠）。
  * 位置は 0434 から文書の座標でキャレットの行のすぐ下（キャレットを測れない欄では欄のすぐ下）。
+ * 【0437】挿入位置の縦棒（.naga-caret-mark）の単体テストは tests/ime/naga-caret-mark.test.ts にある。
  * tests/ime/naga-popup-position.test.ts がキャレットの計測を含む置き場所を、ここは高さの上限と
  * dock かどうかの見た目を測る。
  */
@@ -26,9 +28,9 @@ const DICTIONARY_TEST_TIMEOUT_MS = 8000;
 
 /** 設計 §3.1 の割り付け（実装の private const と一致していることを外から確かめる値）。 */
 const DOCK_GAP = 8;
-const DOCK_MIN = 138;
-const DOCK_MAX = 226;
-const DOCK_FOLDED = 58;
+const DOCK_MIN = 116;
+const DOCK_MAX = 204;
+const DOCK_FOLDED = 36;
 
 const originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport');
 const originalInnerWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');
@@ -78,10 +80,6 @@ function tabTextsOf(): string[] {
 
 function itemsOf(): HTMLElement[] {
   return Array.from(popupOf().querySelectorAll('.naga-item')) as HTMLElement[];
-}
-
-function copyText(): string {
-  return part('.naga-copy').textContent ?? '';
 }
 
 /** 欄の getBoundingClientRect を決め打ちにする（jsdom の矩形はすべて 0 のため。0432）。 */
@@ -178,10 +176,10 @@ describe('NagaIME モバイル dock（AC10）', () => {
     const cases = [
       { vvAvail: 852, popupMax: DOCK_MAX }, // room 608（キーボードなし）
       { vvAvail: 480, popupMax: DOCK_MAX }, // room 236
-      { vvAvail: 460, popupMax: 216 }, // room 216
+      { vvAvail: 460, popupMax: DOCK_MAX }, // room 216（0436 で上限が 204 になった）
       { vvAvail: 400, popupMax: 156 }, // room 156
-      { vvAvail: 380, popupMax: DOCK_MIN }, // room 136 < 138 → 候補 1 行を優先（下端はまだ見えている）
-      { vvAvail: 300, popupMax: DOCK_MIN }, // room 56 → 上限 DOCK_MIN ＋ 開いた直後に 1 回寄せる
+      { vvAvail: 380, popupMax: 136 }, // room 136 ≥ 116 → そのまま（下端はまだ見えている）
+      { vvAvail: 300, popupMax: DOCK_MIN }, // room 56 < 116 → 上限 DOCK_MIN ＋ 開いた直後に 1 回寄せる
     ];
     for (const c of cases) {
       it(
@@ -262,7 +260,7 @@ describe('NagaIME モバイル dock（AC10）', () => {
         const pop = popupOf();
         // 位置は文書の座標（キャレットの行のすぐ下）。visualViewport の offset は足さない
         expect(pop.style.top).toBe(`${POPUP_TOP}px`);
-        // 可視域の下端 = 30 + 216 = 246 → 246 − 236 − 8 = 2 < 138 ∴ 上限 138・寄せ 0
+        // 可視域の下端 = 30 + 216 = 246 → 246 − 236 − 8 = 2 < 116 ∴ 上限 116・寄せ 0
         expect(pop.style.maxHeight).toBe(`${expectedDockMax(30 + 216, POPUP_TOP)}px`);
         expect(pop.style.maxHeight).toBe(`${DOCK_MIN}px`);
       },
@@ -286,7 +284,7 @@ describe('NagaIME モバイル dock（AC10）', () => {
       // 0434: 位置はキャレットの行のすぐ下のまま（キーボードの開閉で動かない）
       expect(pop.style.top).toBe(`${POPUP_TOP}px`);
 
-      // より大きなキーボード（可視域の下端 240 → room 240 − 236 − 8 = −4 < 138 ∴ 上限 DOCK_MIN）
+      // より大きなキーボード（可視域の下端 240 → room 240 − 236 − 8 = −4 < 116 ∴ 上限 DOCK_MIN）
       stubViewport({ width: 390, height: 240, offsetTop: 0, innerHeight: 844 });
       window.dispatchEvent(new Event('resize'));
       expect(popupOf().style.maxHeight).toBe(`${DOCK_MIN}px`);
@@ -474,171 +472,6 @@ describe('NagaIME モバイル dock（AC10）', () => {
   );
 });
 
-describe('NagaIME 挿入先の写し（§3.2・t3/AC2）', () => {
-  let field: HTMLInputElement;
-
-  beforeEach(() => {
-    localStorage.clear();
-    field = document.createElement('input');
-    field.type = 'text';
-    document.body.append(field);
-    ime = new NagaIME({ loadFonts: false });
-    stubViewport(PHONE_KEYBOARD);
-  });
-
-  afterEach(() => {
-    ime.destroy();
-    field.remove();
-    restoreViewport();
-    vi.restoreAllMocks();
-  });
-
-  async function openWith(value: string, caret = value.length, target: HTMLInputElement | HTMLTextAreaElement = field) {
-    target.value = value;
-    ime.attach(target);
-    target.setSelectionRange(caret, caret);
-    await ime.open(target);
-  }
-
-  it(
-    '写しの行は aria-live="polite" で、キャレットの直前の文字と印 ▏ を出す',
-    async () => {
-      await openWith('あいう');
-      const copy = part('.naga-copy');
-      expect(copy.getAttribute('aria-live')).toBe('polite');
-      expect(copyText()).toBe('あいう▏');
-      expect(copy.querySelector('.naga-copy-new')).toBeNull();
-    },
-    DICTIONARY_TEST_TIMEOUT_MS,
-  );
-
-  it(
-    'キャレットの位置まで（後ろは写さない）',
-    async () => {
-      await openWith('あいうえお', 2);
-      expect(copyText()).toBe('あい▏');
-    },
-    DICTIONARY_TEST_TIMEOUT_MS,
-  );
-
-  it(
-    '12 文字を超えると先頭に … を付け、直前の 12 文字だけ',
-    async () => {
-      await openWith('abcdefghijklmnop');
-      expect(copyText()).toBe('…efghijklmnop▏');
-      await ime.close();
-      await openWith('abcdefghijkl');
-      expect(copyText()).toBe('abcdefghijkl▏');
-    },
-    DICTIONARY_TEST_TIMEOUT_MS,
-  );
-
-  it(
-    'サロゲートペアを分けずに 12 文字を数える',
-    async () => {
-      await openWith('𠮷'.repeat(13));
-      expect(copyText()).toBe(`…${'𠮷'.repeat(12)}▏`);
-    },
-    DICTIONARY_TEST_TIMEOUT_MS,
-  );
-
-  it(
-    'textarea の改行は ↵ で見せる（§1 の 6）',
-    async () => {
-      const ta = document.createElement('textarea');
-      document.body.append(ta);
-      try {
-        await openWith('一行目\n二行目', undefined, ta);
-        expect(copyText()).toBe('一行目↵二行目▏');
-      } finally {
-        ta.remove();
-      }
-    },
-    DICTIONARY_TEST_TIMEOUT_MS,
-  );
-
-  it(
-    '欄が空・キャレットが先頭なら（先頭）',
-    async () => {
-      await openWith('');
-      expect(copyText()).toBe('（先頭）');
-      await ime.close();
-      await openWith('あいう', 0);
-      expect(copyText()).toBe('（先頭）');
-    },
-    DICTIONARY_TEST_TIMEOUT_MS,
-  );
-
-  it(
-    'type="password" の欄は中身を写さない（非表示）',
-    async () => {
-      field.type = 'password';
-      await openWith('secret');
-      expect(copyText()).toBe('（非表示）');
-      expect(copyText()).not.toContain('secret');
-      itemsOf()[0].click();
-      expect(copyText()).toBe('（非表示）');
-    },
-    DICTIONARY_TEST_TIMEOUT_MS,
-  );
-
-  it(
-    '確定のたびに更新し、直前の確定で入った文字を .naga-copy-new で包む。次に開くとき・タブを替えたときは包まない',
-    async () => {
-      await openWith('あい');
-      const first = itemsOf()[0];
-      const c1 = first.dataset.char!;
-      first.click();
-      expect(copyText()).toBe(`あい${c1}▏`);
-      expect(part('.naga-copy .naga-copy-new').textContent).toBe(c1);
-
-      const second = itemsOf()[1];
-      const c2 = second.dataset.char!;
-      second.click();
-      expect(copyText()).toBe(`あい${c1}${c2}▏`);
-      expect(part('.naga-copy .naga-copy-new').textContent).toBe(c2);
-
-      (popupOf().querySelector('.naga-tab[data-category="siddham"]') as HTMLButtonElement).click();
-      expect(copyText()).toBe(`あい${c1}${c2}▏`);
-      expect(popupOf().querySelector('.naga-copy .naga-copy-new')).toBeNull();
-
-      itemsOf()[0].click();
-      expect(popupOf().querySelector('.naga-copy .naga-copy-new')).not.toBeNull();
-      ime.close();
-      field.setSelectionRange(field.value.length, field.value.length);
-      await ime.open(field);
-      expect(popupOf().querySelector('.naga-copy .naga-copy-new')).toBeNull();
-    },
-    DICTIONARY_TEST_TIMEOUT_MS,
-  );
-
-  it(
-    '写しは innerHTML を使わずに組む（t2/AC7）',
-    async () => {
-      const setter = vi.fn();
-      const desc = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML')!;
-      Object.defineProperty(Element.prototype, 'innerHTML', {
-        configurable: true,
-        get: desc.get,
-        set(this: Element, v: string) {
-          setter(v);
-          desc.set!.call(this, v);
-        },
-      });
-      try {
-        await openWith('<b>x</b>');
-        itemsOf()[0].click();
-        expect(copyText().startsWith('<b>x</b>')).toBe(true);
-        expect(part('.naga-copy').querySelector('b')).toBeNull();
-        expect(setter).not.toHaveBeenCalled();
-      } finally {
-        Object.defineProperty(Element.prototype, 'innerHTML', desc);
-      }
-    },
-    DICTIONARY_TEST_TIMEOUT_MS,
-  );
-});
-
 describe('NagaIME 折りたたみ（§3.3・t3/AC4）', () => {
   let field: HTMLInputElement;
 
@@ -683,7 +516,7 @@ describe('NagaIME 折りたたみ（§3.3・t3/AC4）', () => {
   );
 
   it(
-    '畳むと高さ 58px・読み欄の行と一覧が hidden・aria-expanded false。focus は動かさない',
+    '畳むと高さ 36px・読み欄の行と一覧が hidden・aria-expanded false。focus は動かさない',
     async () => {
       stubViewport(PHONE_SMALL);
       ime.attach(field);
@@ -696,7 +529,6 @@ describe('NagaIME 折りたたみ（§3.3・t3/AC4）', () => {
       expect(pop.style.getPropertyValue('--naga-dock-max')).toBe(`${DOCK_FOLDED}px`);
       expect(part('.naga-search-row').hidden).toBe(true);
       expect(part('.naga-list').hidden).toBe(true);
-      expect(part('.naga-copy').hidden).toBe(false);
       const fold = part<HTMLButtonElement>('.naga-fold');
       expect(fold.getAttribute('aria-expanded')).toBe('false');
       expect(fold.getAttribute('aria-label')).toBe('ひらく');
@@ -726,7 +558,7 @@ describe('NagaIME 折りたたみ（§3.3・t3/AC4）', () => {
       const focusSpy = vi.spyOn(search, 'focus');
       part<HTMLButtonElement>('.naga-fold').click();
       expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true });
-      // 0434: 可視域の下端 188 − popup の上端 236 − 余白 8 < 0 ∴ 上限 DOCK_MIN(138)
+      // 0434: 可視域の下端 188 − popup の上端 236 − 余白 8 < 0 ∴ 上限 DOCK_MIN(116)
       expect(popupOf().style.maxHeight).toBe(`${DOCK_MIN}px`);
       expect(part('.naga-search-row').hidden).toBe(false);
       expect(part('.naga-list').hidden).toBe(false);
@@ -759,11 +591,11 @@ describe('NagaIME 折りたたみ（§3.3・t3/AC4）', () => {
     DICTIONARY_TEST_TIMEOUT_MS,
   );
 
-  it('畳むボタンと写しの行は dock のときだけ見える（非 dock で隠す selector は base）', () => {
+  it('畳むボタンは dock のときだけ見え、文脈の表示（写し）は残っていない（0437）', () => {
     expect(NAGA_STYLE_TEXT).toMatch(/\.naga-fold\s*\{[^}]*display:\s*none/);
-    expect(NAGA_STYLE_TEXT).toMatch(/\.naga-copy\s*\{[^}]*display:\s*none/);
     expect(NAGA_STYLE_TEXT).toMatch(/\.naga-popup\.naga-is-docked\s+\.naga-fold\s*\{[^}]*display:\s*(block|flex|inline-block)/);
-    expect(NAGA_STYLE_TEXT).toMatch(/\.naga-popup\.naga-is-docked\s+\.naga-copy\s*\{[^}]*display:\s*(block|flex)/);
+    // 【0437】写し（.naga-copy）は広幅・狭幅とも撤去した ∴ CSS の規則も無い
+    expect(NAGA_STYLE_TEXT).not.toMatch(/\.naga-copy\s*\{/);
   });
 });
 
@@ -795,7 +627,7 @@ describe('NagaIME はページも欄もスクロールしない（M-1・MIN-1・
       stubViewport({ width: 375, height: 300, offsetTop: 0, innerHeight: 844 });
       ime.attach(field);
       await ime.open(field);
-      // popup の下端（236 + 138 = 374）が可視域の下端（300）に入るまで寄せる
+      // popup の下端（236 + 116 = 352）が可視域の下端（300）に入るまで寄せる
       expect(scrollBySpy, '開いた直後に 1 回だけ寄せる').toHaveBeenCalledTimes(1);
       expect(scrollBySpy).toHaveBeenCalledWith(0, POPUP_TOP + DOCK_MIN - 300);
 
@@ -860,6 +692,152 @@ describe('NagaIME はページも欄もスクロールしない（M-1・MIN-1・
       key('ArrowUp'); // 0
       expect(list.scrollTop).toBe(0);
       expect(siv).not.toHaveBeenCalled();
+    },
+    DICTIONARY_TEST_TIMEOUT_MS,
+  );
+});
+
+/**
+ * 【NOV26-IM-NAGA-POPUP-REFOCUS-0436】popup を開いている間に、利用者が元の欄（または他の NagaIME
+ * 対象の欄）へ focus を戻したら popup を閉じる。実機の報告:
+ *  - 「IME から一旦元フォームにフォーカスを戻して入力すると、当該の謎文字のところは更新されない」
+ *  - 「一旦元フォームに戻って改行した場合、カーソルが IME の下に回り込む」
+ * 閉じるのは **利用者の操作**（欄への pointerdown / touchstart / mousedown、キーボードの Tab による
+ * focus）だけ。NagaIME 自身が focus を戻す経路（close({ refocus: true }) 等）では閉じない
+ * （閉じると連続入力が壊れる）。梵ボタンは欄の右上に残り、開き直せる。
+ */
+describe('NagaIME popup を開いたまま欄へ Focus を戻したら閉じる（0436）', () => {
+  let field: HTMLInputElement;
+  let second: HTMLInputElement;
+
+  beforeEach(() => {
+    localStorage.clear();
+    field = document.createElement('input');
+    field.type = 'text';
+    second = document.createElement('input');
+    second.type = 'text';
+    document.body.append(field, second);
+    ime = new NagaIME({ loadFonts: false });
+    stubViewport(PHONE_KEYBOARD);
+  });
+
+  afterEach(() => {
+    ime.destroy();
+    field.remove();
+    second.remove();
+    restoreViewport();
+    vi.restoreAllMocks();
+  });
+
+  /** 開いた状態をつくる（欄に focus し、梵ボタンの経路と同じ toggle で開く）。 */
+  async function openOn(target: HTMLInputElement = field): Promise<void> {
+    ime.attach([field, second]);
+    target.focus();
+    await ime.open(target);
+    expect(ime.isOpen, '前提: popup が開いた').toBe(true);
+  }
+
+  it(
+    '元の欄の pointerdown → focus で閉じ、梵ボタンは欄の右上に見えたまま',
+    async () => {
+      await openOn();
+      field.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }));
+      field.focus();
+      expect(ime.isOpen).toBe(false);
+      expect(popupOf().hidden).toBe(true);
+      const trigger = ime.shadowRoot!.querySelector('.naga-trigger') as HTMLButtonElement;
+      expect(trigger.hidden, '梵ボタンは残る').toBe(false);
+      expect(trigger.getAttribute('aria-expanded')).toBe('false');
+      expect(document.activeElement, '欄へ focus を奪い返さない').toBe(field);
+    },
+    DICTIONARY_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'touchstart・pointerdown・mousedown だけでは閉じない（欄の上から始めたスクロールで閉じない・0438 MAJOR-1）',
+    async () => {
+      await openOn();
+      for (const type of ['touchstart', 'pointerdown', 'mousedown']) {
+        field.dispatchEvent(new Event(type, { bubbles: true }));
+        expect(ime.isOpen, type).toBe(true);
+      }
+      ime.close();
+    },
+    DICTIONARY_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    '他の NagaIME 対象の欄へ移っても閉じる（refocus で元の欄へ引き戻さない）',
+    async () => {
+      await openOn(field);
+      second.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }));
+      second.focus();
+      expect(ime.isOpen).toBe(false);
+      expect(document.activeElement, 'タップした欄が focus のまま').toBe(second);
+    },
+    DICTIONARY_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'キーボードの Tab で欄へ focus した場合も閉じる（ポインタを伴わない focus）',
+    async () => {
+      await openOn();
+      // Tab は読み欄から次の要素へ移る。ここでは欄へ focus が移った状態だけを作る
+      field.focus();
+      expect(ime.isOpen).toBe(false);
+    },
+    DICTIONARY_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'NagaIME 自身の focus 戻し（focusFieldSelf）では閉じない（連続入力を壊さない）',
+    async () => {
+      await openOn();
+      // 確定のあと NagaIME が欄へ focus を戻す経路（close({ refocus: true }) と同じ関数）
+      (ime as unknown as { focusFieldSelf: (f: HTMLElement) => void }).focusFieldSelf(field);
+      expect(ime.isOpen, 'NagaIME 自身の focus では閉じない').toBe(true);
+      expect(popupOf().hidden).toBe(false);
+    },
+    DICTIONARY_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    '確定を 2 回続けても開いたまま（連続入力）',
+    async () => {
+      field.value = '';
+      await openOn();
+      const first = itemsOf()[0];
+      const c1 = first.dataset.char!;
+      first.click();
+      expect(ime.isOpen).toBe(true);
+      const secondItem = itemsOf()[1];
+      const c2 = secondItem.dataset.char!;
+      secondItem.click();
+      expect(field.value).toBe(`${c1}${c2}`);
+      expect(ime.isOpen, '確定では閉じない').toBe(true);
+    },
+    DICTIONARY_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    '閉じたあと梵ボタンで開き直せる（Escape・×・畳みの挙動は変えない）',
+    async () => {
+      await openOn();
+      field.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }));
+      field.focus();
+      expect(ime.isOpen).toBe(false);
+
+      const trigger = ime.shadowRoot!.querySelector('.naga-trigger') as HTMLButtonElement;
+      trigger.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+      await vi.waitFor(() => expect(ime.isOpen).toBe(true));
+      expect(popupOf().hidden).toBe(false);
+
+      // Escape は従来どおり「閉じて欄へ focus を戻す」
+      part<HTMLInputElement>('.naga-search').dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+      );
+      expect(ime.isOpen).toBe(false);
+      expect(document.activeElement).toBe(field);
     },
     DICTIONARY_TEST_TIMEOUT_MS,
   );

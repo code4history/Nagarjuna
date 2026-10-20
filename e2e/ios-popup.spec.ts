@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { fieldRect, gotoFixture, nagaIsOpen, partInfo, PART, waitShown, type Rect } from './helpers';
+import { fieldRect, gotoFixture, isShown, nagaIsOpen, partInfo, PART, waitShown, type Rect } from './helpers';
 
 // 【NOV26-IM-NAGA-POPUP-ANCHOR-0432】popup の置き場所の回帰試験（iOS のキーボードとスクロール）。
 //
@@ -263,4 +263,119 @@ test('X-5: textarea の 3 行目では、キャレットの行のすぐ下に開
   await page.evaluate(() => window.visualViewport?.dispatchEvent(new Event('resize')));
   await settle(page);
   expect(await page.evaluate(() => window.scrollY), '[measure:X-5] 2 回目以降は寄せない').toBe(scrolled);
+});
+
+/**
+ * 【NOV26-IM-NAGA-CARET-MARK-0437】挿入位置の縦棒（.naga-caret-mark）の回帰試験。
+ *
+ * 写し（.naga-copy。欄の直前 12 文字を ↵ で詰めた行）は意図が分かりにくく場所を取る ∴ 0437 で撤去した
+ * （人間の提案「IME の表示中はキャレットを目立つように変える」）。popup を開くと focus が読み欄へ移り、
+ * 元の欄のキャレットが見えなくなる ∴ 元の欄の挿入位置に縦棒を出す。
+ * - textarea（#m2）の 2 行目にキャレットを置いて開くと、縦棒がその行に重なる
+ * - 確定で縦棒が右へ進む
+ * - Escape で消える
+ * - ページをスクロールしても欄との相対位置が一定（文書の座標）
+ */
+test('X-6: textarea の 2 行目に縦棒が出て、確定で右へ進み、Escape で消える', async ({ page }) => {
+  /** #m2 の 2 行目の末尾にキャレットを置く（scrollTop は 0 ∴ 2 行目は可視）。 */
+  const placeCaretOnLine2 = async (): Promise<void> => {
+    await page.evaluate(() => {
+      const m2 = document.getElementById('m2') as HTMLTextAreaElement;
+      m2.value = 'いち\nに\nさん\nよん';
+      m2.scrollTop = 0;
+      m2.focus({ preventScroll: true });
+      const at = m2.value.split('\n').slice(0, 2).join('\n').length; // 2 行目の末尾
+      m2.setSelectionRange(at, at);
+    });
+    await waitShown(page, PART.trigger);
+    await settle(page);
+  };
+
+  /** #m2 の 2 行目の上端・下端（layout viewport。M2 の組版から数える）。 */
+  const line2 = async (): Promise<{ top: number; bottom: number; field: Rect }> => {
+    const field = await fieldRect(page, 'm2');
+    const scrollTop = await page.evaluate(() => (document.getElementById('m2') as HTMLTextAreaElement).scrollTop);
+    const top = field.top + M2.border + M2.paddingTop + M2.lineHeight - scrollTop;
+    return { top, bottom: top + M2.lineHeight, field };
+  };
+
+  /** 縦棒の矩形（見えていなければ null）。 */
+  const caretMark = async (): Promise<Rect | null> => {
+    const info = await partInfo(page, '.naga-caret-mark');
+    return info && info.shown ? info.rect : null;
+  };
+
+  // 前提の #m1 の popup を閉じ、#m2 の 2 行目へキャレットを移してから開き直す
+  await page.evaluate(() => (window as unknown as { __naga: { close: () => void } }).__naga.close());
+  await settle(page);
+  await placeCaretOnLine2();
+  await openByTrigger(page);
+
+  // 縦棒は 2 行目に重なる（measureCaret の y は行の箱の内側なので ±4px を許す）
+  const first = await line2();
+  const mark1 = await caretMark();
+  expect(mark1, '[measure:X-6] 縦棒が見えている').not.toBeNull();
+  expect(mark1!.top, '[measure:X-6] 縦棒の上端は 2 行目の上端').toBeGreaterThanOrEqual(first.top - 4);
+  expect(mark1!.bottom, '[measure:X-6] 縦棒の下端は 2 行目の下端').toBeLessThanOrEqual(first.bottom + 4);
+  expect(Math.abs(mark1!.height - M2.lineHeight), '[measure:X-6] 高さは行の高さ').toBeLessThanOrEqual(1);
+  expect(Math.abs(mark1!.width - 2), '[measure:X-6] 幅は 2px').toBeLessThanOrEqual(0.5);
+  expect(mark1!.left, '[measure:X-6] 横は欄の中').toBeGreaterThan(first.field.left);
+  expect(mark1!.left, '[measure:X-6] 横は欄の中').toBeLessThan(first.field.right);
+
+  // ページをスクロールしても、欄との相対位置は一定（文書の座標で置く）
+  const offsets: Array<{ top: number; left: number }> = [];
+  for (const y of [0, 40, 80]) {
+    await page.evaluate((top) => window.scrollTo(0, top), y);
+    await settle(page);
+    expect(await page.evaluate(() => window.scrollY), `前提: ${y} までスクロールした`).toBe(y);
+    const mark = await caretMark();
+    const field = await fieldRect(page, 'm2');
+    if (!mark) throw new Error('スクロール後に縦棒が消えた');
+    offsets.push({ top: mark.top - field.top, left: mark.left - field.left });
+  }
+  expect(Math.max(...offsets.map((o) => o.top)) - Math.min(...offsets.map((o) => o.top)), '[measure:X-6] 縦の差が一定').toBeLessThanOrEqual(1);
+  expect(Math.max(...offsets.map((o) => o.left)) - Math.min(...offsets.map((o) => o.left)), '[measure:X-6] 横の差が一定').toBeLessThanOrEqual(1);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await settle(page);
+
+  // 確定するとキャレットが 1 文字ぶん進み、縦棒も右へ進む
+  const beforeCommit = (await caretMark())!;
+  await page.keyboard.press('1');
+  await settle(page);
+  const afterCommit = await caretMark();
+  expect(afterCommit, '[measure:X-6] 確定後も縦棒は出たまま（連続入力）').not.toBeNull();
+  expect(afterCommit!.left, '[measure:X-6] 縦棒は右へ進む').toBeGreaterThan(beforeCommit.left + 1);
+  expect(Math.abs(afterCommit!.height - M2.lineHeight), '[measure:X-6] 高さは変わらない').toBeLessThanOrEqual(1);
+
+  // Escape で閉じると消える
+  await page.keyboard.press('Escape');
+  await expect.poll(() => nagaIsOpen(page), { message: '[measure:X-6] Escape で閉じる' }).toBe(false);
+  expect(await isShown(page, '.naga-caret-mark'), '[measure:X-6] Escape で縦棒も消える').toBe(false);
+});
+
+test('X-7: 元の欄をタップすると popup が閉じ、梵ボタンで開き直せる。確定 2 回では閉じない', async ({ page }) => {
+  // 確定を 2 回続けても開いたまま（連続入力。NagaIME 自身の focus 戻しでは閉じない）
+  await page.keyboard.press('1');
+  await page.keyboard.press('2');
+  expect(await nagaIsOpen(page), '[measure:X-7] 確定 2 回では閉じない（連続入力）').toBe(true);
+  expect(await isShown(page, PART.popup), '[measure:X-7] popup は見えたまま').toBe(true);
+
+  // 元の欄（#m1）をタップする（キャレットの行より上・popup に覆われない点）
+  const field = await fieldRect(page, 'm1');
+  await page.touchscreen.tap(field.left + 20, field.top + 8);
+  await expect.poll(() => nagaIsOpen(page), { message: '[measure:X-7] 元の欄のタップで閉じる' }).toBe(false);
+  expect(await isShown(page, PART.popup), '[measure:X-7] popup は閉じた').toBe(false);
+
+  // 梵ボタンは欄の右上に残る
+  expect(await isShown(page, PART.trigger), '[measure:X-7] 梵ボタンは残る').toBe(true);
+  const trig = (await partInfo(page, PART.trigger))!;
+  expect(Math.abs(trig.rect.right - field.right), '[measure:X-7] 梵ボタンは欄の右上').toBeLessThanOrEqual(1);
+
+  // 梵ボタンで開き直せる
+  await openByTrigger(page);
+  expect(await nagaIsOpen(page), '[measure:X-7] 梵ボタンで開き直せる').toBe(true);
+  expect(await isShown(page, PART.popup), '[measure:X-7] 開き直した popup が見える').toBe(true);
+  // 直前の 2 文字が欄に入っている（陽性対照: 閉じたのは開き直しの後ではなく前のタップ）
+  const value = await page.evaluate(() => (document.getElementById('m1') as HTMLInputElement).value);
+  expect(Array.from(value).length, '[measure:X-7] 確定した 2 文字が欄に入っている').toBeGreaterThanOrEqual(2);
 });

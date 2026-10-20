@@ -27,7 +27,10 @@ async function loadIme(): Promise<{
 
 /** CSS テキストから規則のセレクタを取り出す（@media 等の at-rule の prelude は除く）。 */
 function selectorsOf(cssText: string): string[] {
-  const noComments = cssText.replace(/\/\*[\s\S]*?\*\//g, '');
+  let noComments = cssText.replace(/\/\*[\s\S]*?\*\//g, '');
+  // 【0437】@keyframes の中の `0%, 50% { … }` は selector ではない ∴ ブロックごと落とす
+  // （この検査は「ページの要素に当たりうる selector が .naga- か :host だけか」を見る）。
+  noComments = noComments.replace(/@keyframes\s+[^{]+\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, '');
   const selectors: string[] = [];
   const re = /([^{}]+)\{/g;
   let m: RegExpExecArray | null;

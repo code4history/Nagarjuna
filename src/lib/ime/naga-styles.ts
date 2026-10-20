@@ -25,7 +25,8 @@ export const NAGA_STYLE_TEXT = `
 }
 
 .naga-popup,
-.naga-trigger {
+.naga-trigger,
+.naga-caret-mark {
   --naga-special-font: 'NINJAL Hentaigana', 'Noto Sans Siddham', 'Noto Sans JP', serif;
   --naga-accent: #5b4a8a;
 }
@@ -33,7 +34,8 @@ export const NAGA_STYLE_TEXT = `
 .naga-popup[hidden],
 .naga-trigger[hidden],
 .naga-search-row[hidden],
-.naga-list[hidden] {
+.naga-list[hidden],
+.naga-caret-mark[hidden] {
   display: none !important;
 }
 
@@ -143,8 +145,55 @@ export const NAGA_STYLE_TEXT = `
   color: #666;
   border-left: 1px solid #eee;
 }
-.naga-copy {
-  display: none;
+
+/*
+ * 【NOV26-IM-NAGA-CARET-MARK-0437】挿入位置の縦棒。
+ * popup を開くと focus が読み欄へ移り、元の欄のキャレットが見えなくなる ∴ 元の欄の挿入位置に
+ * 縦棒を出す（人間の提案「IME の表示中はキャレットを目立つように変える」）。
+ * 位置は positionPopup() と同じ文書の座標（placeCaretMark が top/left に書く）。
+ * 幅 2px・高さは行の高さ（JS が書く）・色は NagaIME の紫（--naga-accent）。
+ * z-index は popup（9999）より下・欄より上。操作の邪魔をしない（pointer-events: none）。
+ * 1s 周期で点滅するが、動きを減らす設定では点滅しない。
+ */
+.naga-caret-mark {
+  position: absolute;
+  z-index: 9997;
+  width: 2px;
+  pointer-events: none;
+  background: var(--naga-accent);
+  animation: naga-caret-blink 1s step-end infinite;
+}
+@keyframes naga-caret-blink {
+  0%,
+  49.99% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .naga-caret-mark {
+    animation: none;
+  }
+}
+
+/*
+ * 確定した文字だけを読み上げる live region（0437）。写し（.naga-copy）に付いていた aria-live の
+ * 最小の代替で、見た目には出さない（visually-hidden。レイアウトにも場所を取らせない）。
+ */
+.naga-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /*
@@ -251,8 +300,9 @@ export const NAGA_STYLE_TEXT = `
  * モバイル dock（是正設計 v2 §3・§4 案 A・§5、nov26-m3-t3 タスク設計 §3.1〜§3.3）。
  * ここから下の規則はすべて .naga-popup.naga-is-docked スコープに閉じる（PC 非影響）。
  * 高さの静的な viewport 比指定（旧 dock ルールの vh 値）は使わない。--naga-dock-max は
- * positionPopup() が visualViewport の実測から毎回設定する（未設定時のみ既定 226px）。
- * 各行の高さは naga-ime.ts の DOCK_*_PX と一致させる（タイトル 34・写し 22・読み欄 36・候補 44・枠 2）。
+ * positionPopup() が visualViewport の実測から毎回設定する（未設定時のみ既定 204px）。
+ * 各行の高さは naga-ime.ts の DOCK_*_PX と一致させる（タイトル 34・読み欄 36・候補 44・枠 2）。
+ * 【0437】挿入先の写し（行の高さ 22px）は広幅・狭幅とも撤去した ∴ 高さの計算にも入れない。
  */
 .naga-popup.naga-is-docked {
   /* 画面の下に据え付けた板（「ふわふわ浮いて」への対応）: 左右いっぱい・上端のアクセントの線・上向きの影 */
@@ -260,9 +310,9 @@ export const NAGA_STYLE_TEXT = `
   border-top: 2px solid var(--naga-accent);
   border-radius: 0;
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.18);
-  max-height: var(--naga-dock-max, 226px);
+  max-height: var(--naga-dock-max, 204px); /* 未設定時の既定（0436 で写しの行を外して 204。0437 で写し自体を撤去） */
 }
-/* 縮むのは内側の list だけ（タイトル行・写しの行・読み欄は潰さない） */
+/* 縮むのは内側の list だけ（タイトル行・読み欄は潰さない） */
 .naga-popup.naga-is-docked .naga-list {
   flex: 1 1 auto;
   min-height: 0;
@@ -292,31 +342,11 @@ export const NAGA_STYLE_TEXT = `
 .naga-popup.naga-is-docked .naga-fold {
   display: block;
 }
-/* 挿入先の写し: 欄が popup に隠れていても、どこに何が入ったか分かるように */
-.naga-popup.naga-is-docked .naga-copy {
-  display: block;
-  flex: none;
-  box-sizing: border-box;
-  height: 22px;
-  padding: 2px 10px;
-  font-family: var(--naga-special-font);
-  font-size: 13px;
-  line-height: 18px;
-  color: #555;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.naga-popup.naga-is-docked .naga-copy-new {
-  color: var(--naga-accent);
-  font-weight: 700;
-}
-.naga-popup.naga-is-docked .naga-copy-empty {
-  color: #aaa;
-}
-.naga-popup.naga-is-docked .naga-copy-caret {
-  color: var(--naga-accent);
-}
+/*
+ * 【NOV26-IM-NAGA-CARET-MARK-0437】挿入先の写し（欄の中身を ↵ で 1 行に詰めた文脈の表示）は
+ * 広幅・狭幅とも撤去した（実機の「元フォームと IME の間にわかりにくい文字列が表示され、狭いのに
+ * 場所を取る」への対応）。挿入位置は .naga-caret-mark の縦棒で示す ∴ ここに写しの規則は無い。
+ */
 /* 読み入力欄: アクセント縦線＋「読み」ラベルで本体の入力欄と見分ける（高さは 1 行のまま） */
 .naga-popup.naga-is-docked .naga-search-row {
   box-sizing: border-box;

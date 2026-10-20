@@ -57,13 +57,17 @@ test('S-b: #s1 で Control+j を押すと popup が見える', async ({ page }) 
   await expect.poll(() => isShown(page, PART.popup), { message: '[measure:S-b]' }).toBe(true);
 });
 
-test('S-c: 開いた状態で #s1 を click しても popup は開いたまま', async ({ page }) => {
+// 【NOV26-IM-NAGA-POPUP-REFOCUS-0436】0436 以前は「開いた状態で欄を click しても popup は開いたまま」
+// だった。実機の「focus を戻して入力しても連携しない」「改行するとカーソルが IME の下に回り込む」への
+// 対応で、利用者が欄を click / tap したら閉じる側に変えた ∴ 影の中の欄でも閉じることを測る。
+test('S-c: 開いた状態で #s1 を click すると popup は閉じ、梵ボタンは残る（0436）', async ({ page }) => {
   await page.locator(shadowField('s1')).focus();
   await page.keyboard.press('Control+j');
   await waitShown(page, PART.item);
   await page.locator(shadowField('s1')).click();
-  expect(await nagaIsOpen(page), '[measure:S-c]').toBe(true);
-  expect(await isShown(page, PART.popup), '[measure:S-c]').toBe(true);
+  await expect.poll(() => nagaIsOpen(page), { message: '[measure:S-c]' }).toBe(false);
+  expect(await isShown(page, PART.popup), '[measure:S-c]').toBe(false);
+  expect(await isShown(page, PART.trigger), '[measure:S-c] 梵ボタンは残る').toBe(true);
 });
 
 test('S-d: #s1 で候補を click すると a<候補>b になり、キャレットが挿入の直後', async ({ page }) => {

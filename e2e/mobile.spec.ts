@@ -10,16 +10,19 @@ import { PART, gotoFixture, nagaIsOpen, waitShown } from './helpers';
 //
 // 【NOV26-IM-NAGA-POPUP-ANCHOR-0432】popup は画面の下に据え付ける fixed をやめ、欄のすぐ下に付ける
 // 文書の座標（position: absolute）になった ∴ M-2〜M-4 の「帯（popup の上に残る高さ）」「下端は可視域の
-// 下端から 8px」という前提は意味を失った。置き場所の回帰は e2e/ios-popup.spec.ts の X-1〜X-4 が見る。
-// ここ（M-*）は、欄のすぐ下に付いた popup の寸法・畳み・操作でスクロールしないことを測る。
+// 下端から 8px」という前提は意味を失った。置き場所の回帰は e2e/ios-popup.spec.ts の X-1〜X-5 が見る。
+// 【NOV26-IM-NAGA-POPUP-CARET-0434】0432 の「欄のすぐ下」は複数行の欄でキャレットの行から遠すぎ、
+// 高さの上限も欄の高さに縮んだ ∴ 狭幅もキャレットの行のすぐ下に置き、上限は「popup の上端から可視域の
+// 下端まで」で決める。可視域に DOCK_MIN（138px）が残らないときだけ、開いた直後に 1 回だけページを寄せる。
+// ここ（M-*）は、キャレットの行のすぐ下に付いた popup の寸法・畳み・操作でスクロールしないことを測る。
 
 const HEIGHTS = [188, 216, 320] as const;
-/** キーボードの上に残る高さから引く余白（設計 §3.1 の DOCK_GAP_PX）。 */
-const GAP = 8;
 /** 候補 1 行がまるごと見える下限（設計 §3.1 の DOCK_MIN_PX）。 */
 const DOCK_MIN = 138;
-/** popup を欄のすぐ下に付ける間隔（0432）。 */
-const POPUP_GAP = 4;
+/** f-mobile の #m1 の組版（CSS で宣言している値。実装とは別に出どころを書いておく）。 */
+const M1 = { border: 1, paddingTop: 4, lineHeight: 22 } as const;
+/** キャレットの行の下端と popup の上端の間隔（0434 の POPUP_CARET_GAP_PX）。 */
+const CARET_GAP = 2;
 /** 畳んだ高さ（タイトル行＋写しの行＋枠。設計 §3.1）。 */
 const FOLDED = 58;
 const TOL = 0.5;
@@ -130,7 +133,9 @@ for (const h of HEIGHTS) {
   test.describe(`375×${h}`, () => {
     test.use({ viewport: { width: 375, height: h } });
 
-    test(`M-1 [${h}]: 開く・確定・タブ切替・畳む・開く・閉じるのどれでもページも欄もスクロールしない`, async ({ page }) => {
+    test(`M-1 [${h}]: 開いた直後の 1 回（0434 の例外）を除き、確定・タブ切替・畳む・開く・閉じるでスクロールしない`, async ({
+      page,
+    }) => {
       for (const fieldId of ['m1', 'm2'] as const) {
         await setup(page, fieldId);
         // 0432: popup は欄のすぐ下に付く ∴ 短い viewport でもタイトル行（タブ・畳む・閉じる）が
@@ -143,14 +148,24 @@ for (const h of HEIGHTS) {
         await frame(page);
         const before = await scrollState(page);
         const valueBefore = await page.evaluate((fid) => (document.getElementById(fid) as HTMLInputElement).value, fieldId);
-        const check = async (step: string) => {
-          await frame(page);
-          expect(await scrollState(page), `[measure:M-1] ${fieldId} ${step}`).toEqual(before);
-        };
 
         await openByTap(page);
         expect(await nagaIsOpen(page), `[measure:M-1] ${fieldId} 開いた`).toBe(true);
-        await check('開く');
+        // 0434 の例外: 可視域に候補 1 行が残らない高さでは、開いた直後にページを下へ寄せる（1 回だけ）。
+        // 欄（要素）のスクロールは動かさない
+        const afterOpen = await scrollState(page);
+        expect(afterOpen.winX, `[measure:M-1] ${fieldId} 開くときに横は動かさない`).toBe(before.winX);
+        expect(afterOpen.winY, `[measure:M-1] ${fieldId} 開くときに上へは戻さない（下へだけ寄せる）`).toBeGreaterThanOrEqual(before.winY);
+        expect(afterOpen.scrollerTop).toBe(before.scrollerTop);
+        expect(afterOpen.m1Top).toBe(before.m1Top);
+        expect(afterOpen.m2Top).toBe(before.m2Top);
+        const baseline = afterOpen;
+        const check = async (step: string) => {
+          await frame(page);
+          expect(await scrollState(page), `[measure:M-1] ${fieldId} ${step}`).toEqual(baseline);
+        };
+
+        await check('開いた直後の 1 回を除く');
 
         // 0432: popup は欄のすぐ下に付く ∴ 短い viewport では候補の行が可視域の外に出る。
         // タップの代わりに、読み欄の数字キー（1-9 の直接選択）で確定する（同じ commit の経路）
@@ -176,7 +191,7 @@ for (const h of HEIGHTS) {
       }
     });
 
-    test(`M-2 [${h}]: popup は欄のすぐ下に付き、タブ・読み欄・写しの行・候補 1 行以上がその中に見える`, async ({
+    test(`M-2 [${h}]: popup はキャレットの行のすぐ下に付き、タブ・読み欄・写しの行・候補 1 行以上がその中に見える`, async ({
       page,
     }) => {
       await setup(page, 'm1');
@@ -184,10 +199,14 @@ for (const h of HEIGHTS) {
       const vp = await visualViewport(page);
       const field = await page.evaluate(() => {
         const r = document.getElementById('m1')!.getBoundingClientRect();
-        return { bottom: r.bottom, height: r.height };
+        return { top: r.top, bottom: r.bottom, height: r.height };
       });
       const pop = (await partRect(page, PART.popup))!;
-      expect(Math.abs(pop.top - field.bottom - POPUP_GAP), '[measure:M-2] popup は欄のすぐ下').toBeLessThanOrEqual(TOL);
+      // 0434: 狭幅もキャレットの行（#m1 は 1 行）のすぐ下に付く
+      const caretBottom = field.top + M1.border + M1.paddingTop + M1.lineHeight;
+      // キャレットの行の下端は組版の半分の行間ぶん（±2px）ずれる ∴ 間隔 2px の前後 2px を許す
+      expect(Math.abs(pop.top - caretBottom - CARET_GAP), '[measure:M-2] popup はキャレットの行のすぐ下').toBeLessThanOrEqual(2);
+      expect(pop.top, '[measure:M-2] popup は欄の下端より上').toBeLessThan(field.bottom);
       expect(pop.left, '[measure:M-2] popup の左端は可視域の左端').toBeGreaterThanOrEqual(-TOL);
       expect(pop.right, '[measure:M-2] popup の右端は可視域の右端').toBeLessThanOrEqual(vp.innerWidth + TOL);
       for (const sel of ['.naga-tab.naga-is-active', '.naga-search', '.naga-copy']) {
@@ -198,7 +217,7 @@ for (const h of HEIGHTS) {
         expect(r!.left, `[measure:M-2] ${sel} left は popup の内側`).toBeGreaterThanOrEqual(pop.left - TOL);
         expect(r!.right, `[measure:M-2] ${sel} right は popup の内側`).toBeLessThanOrEqual(pop.right + TOL);
         expect(r!.top, `[measure:M-2] ${sel} top は popup の内側`).toBeGreaterThanOrEqual(pop.top - TOL);
-        // 横は可視域の中（縦は欄の位置しだい。0432）
+        // 横は可視域の中（縦はキャレットの位置しだい。0434）
         expect(r!.left, `[measure:M-2] ${sel} left`).toBeGreaterThanOrEqual(-TOL);
         expect(r!.right, `[measure:M-2] ${sel} right`).toBeLessThanOrEqual(vp.innerWidth + TOL);
         expect(r!.bottom, `[measure:M-2] ${sel} の下端は popup の下端の内側`).toBeLessThanOrEqual(pop.bottom + TOL);
@@ -214,7 +233,7 @@ for (const h of HEIGHTS) {
       expect(whole, '[measure:M-2] 一覧の中にまるごと入る候補の数').toBeGreaterThanOrEqual(1);
     });
 
-    test(`M-3 [${h}]: popup は position: absolute で欄のすぐ下に付き、高さは残り可視高 − 欄 − 余白を超えない`, async ({
+    test(`M-3 [${h}]: popup は position: absolute でキャレットの行のすぐ下に付き、可視域の下端（キーボードの上）を超えない`, async ({
       page,
     }) => {
       await setup(page, 'm1');
@@ -222,7 +241,7 @@ for (const h of HEIGHTS) {
       const vp = await visualViewport(page);
       const field = await page.evaluate(() => {
         const r = document.getElementById('m1')!.getBoundingClientRect();
-        return { bottom: r.bottom, height: r.height };
+        return { top: r.top, bottom: r.bottom, height: r.height };
       });
       const position = await page.evaluate(() => {
         const el = document.querySelector('naga-ime')!.shadowRoot!.querySelector('.naga-popup') as HTMLElement;
@@ -230,16 +249,21 @@ for (const h of HEIGHTS) {
       });
       expect(position, '[measure:M-3] fixed ではなく absolute（文書の座標）').toBe('absolute');
       const pop = (await partRect(page, PART.popup))!;
-      // 欄のすぐ下に付く（画面の下に据え付けない）
-      expect(pop.top - field.bottom, '[measure:M-3] 欄のすぐ下（間隔 4px）').toBeGreaterThanOrEqual(POPUP_GAP - TOL);
-      expect(pop.top - field.bottom, '[measure:M-3] 欄のすぐ下（間隔 4px）').toBeLessThanOrEqual(POPUP_GAP + TOL);
-      // 高さの上限 = キーボードの上に残る高さ − 余白 − 欄の高さ（DOCK_MIN を下回らない）
-      const avail = vp.height - GAP - field.height;
-      const cap = Math.max(Math.min(DOCK_MIN, avail), Math.min(226, avail));
-      expect(pop.height, '[measure:M-3] 高さは残り可視高 − 欄 − 余白を超えない').toBeLessThanOrEqual(cap + TOL);
+      // キャレットの行のすぐ下に付く（画面の下に据え付けない）
+      const caretBottom = field.top + M1.border + M1.paddingTop + M1.lineHeight;
+      // キャレットの行の下端は組版の半分の行間ぶん（±2px）ずれる ∴ 間隔 2px の前後 2px を許す
+      expect(pop.top - caretBottom, '[measure:M-3] キャレットの行のすぐ下（間隔 2px）').toBeGreaterThanOrEqual(CARET_GAP - 2);
+      expect(pop.top - caretBottom, '[measure:M-3] キャレットの行のすぐ下（間隔 2px）').toBeLessThanOrEqual(CARET_GAP + 2);
+      // 高さの上限 = 可視域の下端（キーボードの上）− popup の上端 − 余白（欄の高さは引かない。0434）
+      expect(pop.height, '[measure:M-3] 高さは可視域の下端 − popup の上端 − 余白を超えない').toBeLessThanOrEqual(226 + TOL);
+      // 開いた直後に寄せたあとの可視域の中に収まっている（DOCK_MIN を残せない高さでは寄せる）
+      expect(pop.bottom, '[measure:M-3] popup の下端は可視域の下端を超えない').toBeLessThanOrEqual(vp.offsetTop + vp.height + TOL);
+      expect(pop.height, '[measure:M-3] 候補 1 行以上（DOCK_MIN）').toBeGreaterThanOrEqual(DOCK_MIN - TOL);
     });
 
-    test(`M-4 [${h}]: 畳むと高さがタイトル行と写しの行だけになり、上端は欄のすぐ下のまま。開くと戻る`, async ({ page }) => {
+    test(`M-4 [${h}]: 畳むと高さがタイトル行と写しの行だけになり、上端はキャレットの行のすぐ下のまま。開くと戻る`, async ({
+      page,
+    }) => {
       await setup(page, 'm1');
       await openByTap(page);
       const open1 = (await partRect(page, PART.popup))!;
@@ -248,13 +272,13 @@ for (const h of HEIGHTS) {
       const folded = (await partRect(page, PART.popup))!;
       expect(folded.height, '[measure:M-4] 畳んだ高さ').toBeLessThanOrEqual(FOLDED + TOL);
       expect(folded.height, '[measure:M-4] 畳むと縮む（陽性対照）').toBeLessThan(open1.height);
-      // 0432: popup は欄に付いている ∴ 畳んでも上端は動かない（帯を広げるのではなく高さが縮む）
-      expect(Math.abs(folded.top - open1.top), '[measure:M-4] 畳んでも上端は欄のすぐ下のまま').toBeLessThanOrEqual(TOL);
+      // 0434: popup はキャレットの行に付いている ∴ 畳んでも上端は動かない（帯を広げるのではなく高さが縮む）
+      expect(Math.abs(folded.top - open1.top), '[measure:M-4] 畳んでも上端はキャレットの行のすぐ下のまま').toBeLessThanOrEqual(TOL);
       await tapPart(page, '.naga-fold');
       await frame(page);
       const open2 = (await partRect(page, PART.popup))!;
       expect(Math.abs(open2.height - open1.height), '[measure:M-4] 開くと高さが戻る').toBeLessThanOrEqual(TOL);
-      expect(Math.abs(open2.top - open1.top), '[measure:M-4] 開いても上端は欄のすぐ下のまま').toBeLessThanOrEqual(TOL);
+      expect(Math.abs(open2.top - open1.top), '[measure:M-4] 開いても上端はキャレットの行のすぐ下のまま').toBeLessThanOrEqual(TOL);
     });
   });
 }

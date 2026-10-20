@@ -53,8 +53,10 @@ const TRIGGER_SIZE_PX = 26;
 const TRIGGER_GAP_PX = 4;
 /** 起動ボタンが横にはみ出すときに、可視域の左端から空ける余白（0430: 縦の clamp はしない）。 */
 const TRIGGER_MARGIN_PX = 4;
-/** 狭幅の popup を欄のすぐ下に付けるときの間隔（0432）。 */
+/** 狭幅の popup を欄のすぐ下に付けるときの間隔（0432。キャレットを測れない欄のときだけ使う）。 */
 const POPUP_GAP_PX = 4;
+/** キャレットの行の下端と popup の上端の間隔（0434。広幅の PC と同じ 2px）。 */
+const POPUP_CARET_GAP_PX = 2;
 const FONT_SETTINGS: FontSettings = { hentaigana: true, siddham: true, itaiji: true };
 const ALL_CATEGORIES: readonly NagaCategoryId[] = NAGA_CATEGORIES.map((c) => c.id);
 const CATEGORY_IDS = new Set<string>(ALL_CATEGORIES);
@@ -62,11 +64,12 @@ const CATEGORY_IDS = new Set<string>(ALL_CATEGORIES);
 /*
  * モバイル dock の割り付け（nov26-m3-t3 タスク設計 §3.1）。下の定数が「dock 時の寸法」の唯一の出どころである
  * （CSS 側には --naga-dock-max 未設定時のフォールバックしか置かない）。静的な vh には依存しない。
- * 位置は文書の座標（欄のすぐ下。0432）。
- *   avail    = vvAvail − DOCK_GAP_PX − 欄の高さ
- *   popupMax = min(DOCK_POPUP_MAX_PX, avail)
- *   popupMax < DOCK_MIN_PX なら min(DOCK_MIN_PX, avail)               // 候補 1 行を優先。可視の領域は超えない
- *   畳んでいるときは DOCK_FOLDED_PX
+ * 位置は文書の座標（キャレットの行のすぐ下。0434。キャレットを測れない欄では欄のすぐ下。0432）。
+ *   visibleBottom = vv.offsetTop + vv.height（viewport の座標。vv が無ければ innerHeight）
+ *   room          = visibleBottom − popup の上端（viewport） − DOCK_GAP_PX
+ *   popupMax      = min(DOCK_POPUP_MAX_PX, room)
+ *   room < DOCK_MIN_PX なら popupMax = DOCK_MIN_PX                     // 候補 1 行を優先（開いた直後に 1 回だけページを寄せる）
+ *   畳んでいるときは min(DOCK_FOLDED_PX, popupMax)
  */
 /** タイトル行（タブ・畳むボタン・閉じるボタン）。 */
 const DOCK_TITLE_PX = 34;
@@ -284,6 +287,8 @@ export class NagaIME extends HTMLElement {
   private docked = false;
   /** 畳んでいるか（人間の操作でだけ変わる。閉じても・dock でなくなっても保つ。§3.3） */
   private folded = false;
+  /** この open で「可視域に収めるための 1 回のスクロール」を済ませたか（0434。開くたびに戻す）。 */
+  private dockScrollDone = false;
   /** 直前の確定で入った文字（写しで強調する。次に開くとき・タブを替えたときに消す。§3.2） */
   private lastCommitted: string | null = null;
   /** 初回の connectedCallback を終えたか（昇格中の attributeChangedCallback で for を引かない） */
@@ -649,6 +654,8 @@ export class NagaIME extends HTMLElement {
     else if (this.activeTab === 'recent') this.activeTab = this.cfgCategories[0];
     this.renderTabs();
     this.refresh();
+    // 0434: 可視域に収めるためのスクロールの例外は「開いた直後の 1 回」だけ ∴ 開くたびに戻す
+    this.dockScrollDone = false;
     this.positionPopup();
     // 置き直しの購読を張り、レイアウトが落ち着いてから 1 回置き直す（0432）
     this.syncPopupTracking();
@@ -1351,13 +1358,13 @@ export class NagaIME extends HTMLElement {
    * iPhone ではキーボード表示中は fixed が visual viewport とずれ、スクロールやキーボードの出入りで
    * popup が欄と無関係に「ふわふわ」動いた（起動ボタンと同じ種類の不具合）。
    * ∴ 起動ボタンと同じく文書の座標（`position: absolute`）で置く。
-   * - 狭幅: 欄のすぐ下（`top = 欄の下端 ＋ 4`）、横は文書の可視幅いっぱい。ページのスクロールは
-   *   ブラウザが本文と一緒に動かすので置き直さない。
+   * - 狭幅: キャレットの行のすぐ下（0434。キャレットを測れない欄では欄のすぐ下 ＋ 4。0432）、横は文書の
+   *   可視幅いっぱい。ページのスクロールはブラウザが本文と一緒に動かすので置き直さない。
    *   読み欄に focus が移ると iOS がその欄をキーボードの上へスクロールして見せる ∴ 画面の下に
-   *   据え付ける必要は無い。
+   *   据え付ける必要は無い。高さの上限は「キャレットの行の下からキーボードの上まで」。
    * - 広幅（PC）: キャレットの行の下。可視域の下端（`scrollY + innerHeight`）に入らなければ上に出す。
    *
-   * visualViewport の値を高さの上限にだけ使う（大きさは可視域の offset に依存しない）。
+   * visualViewport の値を高さの上限にだけ使う（位置の座標には offset を使わない）。
    * 包含ブロックの補正は `containingBlockOffset()`（起動ボタンと同じ関数）。
    */
   private positionPopup(): void {
@@ -1371,7 +1378,7 @@ export class NagaIME extends HTMLElement {
     const vw = vv ? vv.width : window.innerWidth;
     const style = pop.style;
 
-    // 狭幅（またはソフトキーボードで縮んだ viewport）は欄のすぐ下に付ける
+    // 狭幅（またはソフトキーボードで縮んだ viewport）はキャレットの行のすぐ下に付ける
     if (vw < this.cfgDockBreakpoint) {
       pop.classList.add('naga-is-docked');
       this.setDocked(true);
@@ -1380,18 +1387,46 @@ export class NagaIME extends HTMLElement {
       style.right = '';
       style.bottom = '';
       style.width = `${this.documentWidth()}px`;
-      // 高さの上限は「キーボードの上に残る高さ − 欄の高さ − 余白」から逆算する（§3.1）。
-      // ソフトキーボードが出ている間の残り可視高 = visualViewport.height。
+      // 【NOV26-IM-NAGA-POPUP-CARET-0434】0432 は欄の下端のすぐ下（`top = 欄の下端 ＋ 4`）に置いていた ∴
+      // 複数行の欄ではキャレット（1〜2 行目）から遠く、欄の下に出ていた。広幅（PC）と同じく
+      // `measureCaret()` のキャレットの行のすぐ下に置く（measureCaret は viewport の座標を返す）。
+      // 測れない欄（mirror を置けない等）では従来どおり欄の下端のすぐ下に落とす。
+      let anchor: { x: number; y: number; lineHeight: number } | null;
+      try {
+        anchor = this.measureCaret(field);
+      } catch {
+        anchor = null;
+      }
+      const topViewport = anchor
+        ? anchor.y + anchor.lineHeight + POPUP_CARET_GAP_PX
+        : r.bottom + POPUP_GAP_PX;
+      // 高さの上限は「popup の上端からキーボードの上（可視域の下端）まで」（0434）。0432 は
+      // `vv.height − 8 − 欄の高さ` だった ∴ 高い欄（textarea の高さ 200 等）ほど上限が不要に縮み、
+      // しかも popup の上端（キャレットの行の下）とも無関係だった ∴ 欄の高さは引かない。
       const vvAvail = vv ? vv.height : window.innerHeight;
-      const avail = Math.max(0, vvAvail - DOCK_GAP_PX - r.height);
-      let popupMax = Math.min(DOCK_POPUP_MAX_PX, avail);
-      if (popupMax < DOCK_MIN_PX) popupMax = Math.min(DOCK_MIN_PX, avail);
-      if (this.folded) popupMax = Math.min(DOCK_FOLDED_PX, avail);
+      const visibleBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+      const room = visibleBottom - topViewport - DOCK_GAP_PX;
+      let popupMax = Math.min(DOCK_POPUP_MAX_PX, Math.max(0, room));
+      // 候補 1 行は見せる（可視域に入りきらなければ下でページを 1 回だけ寄せる）
+      if (room < DOCK_MIN_PX) popupMax = DOCK_MIN_PX;
+      if (this.folded) popupMax = Math.min(DOCK_FOLDED_PX, popupMax);
       style.maxHeight = `${popupMax}px`;
       style.setProperty('--naga-dock-max', `${popupMax}px`);
       style.setProperty('--naga-dock-avail', `${vvAvail}px`);
-      // 縦は欄のすぐ下（文書の座標）、横は文書の可視域の左端
-      this.placeInDocument(pop, r.bottom + scrollY + POPUP_GAP_PX, scrollX);
+      // 縦はキャレットの行のすぐ下（文書の座標）、横は文書の可視域の左端
+      this.placeInDocument(pop, topViewport + scrollY, scrollX);
+      // 【例外・0434】可視域に残る高さが DOCK_MIN_PX に満たないときだけ、popup の下端が
+      // キーボードの上に入るようページを寄せる。0432 の約束「NagaIME はページをスクロールしない」の
+      // 例外である理由: 寄せないと候補の行が 1 行も見えない（実機の複数行の欄で発生。前回レビューの
+      // MAJOR-1）。ページのスクロールで popup を置き直さない方針は変えない ∴ 寄せるのは開いた直後の
+      // 1 回だけ（resize や確定では寄せない）。位置は文書の座標のままなので、寄せても欄との差は変わらない。
+      if (room < DOCK_MIN_PX && !this.dockScrollDone) {
+        const need = topViewport + popupMax - visibleBottom;
+        if (need > 0) window.scrollBy(0, need);
+      }
+      // 寄せるのは開いた直後の 1 回だけ（この open の最初の配置で窓口を閉じる。寄せが要らなかった
+      // 場合も、あとから届く resize で寄せない）
+      this.dockScrollDone = true;
       return;
     }
 
@@ -1420,14 +1455,14 @@ export class NagaIME extends HTMLElement {
     let top: number;
     let left: number;
     if (anchor) {
-      top = anchor.y + scrollY + anchor.lineHeight + 2;
+      top = anchor.y + scrollY + anchor.lineHeight + POPUP_CARET_GAP_PX;
       left = anchor.x + scrollX;
     } else {
       top = r.bottom + scrollY + POPUP_GAP_PX;
       left = r.left + scrollX;
     }
     if (top + h > vpBottom) {
-      top = anchor ? anchor.y + scrollY - h - 2 : r.top + scrollY - h - POPUP_GAP_PX;
+      top = anchor ? anchor.y + scrollY - h - POPUP_CARET_GAP_PX : r.top + scrollY - h - POPUP_GAP_PX;
     }
     if (left + w > scrollX + vw) left = scrollX + vw - w - 8;
     if (left < scrollX + 4) left = scrollX + 4;

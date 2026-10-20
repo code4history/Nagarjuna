@@ -142,7 +142,7 @@ The public types are `NagaIMEOptions`, `NagaCandidate`, `NagaCategoryId` and `Na
 
 **5. Notes**
 
-- If an ancestor of the field has `transform`, `filter` or `contain`, the popup (positioned with `position: fixed`) is offset by that ancestor's containing block.
+- The trigger button, the popup and the caret mark are placed in document coordinates (`position: absolute`), so they scroll together with the page. If `<naga-ime>` itself is placed inside a `position: fixed` ancestor, they do not follow page scrolling.
 - `new NagaIME()` appends the element to `document.body` when it is not connected yet.
 - If two copies of the package are loaded, `<naga-ime>` belongs to the copy that registered first; `new NagaIME()` throws a `TypeError` in that state (check it with `customElements.get('naga-ime') === NagaIME`).
 - Assigning `htmlFor` does not change the `for` attribute (unlike `<label>`).

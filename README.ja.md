@@ -140,7 +140,7 @@ ime.attach(field);
 
 **5. 注意**
 
-- 欄の祖先に `transform`・`filter`・`contain` があると、`position: fixed` で置く popup が、その祖先の containing block の分だけずれます。
+- 梵ボタン・popup・挿入位置の縦棒は文書の座標（`position: absolute`）で置くので、ページと一緒にスクロールします。`<naga-ime>` 自体を `position: fixed` の祖先の中に置くと、ページのスクロールに追随しません。
 - `new NagaIME()` で作った要素は、未接続のとき `document.body` の末尾へ入ります。
 - パッケージの複製が 2 つ読み込まれると、`<naga-ime>` は先に登録した版のものになります。その状態で `new NagaIME()` は `TypeError` になります（`customElements.get('naga-ime') === NagaIME` で確かめられます）。
 - `htmlFor` への代入は `for` 属性を変えません（`<label>` とは違います）。

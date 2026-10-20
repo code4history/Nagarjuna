@@ -69,12 +69,11 @@ const CATEGORY_IDS = new Set<string>(ALL_CATEGORIES);
  *   room          = visibleBottom − popup の上端（viewport） − DOCK_GAP_PX
  *   popupMax      = min(DOCK_POPUP_MAX_PX, room)
  *   room < DOCK_MIN_PX なら popupMax = DOCK_MIN_PX                     // 候補 1 行を優先（開いた直後に 1 回だけページを寄せる）
+ * 0436: 挿入先の写しの行（22px）は狭幅では出さない ∴ 固定部分にも入れない。
  *   畳んでいるときは min(DOCK_FOLDED_PX, popupMax)
  */
 /** タイトル行（タブ・畳むボタン・閉じるボタン）。 */
 const DOCK_TITLE_PX = 34;
-/** 挿入先の写しの行。 */
-const DOCK_COPY_PX = 22;
 /** 読み欄の行（外余白 3px×2 を含む。font-size 16px で iOS の自動ズームを避ける）。 */
 const DOCK_SEARCH_PX = 36;
 /** 候補 1 行の高さ（タップの的の大きさ）。 */
@@ -85,15 +84,19 @@ const DOCK_ROWS = 3;
 const DOCK_BORDER_PX = 2;
 /** キーボード上端（可視領域の下端）との間隔。 */
 const DOCK_GAP_PX = 8;
-/** 畳んでも残る固定部分 ＋ 読み欄 = 94px。 */
-const DOCK_FIXED_PX = DOCK_TITLE_PX + DOCK_COPY_PX + DOCK_SEARCH_PX + DOCK_BORDER_PX;
-/** 候補が 1 行まるごと見える下限 = 138px。 */
+/**
+ * 畳んでも残る固定部分 ＋ 読み欄 = 72px。
+ * 【NOV26-IM-NAGA-POPUP-REFOCUS-0436】0434 までは挿入先の写しの行（22px）を足した 94px だったが、
+ * 狭幅では写しを出さないことにした ∴ 高さの計算からも外す（実機の「狭いのに場所を取る」への対応）。
+ */
+const DOCK_FIXED_PX = DOCK_TITLE_PX + DOCK_SEARCH_PX + DOCK_BORDER_PX;
+/** 候補が 1 行まるごと見える下限 = 116px。 */
 const DOCK_MIN_PX = DOCK_FIXED_PX + DOCK_ROW_PX;
-/** popup の高さの上限 = 226px。 */
+/** popup の高さの上限 = 204px。 */
 const DOCK_POPUP_MAX_PX = DOCK_FIXED_PX + DOCK_ROW_PX * DOCK_ROWS;
-/** 畳んだ高さ（タイトル行＋写しの行＋枠）= 58px。 */
-const DOCK_FOLDED_PX = DOCK_TITLE_PX + DOCK_COPY_PX + DOCK_BORDER_PX;
-/** 写しの行に出すキャレットの直前の文字数。 */
+/** 畳んだ高さ（タイトル行＋枠）= 36px。 */
+const DOCK_FOLDED_PX = DOCK_TITLE_PX + DOCK_BORDER_PX;
+/** 写しの行に出すキャレットの直前の文字数（狭幅では使わない。広幅の組み立てだけが使う）。 */
 const COPY_MAX_CHARS = 12;
 
 /** 属性名 → プロパティ名（大文字の前で区切り `-` でつなぐ機械変換。`for` だけは DOM の前例どおり `htmlFor`）。 */
@@ -287,6 +290,18 @@ export class NagaIME extends HTMLElement {
   private docked = false;
   /** 畳んでいるか（人間の操作でだけ変わる。閉じても・dock でなくなっても保つ。§3.3） */
   private folded = false;
+  /**
+   * 【NOV26-IM-NAGA-POPUP-REFOCUS-0436】いま NagaIME 自身が欄へ focus を戻している最中か。
+   *
+   * popup を開いたまま欄へ focus が戻ったら popup を閉じる（実機の「フォーカスを戻して入力すると
+   * 連携しない」「改行するとカーソルが IME の下に回り込む」への対応）。ただし NagaIME 自身が
+   * focus を戻す経路（close({ refocus: true }) の欄への戻し）でも focus が飛ぶ ∴ それで閉じると
+   * 閉じた直後の連続入力が壊れる。ポインタの操作（pointerdown / touchstart / mousedown）は
+   * 利用者のものだけなので区別が要らず、**focus だけで戻る経路（キーボードの Tab・IME の確定）**
+   * だけをこの印で見分ける。focus() は同期的に focus イベントを出すので、呼び出しの前後で
+   * 立てて降ろせば足りる（タイマーは使わない）。
+   */
+  private selfFocus = false;
   /** この open で「可視域に収めるための 1 回のスクロール」を済ませたか（0434。開くたびに戻す）。 */
   private dockScrollDone = false;
   /** 直前の確定で入った文字（写しで強調する。次に開くとき・タブを替えたときに消す。§3.2） */
@@ -672,13 +687,26 @@ export class NagaIME extends HTMLElement {
     this.composing = false;
     if (this.popup) this.popup.hidden = true;
     this.trigger?.setAttribute('aria-expanded', 'false');
-    if (refocus && this.target) this.target.focus({ preventScroll: true });
+    if (refocus && this.target) this.focusFieldSelf(this.target);
     // 置き直しの購読を外す。欄が focus のままでボタンが見えている（Escape で閉じた等）ときは、
     // 可視を正本に張り直す（閉じたあともボタンは欄の右上に居続ける）
     this.stopPopupTracking();
     this.stopTriggerTracking();
     this.syncTriggerTracking();
     if (wasOpen) this.emit('nagaClose', { field: this.target });
+  }
+
+  /**
+   * 【0436】NagaIME 自身の都合で欄へ focus を戻す（利用者の操作と区別する印を立てる）。
+   * focus イベントはこの呼び出しの中で同期的に届くので、戻った時点で印を降ろす。
+   */
+  private focusFieldSelf(field: NagaTarget): void {
+    this.selfFocus = true;
+    try {
+      field.focus({ preventScroll: true });
+    } finally {
+      this.selfFocus = false;
+    }
   }
 
   private emit<K extends keyof NagaIMEEventMap>(type: K, detail: NagaIMEEventMap[K]['detail']): void {
@@ -912,7 +940,18 @@ export class NagaIME extends HTMLElement {
     const addedClass = !field.classList.contains('naga-enabled');
     field.classList.add('naga-enabled');
 
-    const onFocus = () => this.showTrigger(field);
+    // 【0436】利用者が欄へ focus を戻したら popup を閉じる（開いたまま連携しないなら閉じる方が良い、
+    // という実機の判断）。NagaIME 自身の focus 戻し（focusFieldSelf）では閉じない
+    const onFocus = () => {
+      if (this.openState && !this.selfFocus) this.close();
+      this.showTrigger(field);
+    };
+    // 【0436】欄を直接触ったら popup を閉じる。ポインタの操作は利用者のものだけ ∴ 自前の focus と
+    // 区別する印は要らない。閉じたあとは欄が focus のまま、梵ボタンは欄の右上に残る。
+    // （refocus はしない。利用者はもうその欄を触っているので、focus を奪い返す必要が無い）
+    const onFieldPointer = () => {
+      if (this.openState) this.close();
+    };
     const onBlur = () => {
       // setTimeout を挟むと focus による付け替えと競合するため、同期的に activeElement で判定する。
       // 影の中の欄・自分の影の中の trigger を見分けるため、影を辿った最も深い要素で判定する
@@ -936,6 +975,9 @@ export class NagaIME extends HTMLElement {
     el.addEventListener('focus', onFocus);
     el.addEventListener('blur', onBlur);
     el.addEventListener('keydown', onKeydown);
+    el.addEventListener('pointerdown', onFieldPointer);
+    el.addEventListener('touchstart', onFieldPointer, { passive: true });
+    el.addEventListener('mousedown', onFieldPointer);
     this.fields.set(field, {
       appliedFontFamily,
       addedClass,
@@ -945,6 +987,9 @@ export class NagaIME extends HTMLElement {
         el.removeEventListener('focus', onFocus);
         el.removeEventListener('blur', onBlur);
         el.removeEventListener('keydown', onKeydown);
+        el.removeEventListener('pointerdown', onFieldPointer);
+        el.removeEventListener('touchstart', onFieldPointer);
+        el.removeEventListener('mousedown', onFieldPointer);
       },
     });
     if (deepActiveElement() === field) this.showTrigger(field);
@@ -1146,6 +1191,8 @@ export class NagaIME extends HTMLElement {
     this.docked = next;
     this.applyTabLabels();
     this.applyFold();
+    // 【0436】写しは狭幅では組まない ∴ dock を跨いだら組み直す（PC で組んだ行を狭幅へ持ち越さない）
+    this.updateCopy();
   }
 
   /* ------------------------------------------------------------ *
@@ -1185,6 +1232,9 @@ export class NagaIME extends HTMLElement {
     const el = this.copyEl;
     if (!el) return;
     el.replaceChildren();
+    // 【0436】狭幅（docked）では文脈の表示を出さない ∴ 組まない（高さも読み上げも空振りさせない）。
+    // 広幅（PC）の組み立ては従来どおり（見た目は CSS の display: none のまま＝後退しない）。
+    if (this.docked) return;
     const field = this.target;
     if (!field) return;
     const span = (cls: string, text: string): HTMLSpanElement => {

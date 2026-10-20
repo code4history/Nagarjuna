@@ -251,7 +251,7 @@ export const NAGA_STYLE_TEXT = `
  * モバイル dock（是正設計 v2 §3・§4 案 A・§5、nov26-m3-t3 タスク設計 §3.1〜§3.3）。
  * ここから下の規則はすべて .naga-popup.naga-is-docked スコープに閉じる（PC 非影響）。
  * 高さの静的な viewport 比指定（旧 dock ルールの vh 値）は使わない。--naga-dock-max は
- * positionPopup() が visualViewport の実測から毎回設定する（未設定時のみ既定 226px）。
+ * positionPopup() が visualViewport の実測から毎回設定する（未設定時のみ既定 204px）。
  * 各行の高さは naga-ime.ts の DOCK_*_PX と一致させる（タイトル 34・写し 22・読み欄 36・候補 44・枠 2）。
  */
 .naga-popup.naga-is-docked {
@@ -260,9 +260,9 @@ export const NAGA_STYLE_TEXT = `
   border-top: 2px solid var(--naga-accent);
   border-radius: 0;
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.18);
-  max-height: var(--naga-dock-max, 226px);
+  max-height: var(--naga-dock-max, 204px); /* 未設定時の既定（0436: 写しの行を外して 204） */
 }
-/* 縮むのは内側の list だけ（タイトル行・写しの行・読み欄は潰さない） */
+/* 縮むのは内側の list だけ（タイトル行・読み欄は潰さない） */
 .naga-popup.naga-is-docked .naga-list {
   flex: 1 1 auto;
   min-height: 0;
@@ -292,31 +292,12 @@ export const NAGA_STYLE_TEXT = `
 .naga-popup.naga-is-docked .naga-fold {
   display: block;
 }
-/* 挿入先の写し: 欄が popup に隠れていても、どこに何が入ったか分かるように */
-.naga-popup.naga-is-docked .naga-copy {
-  display: block;
-  flex: none;
-  box-sizing: border-box;
-  height: 22px;
-  padding: 2px 10px;
-  font-family: var(--naga-special-font);
-  font-size: 13px;
-  line-height: 18px;
-  color: #555;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.naga-popup.naga-is-docked .naga-copy-new {
-  color: var(--naga-accent);
-  font-weight: 700;
-}
-.naga-popup.naga-is-docked .naga-copy-empty {
-  color: #aaa;
-}
-.naga-popup.naga-is-docked .naga-copy-caret {
-  color: var(--naga-accent);
-}
+/*
+ * 【NOV26-IM-NAGA-POPUP-REFOCUS-0436】挿入先の写し（欄の中身を ↵ で 1 行に詰めた文脈の表示）は、
+ * 狭幅では出さない。実機の「元フォームと IME の間にわかりにくい文字列が表示され、狭いのに場所を取る」
+ * への対応 ∴ dock スコープに表示規則を置かない（base の display: none のまま）。行の高さ 22px も
+ * naga-ime.ts の DOCK_FIXED_PX から外してある（高さの計算にも入れない）。
+ */
 /* 読み入力欄: アクセント縦線＋「読み」ラベルで本体の入力欄と見分ける（高さは 1 行のまま） */
 .naga-popup.naga-is-docked .naga-search-row {
   box-sizing: border-box;

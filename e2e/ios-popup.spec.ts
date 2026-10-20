@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { fieldRect, gotoFixture, nagaIsOpen, partInfo, PART, waitShown, type Rect } from './helpers';
+import { fieldRect, gotoFixture, isShown, nagaIsOpen, partInfo, PART, waitShown, type Rect } from './helpers';
 
 // 【NOV26-IM-NAGA-POPUP-ANCHOR-0432】popup の置き場所の回帰試験（iOS のキーボードとスクロール）。
 //
@@ -263,4 +263,64 @@ test('X-5: textarea の 3 行目では、キャレットの行のすぐ下に開
   await page.evaluate(() => window.visualViewport?.dispatchEvent(new Event('resize')));
   await settle(page);
   expect(await page.evaluate(() => window.scrollY), '[measure:X-5] 2 回目以降は寄せない').toBe(scrolled);
+});
+
+/**
+ * 【NOV26-IM-NAGA-POPUP-REFOCUS-0436】実機の iPhone の報告 2 件への回帰試験。
+ *  - 報告 1「元フォームと IME の間に、わかりにくい文字列（改行が記号になった行）が表示される」
+ *    → 文脈の表示（.naga-copy）は狭幅では出さない（高さも取らない）。0436 で固定部分 94 → 72px。
+ *  - 報告 2・3「IME から元フォームへ focus を戻して入力すると連携しない」「改行するとカーソルが IME の
+ *    下に回り込む」→ popup を開いたまま元の欄をタップしたら閉じる。梵ボタンで開き直せる。
+ *    確定（NagaIME 自身の focus 戻し）では閉じない（連続入力）。
+ */
+test('X-6: 文脈の表示（.naga-copy）は狭幅の popup に出ず、高さも取らない', async ({ page }) => {
+  // 実機で「謎文字」に見えたのは、欄の中身を ↵ で 1 行に詰めた写し（.naga-copy）。
+  // 0436 で狭幅では組まない ∴ 要素はあるが display: none・高さ 0
+  // 前提の #m1 の popup を閉じ、改行を含む欄（#m2）へ移してから開き直す
+  await page.evaluate(() => (window as unknown as { __naga: { close: () => void } }).__naga.close());
+  await settle(page);
+  await page.evaluate(() => {
+    const m2 = document.getElementById('m2') as HTMLTextAreaElement;
+    m2.value = 'def\nghi\njkl';
+    m2.focus({ preventScroll: true });
+  });
+  await waitShown(page, PART.trigger);
+  await settle(page);
+  await openByTrigger(page);
+
+  const copy = await partInfo(page, '.naga-copy');
+  expect(copy, '[measure:X-6] 文脈の表示の要素は DOM にある（広幅の組み立てを壊していない）').not.toBeNull();
+  expect(copy!.styles.display, '[measure:X-6] display: none').toBe('none');
+  expect(copy!.shown, '[measure:X-6] 見えない').toBe(false);
+  expect(copy!.rect.height, '[measure:X-6] 高さを取らない').toBe(0);
+  // 謎文字（↵）が描かれていない
+  const text = await page.evaluate(() => document.querySelector('naga-ime')!.shadowRoot!.querySelector('.naga-copy')!.textContent);
+  expect(text, '[measure:X-6] 改行記号の行を組まない').toBe('');
+});
+
+test('X-7: 元の欄をタップすると popup が閉じ、梵ボタンで開き直せる。確定 2 回では閉じない', async ({ page }) => {
+  // 確定を 2 回続けても開いたまま（連続入力。NagaIME 自身の focus 戻しでは閉じない）
+  await page.keyboard.press('1');
+  await page.keyboard.press('2');
+  expect(await nagaIsOpen(page), '[measure:X-7] 確定 2 回では閉じない（連続入力）').toBe(true);
+  expect(await isShown(page, PART.popup), '[measure:X-7] popup は見えたまま').toBe(true);
+
+  // 元の欄（#m1）をタップする（キャレットの行より上・popup に覆われない点）
+  const field = await fieldRect(page, 'm1');
+  await page.touchscreen.tap(field.left + 20, field.top + 8);
+  await expect.poll(() => nagaIsOpen(page), { message: '[measure:X-7] 元の欄のタップで閉じる' }).toBe(false);
+  expect(await isShown(page, PART.popup), '[measure:X-7] popup は閉じた').toBe(false);
+
+  // 梵ボタンは欄の右上に残る
+  expect(await isShown(page, PART.trigger), '[measure:X-7] 梵ボタンは残る').toBe(true);
+  const trig = (await partInfo(page, PART.trigger))!;
+  expect(Math.abs(trig.rect.right - field.right), '[measure:X-7] 梵ボタンは欄の右上').toBeLessThanOrEqual(1);
+
+  // 梵ボタンで開き直せる
+  await openByTrigger(page);
+  expect(await nagaIsOpen(page), '[measure:X-7] 梵ボタンで開き直せる').toBe(true);
+  expect(await isShown(page, PART.popup), '[measure:X-7] 開き直した popup が見える').toBe(true);
+  // 直前の 2 文字が欄に入っている（陽性対照: 閉じたのは開き直しの後ではなく前のタップ）
+  const value = await page.evaluate(() => (document.getElementById('m1') as HTMLInputElement).value);
+  expect(Array.from(value).length, '[measure:X-7] 確定した 2 文字が欄に入っている').toBeGreaterThanOrEqual(2);
 });

@@ -530,7 +530,7 @@ describe('メソッドとイベント（§5.4・§5.5）', () => {
   });
 
   it(
-    '外側の mousedown で閉じる。影の中の欄・自分の部品の mousedown では閉じない（composedPath）',
+    '外側の mousedown で閉じる。自分の部品の mousedown では閉じない。影の中の欄の mousedown では閉じる（0436）',
     async () => {
       const host = document.createElement('div');
       document.body.appendChild(host);
@@ -540,8 +540,12 @@ describe('メソッドとイベント（§5.4・§5.5）', () => {
       const el = new NagaIME({ loadFonts: false });
       el.attach(field);
       await el.open(field);
+      // 【NOV26-IM-NAGA-POPUP-REFOCUS-0436】利用者が元の欄を触ったら閉じる（影の中の欄も同じ）。
+      // 0436 以前は「欄の mousedown では閉じない」だったが、実機の「フォーカスを戻しても連携しない」
+      // 「改行するとカーソルが IME の下に回り込む」への対応で閉じる側に変えた
       field.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true, cancelable: true }));
-      expect(el.isOpen).toBe(true);
+      expect(el.isOpen).toBe(false);
+      await el.open(field);
       popupOf(el).dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true, cancelable: true }));
       expect(el.isOpen).toBe(true);
       const outside = document.createElement('div');

@@ -13,18 +13,22 @@ import { PART, gotoFixture, nagaIsOpen, waitShown } from './helpers';
 // 下端から 8px」という前提は意味を失った。置き場所の回帰は e2e/ios-popup.spec.ts の X-1〜X-5 が見る。
 // 【NOV26-IM-NAGA-POPUP-CARET-0434】0432 の「欄のすぐ下」は複数行の欄でキャレットの行から遠すぎ、
 // 高さの上限も欄の高さに縮んだ ∴ 狭幅もキャレットの行のすぐ下に置き、上限は「popup の上端から可視域の
-// 下端まで」で決める。可視域に DOCK_MIN（138px）が残らないときだけ、開いた直後に 1 回だけページを寄せる。
+// 下端まで」で決める。可視域に DOCK_MIN（116px）が残らないときだけ、開いた直後に 1 回だけページを寄せる。
+// 【NOV26-IM-NAGA-POPUP-REFOCUS-0436】文脈の表示（写しの行 22px）は狭幅では出さない ∴ 固定部分は 72px
+// （候補 3 行上限 204・候補 1 行下限 116・畳み 36）。M-2 は「写しの行が見えないこと」も測る。
 // ここ（M-*）は、キャレットの行のすぐ下に付いた popup の寸法・畳み・操作でスクロールしないことを測る。
 
 const HEIGHTS = [188, 216, 320] as const;
-/** 候補 1 行がまるごと見える下限（設計 §3.1 の DOCK_MIN_PX）。 */
-const DOCK_MIN = 138;
+/** 候補 1 行がまるごと見える下限（設計 §3.1 の DOCK_MIN_PX。0436 で写しの行を外して 116）。 */
+const DOCK_MIN = 116;
+/** popup の高さの上限（DOCK_POPUP_MAX_PX。0436 で 204）。 */
+const DOCK_MAX = 204;
 /** f-mobile の #m1 の組版（CSS で宣言している値。実装とは別に出どころを書いておく）。 */
 const M1 = { border: 1, paddingTop: 4, lineHeight: 22 } as const;
 /** キャレットの行の下端と popup の上端の間隔（0434 の POPUP_CARET_GAP_PX）。 */
 const CARET_GAP = 2;
-/** 畳んだ高さ（タイトル行＋写しの行＋枠。設計 §3.1）。 */
-const FOLDED = 58;
+/** 畳んだ高さ（タイトル行＋枠。0436 で写しの行を外して 36）。 */
+const FOLDED = 36;
 const TOL = 0.5;
 
 interface Box {
@@ -191,7 +195,7 @@ for (const h of HEIGHTS) {
       }
     });
 
-    test(`M-2 [${h}]: popup はキャレットの行のすぐ下に付き、タブ・読み欄・写しの行・候補 1 行以上がその中に見える`, async ({
+    test(`M-2 [${h}]: popup はキャレットの行のすぐ下に付き、タブ・読み欄・候補 1 行以上がその中に見え、文脈の表示は出ない`, async ({
       page,
     }) => {
       await setup(page, 'm1');
@@ -209,7 +213,11 @@ for (const h of HEIGHTS) {
       expect(pop.top, '[measure:M-2] popup は欄の下端より上').toBeLessThan(field.bottom);
       expect(pop.left, '[measure:M-2] popup の左端は可視域の左端').toBeGreaterThanOrEqual(-TOL);
       expect(pop.right, '[measure:M-2] popup の右端は可視域の右端').toBeLessThanOrEqual(vp.innerWidth + TOL);
-      for (const sel of ['.naga-tab.naga-is-active', '.naga-search', '.naga-copy']) {
+      // 【0436】文脈の表示（.naga-copy）は狭幅では出さない（実機の「狭いのに場所を取る」への対応）
+      const copy = await partRect(page, '.naga-copy');
+      expect(copy, '[measure:M-2] 文脈の表示の要素は DOM にある（広幅の組み立てを壊していない）').not.toBeNull();
+      expect(copy!.height, '[measure:M-2] 文脈の表示は狭幅で出さない').toBe(0);
+      for (const sel of ['.naga-tab.naga-is-active', '.naga-search']) {
         const r = await partRect(page, sel);
         expect(r, `[measure:M-2] ${sel} がある`).not.toBeNull();
         expect(r!.height, `[measure:M-2] ${sel} の高さ`).toBeGreaterThan(0);
@@ -255,13 +263,13 @@ for (const h of HEIGHTS) {
       expect(pop.top - caretBottom, '[measure:M-3] キャレットの行のすぐ下（間隔 2px）').toBeGreaterThanOrEqual(CARET_GAP - 2);
       expect(pop.top - caretBottom, '[measure:M-3] キャレットの行のすぐ下（間隔 2px）').toBeLessThanOrEqual(CARET_GAP + 2);
       // 高さの上限 = 可視域の下端（キーボードの上）− popup の上端 − 余白（欄の高さは引かない。0434）
-      expect(pop.height, '[measure:M-3] 高さは可視域の下端 − popup の上端 − 余白を超えない').toBeLessThanOrEqual(226 + TOL);
+      expect(pop.height, '[measure:M-3] 高さは可視域の下端 − popup の上端 − 余白を超えない').toBeLessThanOrEqual(DOCK_MAX + TOL);
       // 開いた直後に寄せたあとの可視域の中に収まっている（DOCK_MIN を残せない高さでは寄せる）
       expect(pop.bottom, '[measure:M-3] popup の下端は可視域の下端を超えない').toBeLessThanOrEqual(vp.offsetTop + vp.height + TOL);
       expect(pop.height, '[measure:M-3] 候補 1 行以上（DOCK_MIN）').toBeGreaterThanOrEqual(DOCK_MIN - TOL);
     });
 
-    test(`M-4 [${h}]: 畳むと高さがタイトル行と写しの行だけになり、上端はキャレットの行のすぐ下のまま。開くと戻る`, async ({
+    test(`M-4 [${h}]: 畳むと高さがタイトル行だけになり、上端はキャレットの行のすぐ下のまま。開くと戻る`, async ({
       page,
     }) => {
       await setup(page, 'm1');

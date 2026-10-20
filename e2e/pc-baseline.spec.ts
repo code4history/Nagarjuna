@@ -46,14 +46,19 @@ test('P-2: trigger の click で popup が #f1 の下に dock せずに出て、
   expect(pop2.rect.left).toBeGreaterThanOrEqual(f1.left + 8 + 32);
 });
 
-test('P-3: Control+j で開き、もう一度 Control+j で閉じる', async ({ page }) => {
+// 【NOV26-IM-NAGA-POPUP-REFOCUS-0436】0436 以前は「欄へ focus を戻して Control+j で閉じる」だった。
+// いまは利用者が欄へ focus を戻した時点で popup が閉じる（実機の「戻しても連携しない」への対応）∴
+// 欄へ戻すと閉じ、閉じたあとの Control+j は開く、という順序で測る（toggle 自体は trigger と単体テストが見る）。
+test('P-3: Control+j で開き、欄へ focus を戻すと閉じ、もう一度 Control+j で開く（0436）', async ({ page }) => {
   await page.focus('#f1');
   await openWithShortcut(page);
   expect(await nagaIsOpen(page)).toBe(true);
-  // 開くと focus は読み入力欄へ移る。閉じる操作は欄に戻して Control+j（欄の keydown が toggle する）
+  // 開くと focus は読み入力欄へ移る。欄へ戻す（キーボードの Tab に相当する focus）と閉じる
   await page.focus('#f1');
-  await page.keyboard.press('Control+j');
   await expect.poll(() => nagaIsOpen(page)).toBe(false);
+  // 閉じたあとは欄の Control+j が開く
+  await page.keyboard.press('Control+j');
+  await expect.poll(() => nagaIsOpen(page)).toBe(true);
 });
 
 test('P-4: 読み → Enter を 2 回で #f1 に 2 文字入り、popup は開いたまま', async ({ page }) => {

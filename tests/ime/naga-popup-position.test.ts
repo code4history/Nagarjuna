@@ -38,9 +38,10 @@ class FakeVisualViewport extends EventTarget {
 const GAP_TO_FIELD = 4;
 const CARET_GAP = 2;
 const DOCK_GAP = 8;
-const DOCK_MIN = 138;
-const DOCK_MAX = 226;
-const DOCK_FOLDED = 58;
+// 【0436】狭幅では文脈の表示（写しの行 22px）を出さない ∴ 固定部分は 72px（3 行上限 204・下限 116・畳み 36）
+const DOCK_MIN = 116;
+const DOCK_MAX = 204;
+const DOCK_FOLDED = 36;
 const TOL = 1;
 
 /** 欄の getBoundingClientRect を決め打ちにする（jsdom の矩形はすべて 0 のため）。 */
@@ -242,7 +243,7 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
       stubCaret({ x: 16, y: 110, lineHeight: 20 });
       ime.attach(field);
       await ime.open(field);
-      // 852 − 132 − 8 = 712 → 上限 226（0432 の式は 400 − 8 − 欄 400 = 0 まで縮んでいた）
+      // 852 − 132 − 8 = 712 → 上限 204（0432 の式は 400 − 8 − 欄 400 = 0 まで縮んでいた）
       expect(popupOf().style.maxHeight).toBe(`${DOCK_MAX}px`);
 
       // 可視域の下端が 300 まで縮んだ → 300 − 132 − 8 = 160（欄の高さ 400 でも 0 にならない）
@@ -251,7 +252,7 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
       expect(popupOf().style.maxHeight).toBe(`${300 - 132 - DOCK_GAP}px`);
       expect(popupOf().style.getPropertyValue('--naga-dock-max')).toBe(`${300 - 132 - DOCK_GAP}px`);
 
-      // 380 まで縮んだ → 380 − 132 − 8 = 240 → 上限 226
+      // 380 まで縮んだ → 380 − 132 − 8 = 240 → 上限 204
       vv.height = 380;
       window.dispatchEvent(new Event('resize'));
       expect(popupOf().style.maxHeight).toBe(`${DOCK_MAX}px`);
@@ -266,14 +267,14 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
       useNarrow();
       stubRect(field, { top: 100, right: 376, bottom: 500, left: 16 });
       stubCaret({ x: 16, y: 400, lineHeight: 20 }); // popup の上端（viewport）= 422
-      vv.height = 300; // room = 300 − 422 − 8 = −130 < DOCK_MIN(138)
+      vv.height = 300; // room = 300 − 422 − 8 = −130 < DOCK_MIN(116)
       ime.attach(field);
       await ime.open(field);
 
       const pop = popupOf();
       expect(pop.style.maxHeight, '候補 1 行は見せる（DOCK_MIN）').toBe(`${DOCK_MIN}px`);
       expect(scrollBySpy, '開いた直後に 1 回だけ寄せる').toHaveBeenCalledTimes(1);
-      // popup の下端（422 + 138 = 560）が可視域の下端（300）に入るまで寄せる
+      // popup の下端（422 + 116 = 538）が可視域の下端（300）に入るまで寄せる
       expect(scrollBySpy).toHaveBeenCalledWith(0, 422 + DOCK_MIN - 300);
       expect(pop.style.top, '寄せても位置（文書の座標）は変わらない').toBe(`${422}px`);
 
@@ -290,7 +291,7 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
   );
 
   it(
-    '畳んだときの上限は畳んだ高さ（58px）',
+    '畳んだときの上限は畳んだ高さ（36px）',
     async () => {
       useNarrow();
       stubRect(field, { top: 400, right: 376, bottom: 432, left: 16 });

@@ -42,8 +42,8 @@ Then change the module specifiers in your imports: nagarjuna becomes `@c4h/nagar
 
 ### Live demo
 
-- IME demo (`IMEManager` / `<ime-ui>`): https://code4history.dev/Nagarjuna/
-- Preview of the new IME UI planned for the next release train (its API is not public yet and may change): https://code4history.dev/Nagarjuna/naga.html
+- NagaIME (the new IME UI, `<naga-ime>`): https://code4history.dev/Nagarjuna/
+- Legacy IME demo (`IMEManager` / `<ime-ui>`, deprecated in 1.2.0): https://code4history.dev/Nagarjuna/legacy.html
 
 ### Display only (font loader)
 
@@ -70,9 +70,87 @@ element.style.fontFamily = fontLoader.getFontFamilyString({
 });
 ```
 
-### Using the IME
+### Using NagaIME (<naga-ime>)
 
-When you also need input:
+NagaIME is the IME UI for entering Hentai-kana, Siddham, Buddha names, variant forms and combined characters. It listens on the fields you attach it to and does not get in the way of ordinary input: a small 梵 button appears at the top right of the field, and `Ctrl+J` (`⌘J` on macOS) opens the popup from the keyboard.
+
+**1. From JavaScript**
+
+```javascript
+import { NagaIME } from '@c4h/nagarjuna/ime';
+
+const ime = new NagaIME({ categories: ['hentaigana', 'itaiji'] });
+ime.attach('#memo');
+```
+
+**2. Declaratively**
+
+```javascript
+import '@c4h/nagarjuna/ime'; // registers <naga-ime> (and the deprecated <ime-ui>)
+```
+
+```html
+<input id="memo" />
+<naga-ime for="memo"></naga-ime>
+```
+
+**3. Fields inside a shadow root**
+
+`attach()` with a string selector resolves it with `document.querySelectorAll`, so it cannot see fields inside a shadow root. Pass the Element instead, or put a `<naga-ime for>` element inside the same shadow root (the `for` lookup uses that root).
+
+```javascript
+const host = document.querySelector('my-card');
+const field = host.shadowRoot.querySelector('input');
+ime.attach(field);
+```
+
+**4. API**
+
+Attributes map to properties one to one (`<attribute>` → `<property>`); the defaults below apply when neither is set.
+
+| Attribute | Property | Type | Default |
+|---|---|---|---|
+| `for` | `htmlFor` | space-separated ids | `''` |
+| `categories` | `categories` | `NagaCategoryId[]` (space-separated in the attribute) | all categories |
+| `trigger-label` | `triggerLabel` | `string` | `'梵'` |
+| `shortcut` | `shortcut` | `boolean` | `true` |
+| `recent-storage-key` | `recentStorageKey` | `string \| null` | `'nagarjuna-naga-recents'` |
+| `recent-max` | `recentMax` | integer ≥ 0 | `14` |
+| `max-candidates` | `maxCandidates` | integer ≥ 1 | `60` |
+| `dock-breakpoint` | `dockBreakpoint` | number (CSS px) | `560` |
+| `load-fonts` | `loadFonts` | `boolean` | `true` |
+
+| Method | What it does |
+|---|---|
+| `new NagaIME(options?)` | Creates the element. When it is not connected, `attach()` appends it to `document.body`. |
+| `attach(target)` | Attaches to a selector string, an Element, or a list of them. Elements other than `input` / `textarea` are ignored. |
+| `detach(target?)` | Detaches from the given target (all targets when omitted). |
+| `destroy()` | Detaches everything, releases the DOM and the listeners, and removes the element. |
+| `open(field)` | Opens the popup for a field that is attached. |
+| `close({ refocus })` | Closes the popup (`refocus: true` returns focus to the field). |
+| `isOpen` | Whether the popup is open (read-only). |
+
+| Event | `detail` |
+|---|---|
+| `nagaOpen` | `{ field }` |
+| `nagaClose` | `{ field }` |
+| `nagaCommit` | `{ field, candidate }` — fired after the candidate was inserted and the field's `input` event was dispatched |
+
+The events are `CustomEvent`s with `bubbles: true`. To follow what the user typed, listen to the field's own `input` event (or to `nagaCommit` when you only need the picked candidate).
+
+The public types are `NagaIMEOptions`, `NagaCandidate`, `NagaCategoryId` and `NagaIMEEventMap`; `NagaIME` and those types are exported from `@c4h/nagarjuna/ime`.
+
+**5. Notes**
+
+- The trigger button, the popup and the caret mark are placed in document coordinates (`position: absolute`), so they scroll together with the page. If `<naga-ime>` itself is placed inside a `position: fixed` ancestor, they do not follow page scrolling.
+- `new NagaIME()` appends the element to `document.body` when it is not connected yet.
+- If two copies of the package are loaded, `<naga-ime>` belongs to the copy that registered first; `new NagaIME()` throws a `TypeError` in that state (check it with `customElements.get('naga-ime') === NagaIME`).
+- Assigning `htmlFor` does not change the `for` attribute (unlike `<label>`).
+- Recently used characters are kept in `localStorage` under `nagarjuna-naga-recents`; `recent-max="0"` turns the "recent" tab off and stops reading and writing it.
+
+### Legacy IME (IMEManager / <ime-ui>) — deprecated
+
+`IMEManager`, `IIMEManager`, `IMEOptions`, `IMEAttachOptions` and `<ime-ui>` are deprecated in 1.2.0, kept in 2.0.0 and will be removed in 3.0.0. Use `NagaIME` (`<naga-ime>`) for new code. A single `console.warn` is printed on the first `IMEManager.getInstance()` and when an `<ime-ui>` element is connected.
 
 ```javascript
 import { IMEManager } from '@c4h/nagarjuna/ime';
@@ -103,6 +181,18 @@ manager.updateOptions({
   }
 });
 ```
+
+### Migrating from IMEManager
+
+| `IMEManager` / `<ime-ui>` | `NagaIME` (`<naga-ime>`) |
+|---|---|
+| `enabledTypes.hentaigana` / `.siddham` / `.itaiji` | the same ids in `categories` (`['hentaigana', 'siddham', 'itaiji']`) |
+| `enabledTypes.buddha_name` | the category id `buddha` |
+| `onChange(value)` | the field's `input` event, or the `nagaCommit` event |
+| `updateOptions({ enabledTypes })` | assign `categories` |
+| `position: 'bottom' \| 'cursor'` | none — NagaIME places the popup by itself |
+
+The two IMEs do not behave the same way: NagaIME does not sit permanently in the page (it is opened explicitly with the 梵 button or `Ctrl+J`), and it supports entering several candidates in a row.
 
 ## License
 

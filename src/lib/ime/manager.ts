@@ -2,9 +2,13 @@ import { IMEOptions, IMEAttachOptions, IIMEManager } from './types';
 import { IMEUIElement } from './ui-elements';
 import { FontLoader } from '../fonts/loader';
 import './ui';  // Web Componentの登録
+import { warnLegacyIMEOnce } from './legacy-warning';
 
 /**
  * 1 要素に `<ime-ui>` パネルを取り付ける singleton の IME マネージャー。
+ *
+ * @deprecated 1.2.0 で非推奨。2.0.0 では維持し、3.0.0 で削除予定。代わりに `NagaIME`（`<naga-ime>`）を使用してください。
+ * Deprecated since 1.2.0. Kept in 2.0.0 and scheduled for removal in 3.0.0. Use `NagaIME` (`<naga-ime>`) instead.
  */
 export class IMEManager implements IIMEManager {
   private static instance: IMEManager;
@@ -13,13 +17,22 @@ export class IMEManager implements IIMEManager {
   
   private constructor() {}  // private constructor for singleton
 
+  /**
+   * @deprecated 1.2.0 で非推奨。2.0.0 では維持し、3.0.0 で削除予定。代わりに `NagaIME`（`<naga-ime>`）を使用してください。
+   * Deprecated since 1.2.0. Kept in 2.0.0 and scheduled for removal in 3.0.0. Use `NagaIME` (`<naga-ime>`) instead.
+   */
   public static getInstance(): IMEManager {
+    warnLegacyIMEOnce();
     if (!IMEManager.instance) {
       IMEManager.instance = new IMEManager();
     }
     return IMEManager.instance;
   }
 
+  /**
+   * @deprecated 1.2.0 で非推奨。2.0.0 では維持し、3.0.0 で削除予定。代わりに `NagaIME`（`<naga-ime>`）を使用してください。
+   * Deprecated since 1.2.0. Kept in 2.0.0 and scheduled for removal in 3.0.0. Use `NagaIME` (`<naga-ime>`) instead.
+   */
   public static resetInstance(): void {  // インスタンスをリセットするメソッドを追加
     if (IMEManager.instance) {
       IMEManager.instance.detach();
@@ -27,6 +40,10 @@ export class IMEManager implements IIMEManager {
     IMEManager.instance = new IMEManager();
   }
 
+  /**
+   * @deprecated 1.2.0 で非推奨。2.0.0 では維持し、3.0.0 で削除予定。代わりに `NagaIME`（`<naga-ime>`）を使用してください。
+   * Deprecated since 1.2.0. Kept in 2.0.0 and scheduled for removal in 3.0.0. Use `NagaIME` (`<naga-ime>`) instead.
+   */
   attach(element: HTMLInputElement | HTMLTextAreaElement, options: IMEAttachOptions = {}) {
     // 既存のIME UIがあれば削除
     this.detach();
@@ -90,6 +107,10 @@ export class IMEManager implements IIMEManager {
     };
   }
   
+  /**
+   * @deprecated 1.2.0 で非推奨。2.0.0 では維持し、3.0.0 で削除予定。代わりに `NagaIME`（`<naga-ime>`）を使用してください。
+   * Deprecated since 1.2.0. Kept in 2.0.0 and scheduled for removal in 3.0.0. Use `NagaIME` (`<naga-ime>`) instead.
+   */
   detach() {
     if (this.eventCleanup) {
       this.eventCleanup();
@@ -101,6 +122,10 @@ export class IMEManager implements IIMEManager {
     }
   }
   
+  /**
+   * @deprecated 1.2.0 で非推奨。2.0.0 では維持し、3.0.0 で削除予定。代わりに `NagaIME`（`<naga-ime>`）を使用してください。
+   * Deprecated since 1.2.0. Kept in 2.0.0 and scheduled for removal in 3.0.0. Use `NagaIME` (`<naga-ime>`) instead.
+   */
   updateOptions(options: IMEOptions) {
     if (this.activeElement) {
       // オプションを完全に置き換える（マージではなく）

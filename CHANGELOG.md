@@ -9,6 +9,16 @@ Notable changes to this project are documented here. This project follows [Seman
 
 - **パッケージ名の変更 / Package name change**: `nagarjuna` から `@c4h/nagarjuna` へ変更しました。インストールは `pnpm add @c4h/nagarjuna` に書き換えてください。API は同じです（import するパッケージ名だけが変わります）。 / The package name changed from `nagarjuna` to `@c4h/nagarjuna`. Install it with `pnpm add @c4h/nagarjuna`; the API is unchanged (only the package name in imports changes).
 
+### 追加 / Added
+
+- `@c4h/nagarjuna/ime` に `NagaIME`（custom element `<naga-ime>`・Shadow DOM）を追加しました。読みを打って候補から選ぶ新しい IME UI で、`IMEManager` / `<ime-ui>` の代わりに使います。 / Added `NagaIME` (custom element `<naga-ime>`, Shadow DOM) to `@c4h/nagarjuna/ime`: the new IME UI that replaces `IMEManager` / `<ime-ui>`.
+- 型 `NagaIMEOptions`・`NagaCandidate`・`NagaCategoryId`・`NagaIMEEventMap` を追加しました。 / Added the types `NagaIMEOptions`, `NagaCandidate`, `NagaCategoryId` and `NagaIMEEventMap`.
+- デモのトップを NagaIME にし、旧デモを `legacy.html` に移しました。旧 URL の `naga.html` はトップへ転送します。 / The top page of the demo is now the NagaIME demo; the old demo moved to `legacy.html`, and the old URL `naga.html` redirects to the top.
+
+### 非推奨 / Deprecated
+
+- `IMEManager`・`IIMEManager`・`IMEOptions`・`IMEAttachOptions`・`<ime-ui>` を非推奨にしました。2.0.0 では維持し、3.0.0 で削除する予定です。代わりに `NagaIME`（`<naga-ime>`）を使用してください。`IMEManager.getInstance()` の初回と `<ime-ui>` の接続時に `console.warn` で 1 回だけ警告します。 / Deprecated `IMEManager`, `IIMEManager`, `IMEOptions`, `IMEAttachOptions` and `<ime-ui>`. They are kept in 2.0.0 and will be removed in 3.0.0; use `NagaIME` (`<naga-ime>`) instead. A single `console.warn` is printed on the first `IMEManager.getInstance()` and when an `<ime-ui>` element is connected.
+
 ## [1.1.0] - 2026-10-05
 
 1.1.0-rc.3 と同じ内容の正式版です（版番号のみ変更）。変更点は 1.1.0-rc.3 までの各項を参照してください。

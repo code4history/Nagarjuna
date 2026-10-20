@@ -79,10 +79,10 @@ push(
 );
 
 // (c) ./ime subpath — 解決＋静的照合（設計 v1.2 §6.6。実 import はしない）。
-// ./ime は読み込み時に window.customElements.define('ime-ui', …) を実行する
+// ./ime は読み込み時に window.customElements へ 'ime-ui' と 'naga-ime' を登録する
 // ブラウザ専用モジュールであり、Node で読むと必ず落ちる。設計 §6.3 の実測により
 // Node で読む正当な用途は 0 件である ∴ 上位契約と m1-t5 §6.3 の字句どおり
-// 「解決できること」＋「配布物が IMEManager を export すること」を検査する。
+// 「解決できること」＋「配布物が IMEManager と NagaIME を export すること」を検査する。
 
 // S5c-1: types / import / require の指し先が実在する（現行の判定をそのまま残す）
 let imeEntry = {};
@@ -143,11 +143,11 @@ try {
   push("S5c 配布物が IMEManager を export する（.d.ts / ESM / CJS の静的照合）", false, error.message);
 }
 
-// S5c-4: 配布物が NagaIME を export しないことを S5c-3 と同じ手法で静的に照合する。
-// 1.1.0 では NagaIME を公開 API に含めない（次トレインで公開予定の新 IME UI のプレビュー。
-// デモ naga.html だけがソースを直接使う。人間の決定 2026-10-01・案 A）。
-// 否定形の検査は「対象が空でも通る」空虚化の経路を持つ ∴ 同じ 3 ファイルで IMEManager が
-// export されていること（S5c-3 と同じ照合）も同時に要求し、detail に両方を出す。
+// S5c-4: 配布物が NagaIME を export することを S5c-3 と同じ手法で静的に照合する。
+// 1.2.0 で NagaIME を公開 API に含めた（旧 IME の非推奨化〔1.2.0 で非推奨・3.0.0 で削除予定〕
+// の代替が NagaIME である ∴ 配布物が NagaIME を出していることが前提になる）。
+// 同じ 3 ファイルで IMEManager が export されていること（S5c-3 と同じ照合）も同時に要求し、
+// 旧 API が消えていないことと新しい API が出ていることを 1 項目で確かめる。detail に両方を出す。
 // label は "S5c-4 " で始め、判定側が前方一致で本項目だけを拾えるようにする。
 try {
   const dtsText = fs.readFileSync(path.join(pkgDir, "dist", "ime.d.ts"), "utf8");
@@ -165,16 +165,45 @@ try {
     dtsText.includes("IMEManager") &&
     esmClause.includes("IMEManager") &&
     (cjsText.includes("exports.IMEManager=") || cjsText.includes("exports.IMEManager ="));
-  const dtsNaga = dtsText.includes("Naga");
-  const esmNaga = esmClause.includes("Naga");
-  const cjsNaga = cjsText.includes("exports.Naga");
+  const dtsNaga = dtsText.includes("NagaIME");
+  const esmNaga = esmClause.includes("NagaIME");
+  const cjsNaga = cjsText.includes("exports.NagaIME=") || cjsText.includes("exports.NagaIME =");
   push(
-    "S5c-4 配布物が NagaIME を export しない（.d.ts / ESM / CJS の静的照合）",
-    hasManager && !dtsNaga && !esmNaga && !cjsNaga,
+    "S5c-4 配布物が NagaIME を export する（.d.ts / ESM / CJS の静的照合）",
+    hasManager && dtsNaga && esmNaga && cjsNaga,
     "IMEManager=" + hasManager + " dtsNaga=" + dtsNaga + " esmNaga=" + esmNaga + " cjsNaga=" + cjsNaga,
   );
 } catch (error) {
-  push("S5c-4 配布物が NagaIME を export しない（.d.ts / ESM / CJS の静的照合）", false, error.message);
+  push("S5c-4 配布物が NagaIME を export する（.d.ts / ESM / CJS の静的照合）", false, error.message);
+}
+
+// S5c-5: 配布物の .d.ts が HTMLElementTagNameMap に 'naga-ime' を持つこと。
+// <naga-ime> を文書に書いた利用者の型（document.querySelector('naga-ime')）が効く条件である。
+// dts プラグインは exclude した実装ファイルを出さない ∴ ここが緑なら型生成の除外も外れている。
+// 「該当が 0 件でも通る」空虚化を避けるため、detail に該当ファイルと .d.ts の総数を出す（S5d と同じ考え方）。
+try {
+  const distDir = path.join(pkgDir, "dist");
+  const dtsFiles = [];
+  const walkDts = (dir) => {
+    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, item.name);
+      if (item.isDirectory()) walkDts(full);
+      else if (item.name.endsWith(".d.ts")) dtsFiles.push(full);
+    }
+  };
+  walkDts(distDir);
+  const declared = dtsFiles.filter((file) => {
+    const text = fs.readFileSync(file, "utf8");
+    return text.includes("HTMLElementTagNameMap") && (text.includes("'naga-ime'") || text.includes('"naga-ime"'));
+  });
+  const relatives = declared.map((file) => path.relative(pkgDir, file).split(path.sep).join("/")).sort();
+  push(
+    "S5c-5 配布物の .d.ts が HTMLElementTagNameMap に 'naga-ime' を持つ",
+    declared.length > 0,
+    "該当 " + relatives.join(",") + " / .d.ts 総数 " + dtsFiles.length,
+  );
+} catch (error) {
+  push("S5c-5 配布物の .d.ts が HTMLElementTagNameMap に 'naga-ime' を持つ", false, error.message);
 }
 
 // (d) 恒久ガード: 配布物に Pages 専用資産 / テスト由来 .d.ts / dist/src の入れ子が無いこと。

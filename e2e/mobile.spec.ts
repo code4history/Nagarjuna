@@ -299,7 +299,8 @@ test.describe('375×320 デバッグ表示', () => {
   test.use({ viewport: { width: 375, height: 320 } });
 
   test('M-5: デバッグ表示は流れの中にあり、popup・起動ボタン・欄の中心を覆わない', async ({ page }) => {
-    await page.goto('/naga.html?debugViewport=1');
+    // nov26-m3-t4: NagaIME のデモはトップ（/）へ移った。転送（naga.html）に頼らず直接開く
+    await page.goto('/?debugViewport=1');
     await page.waitForSelector('#naga-debug-viewport', { state: 'attached' });
     const style = await page.evaluate(() => {
       const cs = getComputedStyle(document.getElementById('naga-debug-viewport')!);

@@ -29,11 +29,11 @@ export default defineConfig({
         emptyOutDir: true,
         rollupOptions: {
           input: {
-            // トップ: 正式な IME（IMEManager / <ime-ui>）の demo（src/demo.ts）。
-            // root に追跡ファイルとして置く（public/ だと変換されない。かつての deploy 時コピーは廃止）
+            // トップ: NagaIME のデモ（src/naga-demo.ts）。root に追跡ファイルとして置く
+            // （public/ だと変換されない。かつての deploy 時コピーは廃止）
             main: resolve(__dirname, 'index.html'),
-            // 次トレインで公開予定の新 IME UI（NagaIME）のプレビュー（src/naga-demo.ts。API は非公開）
-            naga: resolve(__dirname, 'naga.html')
+            // 1.2.0 で非推奨の IMEManager / <ime-ui> のデモ（src/demo.ts）
+            legacy: resolve(__dirname, 'legacy.html')
           },
           output: {
             entryFileNames: 'assets/[name].[hash].js',
@@ -46,19 +46,12 @@ export default defineConfig({
   // リポジトリルートになる ∴ 型定義が dist/src/ へ出て package.json の types と食い違う。
   // 生成対象を src に限ることで dist/index.d.ts / dist/ime.d.ts が正しい位置に出る。
   //
-  // NagaIME（次トレインで公開予定の新 IME UI のプレビュー）は 1.1.0 の公開 API に含めない
-  // （src/ime.ts から export しない）。どのエントリからも到達しない NagaIME 本体の型定義が
-  // 配布物に紛れ込まないよう、その実装ファイルとデモの入口を型生成の対象から外す。
-  // （naga-types.ts は生成辞書の型 internal-types.ts が参照するので対象に残す）
+  // NagaIME は 1.2.0 で公開した（src/ime.ts から export する）。デモの入口だけを型生成から外す
+  // （src/naga-demo.ts は配布物の一部ではない。実装ファイルは型生成の対象に戻す）
   plugins: [
     dts({
       include: ['src'],
-      exclude: [
-        'src/lib/ime/naga-ime.ts',
-        'src/lib/ime/naga-styles.ts',
-        'src/lib/ime/naga-dictionary.ts',
-        'src/naga-demo.ts'
-      ]
+      exclude: ['src/naga-demo.ts']
     })
   ],
   json: {

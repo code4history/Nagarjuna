@@ -1,9 +1,8 @@
 /**
- * NagaIME 専用の型（次トレインで公開予定の新 IME UI のプレビュー）。
+ * NagaIME の公開の型（`@c4h/nagarjuna/ime` から export する。1.2.0 で公開）。
  *
- * 1.1.0 では NagaIME を公開 API に含めない（`@c4h/nagarjuna/ime` から export しない）。
- * 公開型の置き場である types.ts（dist/lib/ime/types.d.ts → dist/ime.d.ts から到達する）に
- * 置かないことで、配布物の公開型から NagaIME の型が見えないようにしている。
+ * 旧 IME（`IMEManager` 系）の公開型の置き場である types.ts とは分けて、NagaIME の型をここに置く。
+ * 分けた位置は変えない（1.2.0 の公開は src/ime.ts からの再 export で行う）。
  */
 
 /**

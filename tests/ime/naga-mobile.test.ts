@@ -754,14 +754,14 @@ describe('NagaIME popup を開いたまま欄へ Focus を戻したら閉じる�
   );
 
   it(
-    'touchstart・mousedown（タップの経路）でも閉じる',
+    'touchstart・pointerdown・mousedown だけでは閉じない（欄の上から始めたスクロールで閉じない・0438 MAJOR-1）',
     async () => {
-      for (const type of ['touchstart', 'mousedown']) {
-        await openOn();
+      await openOn();
+      for (const type of ['touchstart', 'pointerdown', 'mousedown']) {
         field.dispatchEvent(new Event(type, { bubbles: true }));
-        expect(ime.isOpen, type).toBe(false);
-        ime.close();
+        expect(ime.isOpen, type).toBe(true);
       }
+      ime.close();
     },
     DICTIONARY_TEST_TIMEOUT_MS,
   );

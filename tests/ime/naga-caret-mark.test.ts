@@ -208,10 +208,10 @@ describe('NagaIME 挿入位置の縦棒（0437）', () => {
       expect(ime.isOpen).toBe(false);
       expect(caretMark().hidden, 'Escape で隠れる').toBe(true);
 
-      // 欄のタップ（pointerdown）で閉じる経路
+      // 欄のタップ（欄へ focus が戻る）で閉じる経路
       await ime.open(field);
       expect(caretMark().hidden).toBe(false);
-      field.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }));
+      field.focus();
       expect(ime.isOpen).toBe(false);
       expect(caretMark().hidden, '欄のタップで隠れる').toBe(true);
 

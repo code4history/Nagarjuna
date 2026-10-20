@@ -957,12 +957,10 @@ export class NagaIME extends HTMLElement {
       if (this.openState && !this.selfFocus) this.close();
       this.showTrigger(field);
     };
-    // 【0436】欄を直接触ったら popup を閉じる。ポインタの操作は利用者のものだけ ∴ 自前の focus と
-    // 区別する印は要らない。閉じたあとは欄が focus のまま、梵ボタンは欄の右上に残る。
-    // （refocus はしない。利用者はもうその欄を触っているので、focus を奪い返す必要が無い）
-    const onFieldPointer = () => {
-      if (this.openState) this.close();
-    };
+    // 【NOV26-IR-NAGA-REFOCUS-CARET-0438 MAJOR-1】欄の pointerdown／touchstart／mousedown では閉じない。
+    // iOS では欄の上から指でページをスクロールし始めただけでも touchstart が来て popup が閉じてしまう。
+    // 開いている間は「読み」欄が focus を持つので、欄をタップ／クリック／Tab で戻れば必ず focus が起き、
+    // 上の onFocus だけで「欄へ戻ったら閉じる」が成り立つ。
     const onBlur = () => {
       // setTimeout を挟むと focus による付け替えと競合するため、同期的に activeElement で判定する。
       // 影の中の欄・自分の影の中の trigger を見分けるため、影を辿った最も深い要素で判定する
@@ -986,9 +984,6 @@ export class NagaIME extends HTMLElement {
     el.addEventListener('focus', onFocus);
     el.addEventListener('blur', onBlur);
     el.addEventListener('keydown', onKeydown);
-    el.addEventListener('pointerdown', onFieldPointer);
-    el.addEventListener('touchstart', onFieldPointer, { passive: true });
-    el.addEventListener('mousedown', onFieldPointer);
     this.fields.set(field, {
       appliedFontFamily,
       addedClass,
@@ -998,9 +993,6 @@ export class NagaIME extends HTMLElement {
         el.removeEventListener('focus', onFocus);
         el.removeEventListener('blur', onBlur);
         el.removeEventListener('keydown', onKeydown);
-        el.removeEventListener('pointerdown', onFieldPointer);
-        el.removeEventListener('touchstart', onFieldPointer);
-        el.removeEventListener('mousedown', onFieldPointer);
       },
     });
     if (deepActiveElement() === field) this.showTrigger(field);

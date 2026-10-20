@@ -146,3 +146,77 @@ test('P-8: PC の読み欄は popup の枠の内側から左右 8px・タイト�
   expect(Math.abs(m.search.top - m.titlebar.bottom - 8)).toBeLessThanOrEqual(0.5);
   expect(Math.abs(m.list.top - m.search.bottom - 8)).toBeLessThanOrEqual(0.5);
 });
+
+/**
+ * 【NOV26-IM-NAGA-CARET-MARK-0437】PC でも挿入位置の縦棒（.naga-caret-mark）を出す。
+ *
+ * 写し（.naga-copy）は広幅・狭幅とも撤去した。popup を開くと focus が読み欄へ移り、元の欄の
+ * キャレットが見えなくなる ∴ 元の欄の挿入位置に縦棒を出す（狭幅と同じ扱い）。
+ * - textarea（#f2）の 2 行目にキャレットを置いて Control+j で開くと、縦棒がその行に重なる
+ * - 確定で縦棒が右へ進む
+ * - Escape で消える
+ * - ページをスクロールしても欄との相対位置が一定
+ */
+test('P-9: textarea の 2 行目に縦棒が出て、確定で右へ進み、Escape で消える（0437）', async ({ page }) => {
+  /** #f2 の組版（f-clean.html の CSS で宣言している値）。 */
+  const F2 = { border: 1, paddingTop: 4, lineHeight: 22 } as const;
+
+  const settle = async (): Promise<void> => {
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))));
+  };
+  const caretMark = async () => {
+    const info = await partInfo(page, '.naga-caret-mark');
+    return info && info.shown ? info.rect : null;
+  };
+
+  await page.evaluate(() => {
+    const f2 = document.getElementById('f2') as HTMLTextAreaElement;
+    f2.value = 'いち\nに';
+    f2.scrollTop = 0;
+    f2.focus();
+    const at = f2.value.split('\n').slice(0, 2).join('\n').length; // 2 行目の末尾
+    f2.setSelectionRange(at, at);
+  });
+  await waitShown(page, PART.trigger);
+  await openWithShortcut(page);
+  await settle();
+
+  // 縦棒は 2 行目に重なる（measureCaret の y は行の箱の内側なので ±4px を許す）
+  const f2 = await fieldRect(page, 'f2');
+  const lineTop = f2.top + F2.border + F2.paddingTop + F2.lineHeight;
+  const lineBottom = lineTop + F2.lineHeight;
+  const mark1 = await caretMark();
+  expect(mark1, '[measure:P-9] 縦棒が見えている').not.toBeNull();
+  expect(mark1!.top, '[measure:P-9] 縦棒の上端は 2 行目の上端').toBeGreaterThanOrEqual(lineTop - 4);
+  expect(mark1!.bottom, '[measure:P-9] 縦棒の下端は 2 行目の下端').toBeLessThanOrEqual(lineBottom + 4);
+  expect(Math.abs(mark1!.height - F2.lineHeight), '[measure:P-9] 高さは行の高さ').toBeLessThanOrEqual(1);
+  expect(Math.abs(mark1!.width - 2), '[measure:P-9] 幅は 2px').toBeLessThanOrEqual(0.5);
+  expect(mark1!.left, '[measure:P-9] 横は欄の中').toBeGreaterThan(f2.left);
+  expect(mark1!.left, '[measure:P-9] 横は欄の中').toBeLessThan(f2.right);
+
+  // ページをスクロールしても欄との相対位置は一定
+  const before = { top: mark1!.top - f2.top, left: mark1!.left - f2.left };
+  await page.evaluate(() => window.scrollBy(0, 120));
+  await settle();
+  const f2After = await fieldRect(page, 'f2');
+  const markAfterScroll = (await caretMark())!;
+  expect(f2After.top, '前提: スクロールで欄が動いた').toBeLessThan(f2.top);
+  expect(Math.abs(markAfterScroll.top - f2After.top - before.top), '[measure:P-9] 縦の差が一定').toBeLessThanOrEqual(1);
+  expect(Math.abs(markAfterScroll.left - f2After.left - before.left), '[measure:P-9] 横の差が一定').toBeLessThanOrEqual(1);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await settle();
+
+  // 確定すると縦棒も右へ進む
+  const beforeCommit = (await caretMark())!;
+  await page.keyboard.press('1');
+  await settle();
+  const afterCommit = await caretMark();
+  expect(afterCommit, '[measure:P-9] 確定後も縦棒は出たまま').not.toBeNull();
+  expect(afterCommit!.left, '[measure:P-9] 縦棒は右へ進む').toBeGreaterThan(beforeCommit.left + 1);
+
+  // Escape で閉じると消える
+  await page.keyboard.press('Escape');
+  await expect.poll(() => nagaIsOpen(page), { message: '[measure:P-9] Escape で閉じる' }).toBe(false);
+  expect(await isShown(page, '.naga-caret-mark'), '[measure:P-9] Escape で縦棒も消える').toBe(false);
+});
+

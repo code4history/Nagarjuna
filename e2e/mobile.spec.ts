@@ -15,7 +15,9 @@ import { PART, gotoFixture, nagaIsOpen, waitShown } from './helpers';
 // 高さの上限も欄の高さに縮んだ ∴ 狭幅もキャレットの行のすぐ下に置き、上限は「popup の上端から可視域の
 // 下端まで」で決める。可視域に DOCK_MIN（116px）が残らないときだけ、開いた直後に 1 回だけページを寄せる。
 // 【NOV26-IM-NAGA-POPUP-REFOCUS-0436】文脈の表示（写しの行 22px）は狭幅では出さない ∴ 固定部分は 72px
-// （候補 3 行上限 204・候補 1 行下限 116・畳み 36）。M-2 は「写しの行が見えないこと」も測る。
+// （候補 3 行上限 204・候補 1 行下限 116・畳み 36）。
+// 【NOV26-IM-NAGA-CARET-MARK-0437】写しは広幅・狭幅とも撤去した。M-2 は「写しの要素が無く、
+// 代わりに挿入位置の縦棒（.naga-caret-mark）が出ること」を測る。
 // ここ（M-*）は、キャレットの行のすぐ下に付いた popup の寸法・畳み・操作でスクロールしないことを測る。
 
 const HEIGHTS = [188, 216, 320] as const;
@@ -213,10 +215,12 @@ for (const h of HEIGHTS) {
       expect(pop.top, '[measure:M-2] popup は欄の下端より上').toBeLessThan(field.bottom);
       expect(pop.left, '[measure:M-2] popup の左端は可視域の左端').toBeGreaterThanOrEqual(-TOL);
       expect(pop.right, '[measure:M-2] popup の右端は可視域の右端').toBeLessThanOrEqual(vp.innerWidth + TOL);
-      // 【0436】文脈の表示（.naga-copy）は狭幅では出さない（実機の「狭いのに場所を取る」への対応）
+      // 【0437】写し（.naga-copy）は撤去した ∴ 要素は無い。代わりに挿入位置の縦棒が出る
       const copy = await partRect(page, '.naga-copy');
-      expect(copy, '[measure:M-2] 文脈の表示の要素は DOM にある（広幅の組み立てを壊していない）').not.toBeNull();
-      expect(copy!.height, '[measure:M-2] 文脈の表示は狭幅で出さない').toBe(0);
+      expect(copy, '[measure:M-2] 写しの要素は無い').toBeNull();
+      const mark = await partRect(page, '.naga-caret-mark');
+      expect(mark, '[measure:M-2] 挿入位置の縦棒がある').not.toBeNull();
+      expect(mark!.height, '[measure:M-2] 縦棒の高さは行の高さ').toBeGreaterThan(0);
       for (const sel of ['.naga-tab.naga-is-active', '.naga-search']) {
         const r = await partRect(page, sel);
         expect(r, `[measure:M-2] ${sel} がある`).not.toBeNull();

@@ -7,14 +7,14 @@
  * 「仕組み」（style へ書かれる値・class・textContent・hidden・focus の引数）である。実の矩形は e2e の M-1〜M-5 が見る。
  *
  * 割り付け（nov26-m3-t3 タスク設計 §3.1・0432 で高さの式だけ変更・0434 で位置と式を変更・
- * 0436 で写しの行 22px を外した）:
+ * 0436 で写しの行 22px を外した・0437 で写しそのものを撤去した）:
  * タイトル行 34 ＋ 読み欄 36 ＋ 枠 2 ＝ 固定部分 72、候補 1 行 44、上限 3 行。
  * キーボード上端（可視域の下端）との間 8。
  *   room     = (vv.offsetTop + vv.height) − popup の上端（viewport） − 8
  *   popupMax = min(204, room)。116（固定部分＋候補 1 行）未満なら 116（開いた直後に 1 回だけページを寄せる）
  * 畳んだ高さは 36（タイトル行＋枠）。
- * 【0436】狭幅では文脈の表示（.naga-copy。欄の中身を ↵ で 1 行に詰めた写し）を出さない ∴ 高さにも入れない。
  * 位置は 0434 から文書の座標でキャレットの行のすぐ下（キャレットを測れない欄では欄のすぐ下）。
+ * 【0437】挿入位置の縦棒（.naga-caret-mark）の単体テストは tests/ime/naga-caret-mark.test.ts にある。
  * tests/ime/naga-popup-position.test.ts がキャレットの計測を含む置き場所を、ここは高さの上限と
  * dock かどうかの見た目を測る。
  */
@@ -80,10 +80,6 @@ function tabTextsOf(): string[] {
 
 function itemsOf(): HTMLElement[] {
   return Array.from(popupOf().querySelectorAll('.naga-item')) as HTMLElement[];
-}
-
-function copyText(): string {
-  return part('.naga-copy').textContent ?? '';
 }
 
 /** 欄の getBoundingClientRect を決め打ちにする（jsdom の矩形はすべて 0 のため。0432）。 */
@@ -476,175 +472,6 @@ describe('NagaIME モバイル dock（AC10）', () => {
   );
 });
 
-/**
- * 挿入先の写し（§3.2・t3/AC2）。【0436】狭幅（docked）では出さない（組まない）ことにした ∴
- * ここは広幅（PC）で組み立てる（写しの計算そのものの回帰。狭幅に出ないことは下の describe が見る）。
- */
-describe('NagaIME 挿入先の写し（§3.2・t3/AC2）', () => {
-  let field: HTMLInputElement;
-
-  beforeEach(() => {
-    localStorage.clear();
-    field = document.createElement('input');
-    field.type = 'text';
-    document.body.append(field);
-    ime = new NagaIME({ loadFonts: false });
-    stubViewport({ width: 1024, height: 768, offsetTop: 0, innerHeight: 768 });
-  });
-
-  afterEach(() => {
-    ime.destroy();
-    field.remove();
-    restoreViewport();
-    vi.restoreAllMocks();
-  });
-
-  async function openWith(value: string, caret = value.length, target: HTMLInputElement | HTMLTextAreaElement = field) {
-    target.value = value;
-    ime.attach(target);
-    target.setSelectionRange(caret, caret);
-    await ime.open(target);
-  }
-
-  it(
-    '写しの行は aria-live="polite" で、キャレットの直前の文字と印 ▏ を出す',
-    async () => {
-      await openWith('あいう');
-      const copy = part('.naga-copy');
-      expect(copy.getAttribute('aria-live')).toBe('polite');
-      expect(copyText()).toBe('あいう▏');
-      expect(copy.querySelector('.naga-copy-new')).toBeNull();
-    },
-    DICTIONARY_TEST_TIMEOUT_MS,
-  );
-
-  it(
-    'キャレットの位置まで（後ろは写さない）',
-    async () => {
-      await openWith('あいうえお', 2);
-      expect(copyText()).toBe('あい▏');
-    },
-    DICTIONARY_TEST_TIMEOUT_MS,
-  );
-
-  it(
-    '12 文字を超えると先頭に … を付け、直前の 12 文字だけ',
-    async () => {
-      await openWith('abcdefghijklmnop');
-      expect(copyText()).toBe('…efghijklmnop▏');
-      await ime.close();
-      await openWith('abcdefghijkl');
-      expect(copyText()).toBe('abcdefghijkl▏');
-    },
-    DICTIONARY_TEST_TIMEOUT_MS,
-  );
-
-  it(
-    'サロゲートペアを分けずに 12 文字を数える',
-    async () => {
-      await openWith('𠮷'.repeat(13));
-      expect(copyText()).toBe(`…${'𠮷'.repeat(12)}▏`);
-    },
-    DICTIONARY_TEST_TIMEOUT_MS,
-  );
-
-  it(
-    'textarea の改行は ↵ で見せる（§1 の 6）',
-    async () => {
-      const ta = document.createElement('textarea');
-      document.body.append(ta);
-      try {
-        await openWith('一行目\n二行目', undefined, ta);
-        expect(copyText()).toBe('一行目↵二行目▏');
-      } finally {
-        ta.remove();
-      }
-    },
-    DICTIONARY_TEST_TIMEOUT_MS,
-  );
-
-  it(
-    '欄が空・キャレットが先頭なら（先頭）',
-    async () => {
-      await openWith('');
-      expect(copyText()).toBe('（先頭）');
-      await ime.close();
-      await openWith('あいう', 0);
-      expect(copyText()).toBe('（先頭）');
-    },
-    DICTIONARY_TEST_TIMEOUT_MS,
-  );
-
-  it(
-    'type="password" の欄は中身を写さない（非表示）',
-    async () => {
-      field.type = 'password';
-      await openWith('secret');
-      expect(copyText()).toBe('（非表示）');
-      expect(copyText()).not.toContain('secret');
-      itemsOf()[0].click();
-      expect(copyText()).toBe('（非表示）');
-    },
-    DICTIONARY_TEST_TIMEOUT_MS,
-  );
-
-  it(
-    '確定のたびに更新し、直前の確定で入った文字を .naga-copy-new で包む。次に開くとき・タブを替えたときは包まない',
-    async () => {
-      await openWith('あい');
-      const first = itemsOf()[0];
-      const c1 = first.dataset.char!;
-      first.click();
-      expect(copyText()).toBe(`あい${c1}▏`);
-      expect(part('.naga-copy .naga-copy-new').textContent).toBe(c1);
-
-      const second = itemsOf()[1];
-      const c2 = second.dataset.char!;
-      second.click();
-      expect(copyText()).toBe(`あい${c1}${c2}▏`);
-      expect(part('.naga-copy .naga-copy-new').textContent).toBe(c2);
-
-      (popupOf().querySelector('.naga-tab[data-category="siddham"]') as HTMLButtonElement).click();
-      expect(copyText()).toBe(`あい${c1}${c2}▏`);
-      expect(popupOf().querySelector('.naga-copy .naga-copy-new')).toBeNull();
-
-      itemsOf()[0].click();
-      expect(popupOf().querySelector('.naga-copy .naga-copy-new')).not.toBeNull();
-      ime.close();
-      field.setSelectionRange(field.value.length, field.value.length);
-      await ime.open(field);
-      expect(popupOf().querySelector('.naga-copy .naga-copy-new')).toBeNull();
-    },
-    DICTIONARY_TEST_TIMEOUT_MS,
-  );
-
-  it(
-    '写しは innerHTML を使わずに組む（t2/AC7）',
-    async () => {
-      const setter = vi.fn();
-      const desc = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML')!;
-      Object.defineProperty(Element.prototype, 'innerHTML', {
-        configurable: true,
-        get: desc.get,
-        set(this: Element, v: string) {
-          setter(v);
-          desc.set!.call(this, v);
-        },
-      });
-      try {
-        await openWith('<b>x</b>');
-        itemsOf()[0].click();
-        expect(copyText().startsWith('<b>x</b>')).toBe(true);
-        expect(part('.naga-copy').querySelector('b')).toBeNull();
-        expect(setter).not.toHaveBeenCalled();
-      } finally {
-        Object.defineProperty(Element.prototype, 'innerHTML', desc);
-      }
-    },
-    DICTIONARY_TEST_TIMEOUT_MS,
-  );
-});
-
 describe('NagaIME 折りたたみ（§3.3・t3/AC4）', () => {
   let field: HTMLInputElement;
 
@@ -764,102 +591,12 @@ describe('NagaIME 折りたたみ（§3.3・t3/AC4）', () => {
     DICTIONARY_TEST_TIMEOUT_MS,
   );
 
-  it('畳むボタンは dock のときだけ見え、文脈の表示（写し）は dock でも出さない（0436）', () => {
+  it('畳むボタンは dock のときだけ見え、文脈の表示（写し）は残っていない（0437）', () => {
     expect(NAGA_STYLE_TEXT).toMatch(/\.naga-fold\s*\{[^}]*display:\s*none/);
     expect(NAGA_STYLE_TEXT).toMatch(/\.naga-popup\.naga-is-docked\s+\.naga-fold\s*\{[^}]*display:\s*(block|flex|inline-block)/);
-    // 【0436】狭幅では写しの行を出さない ∴ base の display: none だけが残り、dock スコープに表示規則は無い
-    expect(NAGA_STYLE_TEXT).toMatch(/\.naga-copy\s*\{[^}]*display:\s*none/);
-    expect(NAGA_STYLE_TEXT).not.toMatch(/\.naga-popup\.naga-is-docked\s+\.naga-copy\s*\{/);
+    // 【0437】写し（.naga-copy）は広幅・狭幅とも撤去した ∴ CSS の規則も無い
+    expect(NAGA_STYLE_TEXT).not.toMatch(/\.naga-copy\s*\{/);
   });
-});
-
-/**
- * 【NOV26-IM-NAGA-POPUP-REFOCUS-0436】文脈の表示（.naga-copy。欄のキャレットの直前の文字を 1 行に
- * 詰めた写し）は、狭幅（docked）の popup では出さない。実機の報告「元フォームと IME の間に
- * わかりにくい文字列が表示される（改行が記号になった行）」への対応。広幅（PC）は従来どおり組む
- * （見た目は base の display: none のまま＝後退しない）。
- */
-describe('NagaIME 文脈の表示は狭幅で出さない（0436）', () => {
-  let field: HTMLInputElement;
-
-  beforeEach(() => {
-    localStorage.clear();
-    field = document.createElement('input');
-    field.type = 'text';
-    document.body.append(field);
-    ime = new NagaIME({ loadFonts: false });
-  });
-
-  afterEach(() => {
-    ime.destroy();
-    field.remove();
-    restoreViewport();
-    vi.restoreAllMocks();
-  });
-
-  it(
-    '狭幅: .naga-copy の中身を組まず、高さの計算にも入れない（固定部分は 72px）',
-    async () => {
-      stubViewport(PHONE_KEYBOARD);
-      field.value = 'def\nghi\njkl';
-      ime.attach(field);
-      await ime.open(field);
-
-      const pop = popupOf();
-      expect(pop.classList.contains('naga-is-docked')).toBe(true);
-      // 組まない（改行を ↵ にした文字列が DOM に残らない）
-      expect(part('.naga-copy').textContent).toBe('');
-      expect(part('.naga-copy').childElementCount).toBe(0);
-      // 高さの計算にも入れない: 上限は「タイトル 34 ＋ 読み欄 36 ＋ 枠 2 ＋ 候補 3 行 132」= 204
-      expect(pop.style.maxHeight).toBe(`${DOCK_MAX}px`);
-      expect(DOCK_MAX).toBe(204);
-      expect(DOCK_MIN).toBe(116);
-      expect(DOCK_FOLDED).toBe(36);
-    },
-    DICTIONARY_TEST_TIMEOUT_MS,
-  );
-
-  it(
-    '広幅（PC）は従来どおり写しを組む（狭幅のための条件分岐が PC を止めていない）',
-    async () => {
-      stubViewport({ width: 1024, height: 768, offsetTop: 0, innerHeight: 768 });
-      // 実機の報告と同じ「改行を含む欄」で確かめる（input は改行を落とす ∴ textarea を使う）
-      const ta = document.createElement('textarea');
-      document.body.append(ta);
-      try {
-        ta.value = 'def\nghi';
-        ime.attach(ta);
-        ta.setSelectionRange(ta.value.length, ta.value.length);
-        await ime.open(ta);
-
-        expect(popupOf().classList.contains('naga-is-docked')).toBe(false);
-        expect(copyText()).toBe('def↵ghi▏');
-      } finally {
-        ta.remove();
-      }
-    },
-    DICTIONARY_TEST_TIMEOUT_MS,
-  );
-
-  it(
-    'dock から PC へ変わると写しを組み、PC から dock へ変わると捨てる（状態を持ち越さない）',
-    async () => {
-      stubViewport(PHONE_KEYBOARD);
-      field.value = 'あい';
-      ime.attach(field);
-      await ime.open(field);
-      expect(copyText()).toBe('');
-
-      stubViewport({ width: 1024, height: 768, offsetTop: 0, innerHeight: 768 });
-      window.dispatchEvent(new Event('resize'));
-      expect(copyText()).toBe('あい▏');
-
-      stubViewport(PHONE_KEYBOARD);
-      window.dispatchEvent(new Event('resize'));
-      expect(copyText()).toBe('');
-    },
-    DICTIONARY_TEST_TIMEOUT_MS,
-  );
 });
 
 describe('NagaIME はページも欄もスクロールしない（M-1・MIN-1・t3/AC1。0434 の例外は 1 回だけ）', () => {

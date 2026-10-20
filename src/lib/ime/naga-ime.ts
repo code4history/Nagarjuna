@@ -70,6 +70,7 @@ const CATEGORY_IDS = new Set<string>(ALL_CATEGORIES);
  *   popupMax      = min(DOCK_POPUP_MAX_PX, room)
  *   room < DOCK_MIN_PX なら popupMax = DOCK_MIN_PX                     // 候補 1 行を優先（開いた直後に 1 回だけページを寄せる）
  * 0436: 挿入先の写しの行（22px）は狭幅では出さない ∴ 固定部分にも入れない。
+ * 0437: 写しそのものを撤去した（挿入位置は .naga-caret-mark の縦棒で示す）。
  *   畳んでいるときは min(DOCK_FOLDED_PX, popupMax)
  */
 /** タイトル行（タブ・畳むボタン・閉じるボタン）。 */
@@ -88,6 +89,7 @@ const DOCK_GAP_PX = 8;
  * 畳んでも残る固定部分 ＋ 読み欄 = 72px。
  * 【NOV26-IM-NAGA-POPUP-REFOCUS-0436】0434 までは挿入先の写しの行（22px）を足した 94px だったが、
  * 狭幅では写しを出さないことにした ∴ 高さの計算からも外す（実機の「狭いのに場所を取る」への対応）。
+ * 【0437】写しは広幅・狭幅とも撤去した ∴ どの幅でもこの値のまま。
  */
 const DOCK_FIXED_PX = DOCK_TITLE_PX + DOCK_SEARCH_PX + DOCK_BORDER_PX;
 /** 候補が 1 行まるごと見える下限 = 116px。 */
@@ -96,8 +98,6 @@ const DOCK_MIN_PX = DOCK_FIXED_PX + DOCK_ROW_PX;
 const DOCK_POPUP_MAX_PX = DOCK_FIXED_PX + DOCK_ROW_PX * DOCK_ROWS;
 /** 畳んだ高さ（タイトル行＋枠）= 36px。 */
 const DOCK_FOLDED_PX = DOCK_TITLE_PX + DOCK_BORDER_PX;
-/** 写しの行に出すキャレットの直前の文字数（狭幅では使わない。広幅の組み立てだけが使う）。 */
-const COPY_MAX_CHARS = 12;
 
 /** 属性名 → プロパティ名（大文字の前で区切り `-` でつなぐ機械変換。`for` だけは DOM の前例どおり `htmlFor`）。 */
 const ATTRIBUTE_TO_PROPERTY = {
@@ -304,8 +304,6 @@ export class NagaIME extends HTMLElement {
   private selfFocus = false;
   /** この open で「可視域に収めるための 1 回のスクロール」を済ませたか（0434。開くたびに戻す）。 */
   private dockScrollDone = false;
-  /** 直前の確定で入った文字（写しで強調する。次に開くとき・タブを替えたときに消す。§3.2） */
-  private lastCommitted: string | null = null;
   /** 初回の connectedCallback を終えたか（昇格中の attributeChangedCallback で for を引かない） */
   private initialized = false;
   private pendingForLookup: (() => void) | null = null;
@@ -316,7 +314,10 @@ export class NagaIME extends HTMLElement {
   private searchEl: HTMLInputElement | null = null;
   private listEl: HTMLDivElement | null = null;
   private searchRowEl: HTMLDivElement | null = null;
-  private copyEl: HTMLDivElement | null = null;
+  /** 挿入位置の縦棒（0437。popup を開いている間だけ見える）。 */
+  private caretMarkEl: HTMLDivElement | null = null;
+  /** 確定した文字だけを読み上げる visually-hidden の live region（0437。写しの aria-live の代替）。 */
+  private liveEl: HTMLDivElement | null = null;
   private foldEl: HTMLButtonElement | null = null;
   private globalCleanup: (() => void) | null = null;
   /** 起動ボタンの置き直しの購読を外す関数（購読していないときは null）。 */
@@ -664,7 +665,8 @@ export class NagaIME extends HTMLElement {
     this.trigger?.setAttribute('aria-expanded', 'true');
     this.searchEl.value = '';
     this.selectedIndex = 0;
-    this.lastCommitted = null;
+    // 【0437】確定文字の読み上げ（写しの aria-live の代替）を空から始める
+    if (this.liveEl) this.liveEl.textContent = '';
     if (this.recents.length) this.activeTab = 'recent';
     else if (this.activeTab === 'recent') this.activeTab = this.cfgCategories[0];
     this.renderTabs();
@@ -674,7 +676,6 @@ export class NagaIME extends HTMLElement {
     this.positionPopup();
     // 置き直しの購読を張り、レイアウトが落ち着いてから 1 回置き直す（0432）
     this.syncPopupTracking();
-    this.updateCopy();
     // NagaIME はページも欄もスクロールしない（M-1）。focus の暗黙のスクロールも止める（MIN-1）
     this.searchEl.focus({ preventScroll: true });
     this.emit('nagaOpen', { field });
@@ -686,6 +687,8 @@ export class NagaIME extends HTMLElement {
     this.openState = false;
     this.composing = false;
     if (this.popup) this.popup.hidden = true;
+    // 【0437】挿入位置の縦棒は popup と一緒に消す（Escape・×・欄のタップ・detach・teardown のすべて）
+    if (this.caretMarkEl) this.caretMarkEl.hidden = true;
     this.trigger?.setAttribute('aria-expanded', 'false');
     if (refocus && this.target) this.focusFieldSelf(this.target);
     // 置き直しの購読を外す。欄が focus のままでボタンが見えている（Escape で閉じた等）ときは、
@@ -771,11 +774,6 @@ export class NagaIME extends HTMLElement {
     foldBtn.addEventListener('click', () => this.toggleFold());
     titlebar.append(tabs, foldBtn, closeBtn);
 
-    // 挿入先の写し（dock のときだけ見える。§3.2）。欄が popup に隠れていても、どこに何が入ったか分かるように
-    const copy = document.createElement('div');
-    copy.className = 'naga-copy';
-    copy.setAttribute('aria-live', 'polite');
-
     const search = document.createElement('input');
     search.type = 'text';
     search.className = 'naga-search';
@@ -808,7 +806,18 @@ export class NagaIME extends HTMLElement {
     hint.className = 'naga-hint';
     hint.textContent = '↑↓:選択 Enter:確定（連続入力可） 1-9:直接選択 Esc:閉じる';
 
-    popup.append(titlebar, copy, searchRow, list, hint);
+    // 【0437】確定した文字だけを読み上げる（写しに付いていた aria-live の最小の代替）
+    const live = document.createElement('div');
+    live.className = 'naga-live';
+    live.setAttribute('aria-live', 'polite');
+    live.setAttribute('aria-atomic', 'true');
+
+    // 【0437】挿入位置の縦棒。popup を開いている間だけ、元の欄のキャレットの位置に出す
+    const caretMark = document.createElement('div');
+    caretMark.className = 'naga-caret-mark';
+    caretMark.hidden = true;
+
+    popup.append(titlebar, searchRow, list, hint);
 
     // 検索欄: システム IME の変換中は介入しない
     search.addEventListener('compositionstart', () => {
@@ -830,14 +839,15 @@ export class NagaIME extends HTMLElement {
     });
 
     // 部品は影の中（§5.2）。document.body には何も入れない
-    this.root.append(trigger, popup);
+    this.root.append(trigger, popup, caretMark, live);
     this.trigger = trigger;
     this.popup = popup;
     this.tabsEl = tabs;
     this.searchEl = search;
     this.listEl = list;
     this.searchRowEl = searchRow;
-    this.copyEl = copy;
+    this.caretMarkEl = caretMark;
+    this.liveEl = live;
     this.foldEl = foldBtn;
     this.applyFold();
     this.rebuildTabs();
@@ -889,10 +899,8 @@ export class NagaIME extends HTMLElement {
       b.addEventListener('mousedown', (e) => e.preventDefault());
       b.addEventListener('click', () => {
         this.activeTab = id;
-        this.lastCommitted = null;
         this.renderTabs();
         this.refresh();
-        this.updateCopy();
         this.searchEl?.focus({ preventScroll: true });
       });
       tabs.appendChild(b);
@@ -908,13 +916,16 @@ export class NagaIME extends HTMLElement {
     this.globalCleanup = null;
     this.trigger?.remove();
     this.popup?.remove();
+    this.caretMarkEl?.remove();
+    this.liveEl?.remove();
     this.trigger = null;
     this.popup = null;
     this.tabsEl = null;
     this.searchEl = null;
     this.listEl = null;
     this.searchRowEl = null;
-    this.copyEl = null;
+    this.caretMarkEl = null;
+    this.liveEl = null;
     this.foldEl = null;
     this.target = null;
     this.docked = false;
@@ -1191,12 +1202,10 @@ export class NagaIME extends HTMLElement {
     this.docked = next;
     this.applyTabLabels();
     this.applyFold();
-    // 【0436】写しは狭幅では組まない ∴ dock を跨いだら組み直す（PC で組んだ行を狭幅へ持ち越さない）
-    this.updateCopy();
   }
 
   /* ------------------------------------------------------------ *
-   * 折りたたみ（§3.3）と挿入先の写し（§3.2）
+   * 折りたたみ（§3.3）
    * ------------------------------------------------------------ */
 
   /** 畳む／開く（人間の操作でだけ呼ぶ）。開くときは読み欄へ戻す（タップの中なのでソフトキーボードが出る）。 */
@@ -1204,7 +1213,6 @@ export class NagaIME extends HTMLElement {
     this.folded = !this.folded;
     this.applyFold();
     if (this.openState) this.positionPopup();
-    this.updateCopy();
     if (!this.folded) this.searchEl?.focus({ preventScroll: true });
   }
 
@@ -1221,50 +1229,6 @@ export class NagaIME extends HTMLElement {
       fold.title = this.folded ? 'ひらく' : 'たたむ';
       fold.textContent = this.folded ? '▴' : '▾';
     }
-  }
-
-  /**
-   * 写しの行を組み直す。テキストノードと textContent だけで組む（欄の値を HTML として解釈させない）。
-   * キャレットの直前の最大 12 文字（Array.from で数える）。改行は ↵、前があれば先頭に …、末尾に ▏。
-   * type="password" の欄は中身を写さない。
-   */
-  private updateCopy(): void {
-    const el = this.copyEl;
-    if (!el) return;
-    el.replaceChildren();
-    // 【0436】狭幅（docked）では文脈の表示を出さない ∴ 組まない（高さも読み上げも空振りさせない）。
-    // 広幅（PC）の組み立ては従来どおり（見た目は CSS の display: none のまま＝後退しない）。
-    if (this.docked) return;
-    const field = this.target;
-    if (!field) return;
-    const span = (cls: string, text: string): HTMLSpanElement => {
-      const s = document.createElement('span');
-      s.className = cls;
-      s.textContent = text;
-      return s;
-    };
-    if (field instanceof HTMLInputElement && field.type === 'password') {
-      el.append(span('naga-copy-empty', '（非表示）'));
-      return;
-    }
-    const caret = field.selectionStart ?? field.value.length;
-    const before = Array.from(field.value.slice(0, caret));
-    if (before.length === 0) {
-      el.append(span('naga-copy-empty', '（先頭）'));
-      return;
-    }
-    const tail = before.slice(-COPY_MAX_CHARS);
-    const show = (chars: string[]): string => chars.join('').replace(/\r?\n/g, '↵');
-    let fresh = 0;
-    if (this.lastCommitted) {
-      const n = Array.from(this.lastCommitted).length;
-      if (n <= tail.length && tail.slice(-n).join('') === this.lastCommitted) fresh = n;
-    }
-    if (before.length > COPY_MAX_CHARS) el.append('…');
-    const old = tail.slice(0, tail.length - fresh);
-    if (old.length) el.append(show(old));
-    if (fresh) el.append(span('naga-copy-new', show(tail.slice(-fresh))));
-    el.append(span('naga-copy-caret', '▏'));
   }
 
   private renderList(): void {
@@ -1386,13 +1350,14 @@ export class NagaIME extends HTMLElement {
     );
     this.emit('nagaCommit', { field, candidate: copyCandidate(candidate) });
 
-    // 連続入力: 開いたまま検索語だけクリアし、写しを更新する（dock はページも欄も動かさない。M-1）
-    this.lastCommitted = candidate.char;
+    // 連続入力: 開いたまま検索語だけクリアする（dock はページも欄も動かさない。M-1）。
+    // 【0437】確定で欄の値・selectionStart が変わった ∴ 挿入位置の縦棒を置き直す（positionPopup が
+    // キャレットを測り直し、その中で縦棒も置き直す）。確定文字は live region で読み上げる。
+    if (this.liveEl) this.liveEl.textContent = candidate.char;
     if (this.searchEl) this.searchEl.value = '';
     this.selectedIndex = 0;
     this.refresh();
     this.positionPopup();
-    this.updateCopy();
     this.searchEl?.focus({ preventScroll: true });
   }
 
@@ -1477,6 +1442,7 @@ export class NagaIME extends HTMLElement {
       // 寄せるのは開いた直後の 1 回だけ（この open の最初の配置で窓口を閉じる。寄せが要らなかった
       // 場合も、あとから届く resize で寄せない）
       this.dockScrollDone = true;
+      this.placeCaretMark(anchor);
       return;
     }
 
@@ -1518,6 +1484,39 @@ export class NagaIME extends HTMLElement {
     if (left < scrollX + 4) left = scrollX + 4;
 
     this.placeInDocument(pop, top, left);
+    this.placeCaretMark(anchor);
+  }
+
+  /**
+   * 【NOV26-IM-NAGA-CARET-MARK-0437】popup を開いている間、元の欄の挿入位置に縦棒を置く。
+   *
+   * popup を開くと focus が読み欄へ移り、元の欄のキャレットが見えなくなる（人間の提案
+   * 「IME の表示中はキャレットを目立つように変える」）。縦棒は popup・梵ボタンと同じく
+   * `position: absolute` の文書座標で置く（placeInDocument で offsetParent を補正する）。
+   * - 置き直すのは positionPopup() と同じ契機（resize・開いた直後・スクロールコンテナ要素の scroll）と、
+   *   確定で欄の値・selectionStart が変わった直後（commit が positionPopup を呼ぶ）。
+   *   ページのスクロールでは置き直さない（ブラウザが本文と一緒に動かす）。
+   * - textarea の内部スクロール（scrollTop）は measureCaret が引いた値を返す ∴ そのまま使う。
+   *   キャレットの行が欄の可視範囲の外なら隠す。
+   * - type="password" の欄・measureCaret が失敗したとき（anchor が null）は出さない。
+   */
+  private placeCaretMark(anchor: { x: number; y: number; lineHeight: number } | null): void {
+    const mark = this.caretMarkEl;
+    const field = this.target;
+    if (!mark) return;
+    if (!this.openState || !field || !anchor || (field instanceof HTMLInputElement && field.type === 'password')) {
+      mark.hidden = true;
+      return;
+    }
+    const rect = field.getBoundingClientRect();
+    // 行が欄の可視範囲の外（textarea の内部スクロールで見えない行）なら出さない
+    if (anchor.y < rect.top || anchor.y + anchor.lineHeight > rect.bottom) {
+      mark.hidden = true;
+      return;
+    }
+    mark.style.height = `${anchor.lineHeight}px`;
+    mark.hidden = false;
+    this.placeInDocument(mark, anchor.y + window.scrollY, anchor.x + window.scrollX);
   }
 
   /**

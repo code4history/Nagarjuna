@@ -2,14 +2,20 @@
  * legacy IME（IMEManager / IMEOptions / onChange / updateOptions / <ime-ui>）の契約テスト。
  *
  * oct26-m7-t1（設計 v4 §5.3.2 AC1・AC3-d）。動作契約は 1.0.0 のまま維持する。
- * 1.1.0-rc.1 で入れた非推奨化（console.warn）は 1.1.0-rc.3 で取り消した ∴ 警告が出ないことも検査する。
+ * 1.2.0 で IMEManager / <ime-ui> を非推奨にした（2.0.0 で維持・3.0.0 で削除予定）∴
+ * `DEPRECATED:` の警告が同一モジュールにつき 1 回出ることも検査する。
  * src/demo.ts と同じ呼出し順（resetInstance → getInstance →
  * focus で attach(element, { options }) → updateOptions）で検証する。
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import * as imeEntry from '@/ime';
 import { IMEManager } from '@/ime';
 import type { IMEOptions, IMEAttachOptions, IIMEManager } from '@/ime';
+
+/** メッセージの `[...]` を package.json の name と照合する（名前はビルド時に埋める。AC7）。 */
+const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8')) as { name: string };
 
 type LegacyUI = HTMLElement & { updatePosition?: unknown; updateOptions?: unknown };
 
@@ -50,14 +56,15 @@ describe('legacy IMEManager の契約（1.0.0 と同じ動作）', () => {
     expect(typeof asInterface).toBe('function');
   });
 
-  it('NagaIME は公開 API（@/ime = nagarjuna/ime のエントリ）に無い（1.1.0 では新 UI のプレビューとしてデモでのみ使う）', () => {
-    // 値の export は 1.0.0 と同じ IMEManager だけ（型は実行時に存在しない）
-    expect(Object.keys(imeEntry).sort()).toEqual(['IMEManager']);
-    expect('NagaIME' in imeEntry).toBe(false);
+  it('NagaIME も公開 API（@/ime = パッケージの ime エントリ）から得られる（1.2.0 で公開。旧 export は残る）', () => {
+    // 値の export は IMEManager と NagaIME の 2 つ（型は実行時に存在しない）
+    expect(Object.keys(imeEntry).sort()).toEqual(['IMEManager', 'NagaIME']);
+    // 得られる NagaIME は、import の副作用で登録された <naga-ime> の実体と同じもの
+    expect(imeEntry.NagaIME).toBe(window.customElements.get('naga-ime'));
   });
 
   it(
-    'demo と同じ順序で attach / updateOptions / onChange / detach が動き、<ime-ui> が昇格し、console.warn は 0 回（AC3-d）',
+    'demo と同じ順序で attach / updateOptions / onChange / detach が動き、<ime-ui> が昇格し、DEPRECATED: の警告は 1 回（AC3-d）',
     async () => {
       const warn = vi.spyOn(console, 'warn');
       vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -115,8 +122,13 @@ describe('legacy IMEManager の契約（1.0.0 と同じ動作）', () => {
       manager.detach();
       expect(findImeUI()).toBeNull();
 
-      // 非推奨化は取り消した ∴ getInstance()・<ime-ui> の接続・再 attach のいずれでも警告しない
-      expect(warn).not.toHaveBeenCalled();
+      // 1.2.0 で非推奨にした ∴ getInstance()・<ime-ui> の接続・再 attach を合わせて、
+      // 同一モジュールにつき `DEPRECATED:` の警告はちょうど 1 回だけ（文は package 名を埋めたもの）
+      const deprecations = warn.mock.calls.filter((args) => String(args[0]).includes('DEPRECATED:'));
+      expect(deprecations).toHaveLength(1);
+      expect(deprecations[0][0]).toBe(
+        `[${pkg.name}] DEPRECATED: IMEManager and <ime-ui> are deprecated since 1.2.0 and will be removed in 3.0.0. Use NagaIME (<naga-ime>) instead.`
+      );
       input.remove();
     },
     8000

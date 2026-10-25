@@ -173,7 +173,8 @@ jobs:
             | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).value||""))')
           [ -n "${ID}" ] || { echo "::error::GitHub から ID トークンを取れない（id-token 権限を確認）"; exit 1; }
           echo "::add-mask::${ID}"
-          ESC=$(node -p 'encodeURIComponent(process.env.NAME).replace(/^%40/,"@")')
+          # npm CLI（npm-package-arg の escapedName）と同じ形にする: スコープの区切りは小文字の %2f
+          ESC=$(node -p 'process.env.NAME.replace("/","%2f")')
           CODE=$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer ${ID}" \
             "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/${ESC}")
           echo "- OIDC exchange: HTTP ${CODE}" >> "$GITHUB_STEP_SUMMARY"

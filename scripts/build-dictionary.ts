@@ -146,6 +146,14 @@ export const dictionary: NagaDictionaryEntry[] = ${JSON.stringify(processedEntri
 `;
 }
 
+// 保存された候補の文字列の長さの上限に使う。`.length` と同じく UTF-16 のコード単位で数える
+function generateStatsCode(entries: RawEntry[]): string {
+  const maxCharLength = entries.reduce((max, entry) => Math.max(max, entry.character.length), 0);
+  return `// このファイルは自動生成されています。直接編集しないでください。
+export const DICTIONARY_MAX_CHAR_LENGTH = ${maxCharLength};
+`;
+}
+
 // ファイルパスの設定
 const rootDir = path.resolve(__dirname, '..');
 const dataDir = path.join(rootDir, 'data');
@@ -183,4 +191,5 @@ if (!fs.existsSync(outputDir)) {
 // ファイルの出力
 const code = generateTypeScriptCode(entries);
 fs.writeFileSync(path.join(outputDir, 'dictionary.ts'), code);
+fs.writeFileSync(path.join(outputDir, 'dictionary-stats.ts'), generateStatsCode(entries));
 console.log('Dictionary file has been generated successfully.');

@@ -19,6 +19,10 @@ Notable changes to this project are documented here. This project follows [Seman
 
 - `IMEManager`・`IIMEManager`・`IMEOptions`・`IMEAttachOptions`・`<ime-ui>` を非推奨にしました。2.0.0 では維持し、3.0.0 で削除する予定です。代わりに `NagaIME`（`<naga-ime>`）を使用してください。`IMEManager.getInstance()` の初回と `<ime-ui>` の接続時に `console.warn` で 1 回だけ警告します。 / Deprecated `IMEManager`, `IIMEManager`, `IMEOptions`, `IMEAttachOptions` and `<ime-ui>`. They are kept in 2.0.0 and will be removed in 3.0.0; use `NagaIME` (`<naga-ime>`) instead. A single `console.warn` is printed on the first `IMEManager.getInstance()` and when an `<ime-ui>` element is connected.
 
+### セキュリティ / Security
+
+- NagaIME が `localStorage` から読む「最近」の候補を検証するようにしました。辞書に無い文字、辞書の最長を超える文字列、制御文字を含む項目は捨て、読みと説明は保存された値ではなく辞書の値を使います。 / NagaIME now validates the recent candidates it reads from `localStorage`. Entries with characters not in the dictionary, strings longer than the longest dictionary entry, or control characters are dropped, and the reading and description always come from the dictionary rather than from the stored value.
+
 ## [1.1.0] - 2026-10-05
 
 1.1.0-rc.3 と同じ内容の正式版です（版番号のみ変更）。変更点は 1.1.0-rc.3 までの各項を参照してください。

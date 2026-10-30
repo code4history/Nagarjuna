@@ -26,6 +26,7 @@ coverage
 
 # Generated dictionary
 src/data/dictionary.ts
+src/data/dictionary-stats.ts
 # Playwright
 playwright-report/
 test-results/

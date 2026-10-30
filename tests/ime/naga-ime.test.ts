@@ -415,6 +415,19 @@ describe('NagaIME', () => {
       expect(shown).toContain('より');
     }, DICTIONARY_TEST_TIMEOUT_MS);
 
+    it('読みが複数ある文字は、保存された読みの項目を辞書から引く', async () => {
+      const items = await recentItems([{ char: '𛀢', reading: 'け', description: '偽', category: 'hentaigana' }]);
+      expect(items.map((el) => el.dataset.char)).toEqual(['𛀢']);
+      expect(items[0].querySelector('.naga-reading')!.textContent).toBe('け');
+      expect(items[0].querySelector('.naga-desc')!.textContent).toBe('けの変体仮名（字母：家）');
+    }, DICTIONARY_TEST_TIMEOUT_MS);
+
+    it('保存された読みが辞書に無ければ、その文字の先頭の項目を使う', async () => {
+      const items = await recentItems([{ char: '𛀢', reading: 'にせ', description: '偽', category: 'hentaigana' }]);
+      expect(items[0].querySelector('.naga-reading')!.textContent).toBe('か');
+      expect(items[0].querySelector('.naga-desc')!.textContent).toBe('かの変体仮名（字母：家）');
+    }, DICTIONARY_TEST_TIMEOUT_MS);
+
     it.each([
       ['char の改行', { char: 'ゟ\n', reading: 'より', description: 'より', category: 'kumimoji' }],
       ['description の NUL', { char: 'ゟ', reading: 'より', description: 'より\u0000', category: 'kumimoji' }],

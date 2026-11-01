@@ -8,6 +8,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NagaIME } from '@/lib/ime/naga-ime';
 import { FontLoader } from '@/lib/fonts/loader';
+import { loadNagaDictionary, type NagaDictionary } from '@/lib/ime/naga-dictionary';
+import { DICTIONARY_MAX_CHAR_LENGTH } from '@/data/dictionary-stats';
+
+// 既定では本物の辞書を読む。辞書の中身を差し替える試験だけ mockResolvedValueOnce で与える。
+vi.mock('@/lib/ime/naga-dictionary', { spy: true });
 
 // 辞書（生成済み dictionary.ts）の動的 import を伴うテストは、vitest.config.ts の testTimeout: 1000 では
 // 高負荷時に偽の赤になる（実装レビュー Round 1 Minor-1）。legacy-manager.test.ts と同じく個別に 8000ms を与える。
@@ -359,19 +364,100 @@ describe('NagaIME', () => {
     reader.destroy();
   }, DICTIONARY_TEST_TIMEOUT_MS);
 
-  it('候補の文字と説明は HTML として解釈しない', async () => {
-    localStorage.setItem(
-      'nagarjuna-naga-recents',
-      JSON.stringify([{ char: '<img src=x onerror=alert(1)>', reading: 'あ', description: '<b>x</b>', category: 'hentaigana' }])
-    );
+  it('候補の説明と読みは HTML として解釈しない', async () => {
+    const entry = {
+      char: 'ゟ',
+      reading: '<img src=x onerror=alert(1)>',
+      description: '<b>x</b>',
+      category: 'kumimoji' as const,
+    };
+    const dictionary: NagaDictionary = new Map([['kumimoji', [entry]]]);
+    vi.mocked(loadNagaDictionary).mockResolvedValueOnce(dictionary);
+    localStorage.setItem('nagarjuna-naga-recents', JSON.stringify([entry]));
     const local = new NagaIME();
     local.attach(field);
     await local.open(field);
-    expect(popupOf().querySelector('img')).toBeNull();
-    expect(popupOf().querySelector('b')).toBeNull();
-    expect(itemsOf()[0].querySelector('.naga-char')!.textContent).toBe('<img src=x onerror=alert(1)>');
+    expect(popupOf().querySelector('img, b')).toBeNull();
+    expect(itemsOf()[0].querySelector('.naga-desc')!.textContent).toBe('<b>x</b>');
     local.destroy();
   }, DICTIONARY_TEST_TIMEOUT_MS);
+
+  describe('保存された「最近」の検証', () => {
+    const KEY = 'nagarjuna-naga-recents';
+    let localCleanup: () => void = () => undefined;
+
+    async function recentItems(stored: unknown[]): Promise<HTMLElement[]> {
+      localStorage.setItem(KEY, JSON.stringify(stored));
+      const local = new NagaIME();
+      local.attach(field);
+      await local.open(field);
+      localCleanup = () => local.destroy();
+      const active = popupOf().querySelector('.naga-tab.naga-is-active') as HTMLElement;
+      return active.dataset.category === 'recent' ? itemsOf() : [];
+    }
+
+    afterEach(() => {
+      localCleanup();
+      localCleanup = () => undefined;
+    });
+
+    it('辞書に無い文字は出ない', async () => {
+      const items = await recentItems([{ char: 'Z', reading: 'ぜっと', description: '偽', category: 'kumimoji' }]);
+      expect(items).toEqual([]);
+    }, DICTIONARY_TEST_TIMEOUT_MS);
+
+    it('辞書にある文字の読みと説明は辞書の値に置き換わる', async () => {
+      const items = await recentItems([{ char: 'ゟ', reading: 'にせ', description: '偽', category: 'hentaigana' }]);
+      expect(items.map((el) => el.dataset.char)).toEqual(['ゟ']);
+      const shown = items[0].textContent ?? '';
+      expect(shown).not.toContain('偽');
+      expect(shown).not.toContain('にせ');
+      expect(shown).toContain('より');
+    }, DICTIONARY_TEST_TIMEOUT_MS);
+
+    it('読みが複数ある文字は、保存された読みの項目を辞書から引く', async () => {
+      const items = await recentItems([{ char: '𛀢', reading: 'け', description: '偽', category: 'hentaigana' }]);
+      expect(items.map((el) => el.dataset.char)).toEqual(['𛀢']);
+      expect(items[0].querySelector('.naga-reading')!.textContent).toBe('け');
+      expect(items[0].querySelector('.naga-desc')!.textContent).toBe('けの変体仮名（字母：家）');
+    }, DICTIONARY_TEST_TIMEOUT_MS);
+
+    it('保存された読みが辞書に無ければ、その文字の先頭の項目を使う', async () => {
+      const items = await recentItems([{ char: '𛀢', reading: 'にせ', description: '偽', category: 'hentaigana' }]);
+      expect(items[0].querySelector('.naga-reading')!.textContent).toBe('か');
+      expect(items[0].querySelector('.naga-desc')!.textContent).toBe('かの変体仮名（字母：家）');
+    }, DICTIONARY_TEST_TIMEOUT_MS);
+
+    it.each([
+      ['char の改行', { char: 'ゟ\n', reading: 'より', description: 'より', category: 'kumimoji' }],
+      ['description の NUL', { char: 'ゟ', reading: 'より', description: 'より\u0000', category: 'kumimoji' }],
+      ['reading の行区切り', { char: 'ゟ', reading: 'より\u2028', description: 'より', category: 'kumimoji' }],
+    ])('%s を含む項目は出ない', async (_label, entry) => {
+      expect(await recentItems([entry])).toEqual([]);
+    }, DICTIONARY_TEST_TIMEOUT_MS);
+
+    it('辞書の最長を超える長さの文字列は出ない', async () => {
+      const char = 'ゟ'.repeat(DICTIONARY_MAX_CHAR_LENGTH + 1);
+      expect(await recentItems([{ char, reading: 'より', description: 'より', category: 'kumimoji' }])).toEqual([]);
+    }, DICTIONARY_TEST_TIMEOUT_MS);
+
+    it('正当な履歴は順序を保って残る', async () => {
+      const items = await recentItems([
+        { char: 'ヿ', reading: 'こと', description: 'コト', category: 'kumimoji' },
+        { char: 'ゟ', reading: 'より', description: 'より', category: 'kumimoji' },
+      ]);
+      expect(items.map((el) => el.dataset.char)).toEqual(['ヿ', 'ゟ']);
+    }, DICTIONARY_TEST_TIMEOUT_MS);
+
+    it('文字の長さの上限は辞書の全項目の最長と等しい', async () => {
+      const { loadNagaDictionary: load } = await vi.importActual<typeof import('@/lib/ime/naga-dictionary')>(
+        '@/lib/ime/naga-dictionary',
+      );
+      const dictionary = await load();
+      const lengths = Array.from(dictionary.values()).flatMap((entries) => entries.map((e) => e.char.length));
+      expect(DICTIONARY_MAX_CHAR_LENGTH).toBe(Math.max(...lengths));
+    }, DICTIONARY_TEST_TIMEOUT_MS);
+  });
 
   it('detach / destroy で trigger・popup・class・listener を片付け、再 attach できる（AC5・AC6 cleanup）', async () => {
     ime.attach(field);

@@ -26,6 +26,7 @@
  *  - detach / destroy で DOM と listener を片付ける。候補は textContent で描画する。
  *  - 対象の inline fontFamily は空のときだけ設定し、detach では自分の値のままなら空へ戻す（§3.1）。
  */
+import { DICTIONARY_MAX_CHAR_LENGTH } from '../../data/dictionary-stats';
 import { FontLoader } from '../fonts/loader';
 import { fontFamilies } from '../fonts/styles';
 import type { FontSettings } from '../fonts/types';
@@ -212,16 +213,30 @@ function isTarget(el: unknown): el is NagaTarget {
   );
 }
 
+// エスケープで書く（生の U+2028/U+2029 は JavaScript の行区切りとして扱われる）
+// eslint-disable-next-line no-control-regex -- 制御文字を拒否するための正規表現
+const CONTROL_CHARS = /[\u0000-\u001f\u007f\u2028\u2029]/;
+
 function isCandidate(value: unknown): value is NagaCandidate {
   if (!value || typeof value !== 'object') return false;
   const v = value as Record<string, unknown>;
   return (
     typeof v.char === 'string' &&
+    v.char.length > 0 &&
+    v.char.length <= DICTIONARY_MAX_CHAR_LENGTH &&
+    !CONTROL_CHARS.test(v.char) &&
     typeof v.reading === 'string' &&
+    !CONTROL_CHARS.test(v.reading) &&
     typeof v.description === 'string' &&
+    !CONTROL_CHARS.test(v.description) &&
     typeof v.category === 'string' &&
     CATEGORY_IDS.has(v.category)
   );
+}
+
+/** 文字と読みの組の索引のキー。検証を通った値は制御文字を含まないので NUL で区切れる。 */
+function charAndReadingKey(char: string, reading: string): string {
+  return `${char}\u0000${reading}`;
 }
 
 function copyCandidate(candidate: NagaCandidate): NagaCandidate {
@@ -276,6 +291,10 @@ export class NagaIME extends HTMLElement {
   private readonly fields = new Map<NagaTarget, FieldBinding>();
 
   private dictionary: NagaDictionary | null = null;
+  /** `dictionary` を文字で引くための索引。最初の引き当てのときに 1 回だけ作る */
+  private dictionaryByChar: Map<string, NagaCandidate> | null = null;
+  /** `dictionary` を文字と読みの組で引くための索引。`dictionaryByChar` と同時に作る */
+  private dictionaryByCharAndReading: Map<string, NagaCandidate> | null = null;
   private recents: NagaCandidate[] = [];
   /** recents を localStorage から読んだか（読むのは最初の open まで遅らせる。§5.3 規則 6） */
   private recentsLoaded = false;
@@ -1621,10 +1640,41 @@ export class NagaIME extends HTMLElement {
     }
     try {
       const parsed: unknown = JSON.parse(localStorage.getItem(key) || '[]');
-      this.recents = Array.isArray(parsed) ? parsed.filter(isCandidate).slice(0, max) : [];
+      this.recents = Array.isArray(parsed) ? this.fromDictionary(parsed.filter(isCandidate)).slice(0, max) : [];
     } catch {
       this.recents = [];
     }
+  }
+
+  /**
+   * 保存された候補を辞書の項目へ置き換える。辞書に無い文字は捨てる。
+   * localStorage の値は信頼しないので、画面に出す読みと説明は辞書のものだけを使う。
+   */
+  private fromDictionary(candidates: readonly NagaCandidate[]): NagaCandidate[] {
+    return candidates.flatMap((candidate) => {
+      const entry = this.lookupDictionary(candidate);
+      return entry ? [copyCandidate(entry)] : [];
+    });
+  }
+
+  /** 文字と読みの組で引き、無ければその文字の先頭の項目を返す。 */
+  private lookupDictionary({ char, reading }: NagaCandidate): NagaCandidate | undefined {
+    if (!this.dictionary) return undefined;
+    if (!this.dictionaryByChar || !this.dictionaryByCharAndReading) {
+      const byChar = new Map<string, NagaCandidate>();
+      const byCharAndReading = new Map<string, NagaCandidate>();
+      // 同じ文字が複数の category にあれば NAGA_CATEGORIES の順で先のものを使う
+      for (const { id } of NAGA_CATEGORIES) {
+        for (const entry of this.dictionary.get(id) ?? []) {
+          if (!byChar.has(entry.char)) byChar.set(entry.char, entry);
+          const key = charAndReadingKey(entry.char, entry.reading);
+          if (!byCharAndReading.has(key)) byCharAndReading.set(key, entry);
+        }
+      }
+      this.dictionaryByChar = byChar;
+      this.dictionaryByCharAndReading = byCharAndReading;
+    }
+    return this.dictionaryByCharAndReading.get(charAndReadingKey(char, reading)) ?? this.dictionaryByChar.get(char);
   }
 
   private pushRecent(candidate: NagaCandidate): void {

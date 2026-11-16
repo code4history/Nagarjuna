@@ -72,7 +72,7 @@ element.style.fontFamily = fontLoader.getFontFamilyString({
 
 ### Using NagaIME (<naga-ime>)
 
-NagaIME is the IME UI for entering Hentai-kana, Siddham, Buddha names, variant forms and combined characters. It listens on the fields you attach it to and does not get in the way of ordinary input: a small 梵 button appears at the top right of the field, and `Ctrl+J` (`⌘J` on macOS) opens the popup from the keyboard.
+NagaIME is the IME UI for entering Hentai-kana, Siddham, Buddha names, variant forms and combined characters. It listens on the fields you attach it to and does not get in the way of ordinary input: a small 梵 button appears at the top right of the field, and `Ctrl+J` (`⌘J` on macOS) opens the popup from the keyboard. Press `Ctrl+J` (`⌘J`) again or `Esc` to close it.
 
 **1. From JavaScript**
 

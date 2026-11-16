@@ -248,6 +248,11 @@ function copyCandidate(candidate: NagaCandidate): NagaCandidate {
   };
 }
 
+/** 開閉のショートカット（Ctrl+J / ⌘J）か。 */
+function isToggleShortcut(e: KeyboardEvent): boolean {
+  return (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'j';
+}
+
 /** 影を辿った最も深い activeElement（影の中の欄・自分の影の中の部品を見分けるため）。 */
 function deepActiveElement(): Element | null {
   let ae: Element | null = document.activeElement;
@@ -990,7 +995,7 @@ export class NagaIME extends HTMLElement {
       }
     };
     const onKeydown = (e: KeyboardEvent) => {
-      if (this.cfgShortcut && (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'j') {
+      if (this.cfgShortcut && isToggleShortcut(e)) {
         e.preventDefault();
         void this.toggle(field);
         return;
@@ -1309,6 +1314,13 @@ export class NagaIME extends HTMLElement {
     const n = this.candidates.length;
     // 変換中（composition）のキーは一切消費しない
     const composing = this.composing || e.isComposing || e.keyCode === 229;
+    // 開いたときと同じ Ctrl+J（⌘J）で閉じて元の欄へ戻る
+    if (this.cfgShortcut && isToggleShortcut(e)) {
+      if (composing) return;
+      e.preventDefault();
+      this.close({ refocus: true });
+      return;
+    }
     if (e.key === 'ArrowDown') {
       if (composing) return;
       e.preventDefault();

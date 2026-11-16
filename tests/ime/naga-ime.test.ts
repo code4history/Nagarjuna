@@ -181,6 +181,20 @@ describe('NagaIME', () => {
     expect(ime.isOpen).toBe(false);
   });
 
+  it('開いた後は検索欄でも Ctrl+J / Cmd+J で閉じて元の欄へ戻る', async () => {
+    ime.attach(field);
+    await ime.open(field);
+    const ctrlJ = key('keydown', { key: 'j', ctrlKey: true });
+    searchOf().dispatchEvent(ctrlJ);
+    expect(ctrlJ.defaultPrevented).toBe(true);
+    expect(ime.isOpen).toBe(false);
+    expect(document.activeElement).toBe(field);
+
+    await ime.open(field);
+    searchOf().dispatchEvent(key('keydown', { key: 'J', metaKey: true }));
+    expect(ime.isOpen).toBe(false);
+  }, DICTIONARY_TEST_TIMEOUT_MS);
+
   it('shortcut: false では Ctrl+J を消費しない', () => {
     const local = new NagaIME({ shortcut: false });
     const other = document.createElement('input');
@@ -193,6 +207,21 @@ describe('NagaIME', () => {
     local.destroy();
     other.remove();
   });
+
+  it('shortcut: false では開いた後の検索欄でも Ctrl+J を消費しない', async () => {
+    const local = new NagaIME({ shortcut: false });
+    const other = document.createElement('input');
+    document.body.appendChild(other);
+    local.attach(other);
+    await local.open(other);
+    const search = local.shadowRoot!.querySelector('.naga-search') as HTMLInputElement;
+    const ev = key('keydown', { key: 'j', ctrlKey: true });
+    search.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+    expect(local.isOpen).toBe(true);
+    local.destroy();
+    other.remove();
+  }, DICTIONARY_TEST_TIMEOUT_MS);
 
   it('検索欄の composition 中の keydown（Enter / 数字）を消費せず、確定もしない（AC5）', async () => {
     ime.attach(field);

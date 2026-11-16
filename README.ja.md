@@ -70,7 +70,7 @@ element.style.fontFamily = fontLoader.getFontFamilyString({
 
 ### NagaIME（<naga-ime>）を使う
 
-NagaIME は、変体仮名・悉曇文字・仏名・異体字・組み文字を入力するための IME UI です。取り付けた欄でだけ働き、通常の入力は妨げません。欄の右上に小さな `梵` ボタンが出て、`Ctrl+J`（macOS は `⌘J`）でもキーボードから開けます。
+NagaIME は、変体仮名・悉曇文字・仏名・異体字・組み文字を入力するための IME UI です。取り付けた欄でだけ働き、通常の入力は妨げません。欄の右上に小さな `梵` ボタンが出て、`Ctrl+J`（macOS は `⌘J`）でもキーボードから開けます。開いた後は、`Ctrl+J`（`⌘J`）をもう一度押すか `Esc` で閉じます。
 
 **1. JavaScript から**
 

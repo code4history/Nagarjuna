@@ -181,6 +181,20 @@ describe('NagaIME', () => {
     expect(ime.isOpen).toBe(false);
   });
 
+  it('開いた後は検索欄でも Ctrl+J / Cmd+J で閉じて元の欄へ戻る', async () => {
+    ime.attach(field);
+    await ime.open(field);
+    const ctrlJ = key('keydown', { key: 'j', ctrlKey: true });
+    searchOf().dispatchEvent(ctrlJ);
+    expect(ctrlJ.defaultPrevented).toBe(true);
+    expect(ime.isOpen).toBe(false);
+    expect(document.activeElement).toBe(field);
+
+    await ime.open(field);
+    searchOf().dispatchEvent(key('keydown', { key: 'J', metaKey: true }));
+    expect(ime.isOpen).toBe(false);
+  }, DICTIONARY_TEST_TIMEOUT_MS);
+
   it('shortcut: false では Ctrl+J を消費しない', () => {
     const local = new NagaIME({ shortcut: false });
     const other = document.createElement('input');

@@ -248,12 +248,12 @@ function copyCandidate(candidate: NagaCandidate): NagaCandidate {
   };
 }
 
-/** 影を辿った最も深い activeElement（影の中の欄・自分の影の中の部品を見分けるため）。 */
 /** 開閉のショートカット（Ctrl+J / ⌘J）か。 */
 function isToggleShortcut(e: KeyboardEvent): boolean {
   return (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'j';
 }
 
+/** 影を辿った最も深い activeElement（影の中の欄・自分の影の中の部品を見分けるため）。 */
 function deepActiveElement(): Element | null {
   let ae: Element | null = document.activeElement;
   while (ae && ae.shadowRoot && ae.shadowRoot.activeElement) ae = ae.shadowRoot.activeElement;

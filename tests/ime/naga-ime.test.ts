@@ -208,6 +208,21 @@ describe('NagaIME', () => {
     other.remove();
   });
 
+  it('shortcut: false では開いた後の検索欄でも Ctrl+J を消費しない', async () => {
+    const local = new NagaIME({ shortcut: false });
+    const other = document.createElement('input');
+    document.body.appendChild(other);
+    local.attach(other);
+    await local.open(other);
+    const search = local.shadowRoot!.querySelector('.naga-search') as HTMLInputElement;
+    const ev = key('keydown', { key: 'j', ctrlKey: true });
+    search.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+    expect(local.isOpen).toBe(true);
+    local.destroy();
+    other.remove();
+  }, DICTIONARY_TEST_TIMEOUT_MS);
+
   it('検索欄の composition 中の keydown（Enter / 数字）を消費せず、確定もしない（AC5）', async () => {
     ime.attach(field);
     await ime.open(field);

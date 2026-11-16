@@ -5,9 +5,9 @@ Notable changes to this project are documented here. This project follows [Seman
 
 ## [Unreleased]
 
-### Changed
-- **開いた後も Ctrl+J（⌘J）で閉じられるようになりました**: これまで Ctrl+J は取り付けた欄にいるときだけ開閉し、開いた後（検索欄にいるとき）は Esc でしか閉じられませんでした。検索欄でも Ctrl+J で閉じ、元の欄へ戻ります。`shortcut: false` のときは今までどおり反応しません。
-- **Ctrl+J (⌘J) now also closes the open popup**: Until now Ctrl+J only toggled the popup while the attached field had focus, so once the popup was open (focus in its search box) only Esc closed it. Ctrl+J in the search box now closes it and returns focus to the field. With `shortcut: false` it still does nothing.
+### 変更 / Changed
+
+- **開いた後も Ctrl+J（⌘J）で閉じられるように / Ctrl+J (⌘J) now also closes the open popup**: これまで Ctrl+J は取り付けた欄にいるときだけ開閉し、開いた後（検索欄にいるとき）は Esc でしか閉じられませんでした。検索欄でも Ctrl+J で閉じ、元の欄へ戻ります。`shortcut: false` のときは今までどおり反応しません。 / Until now Ctrl+J only toggled the popup while the attached field had focus, so once the popup was open (focus in its search box) only Esc closed it. Ctrl+J in the search box now closes it and returns focus to the field. With `shortcut: false` it still does nothing.
 
 ## [1.2.0] - 2026-11-02
 

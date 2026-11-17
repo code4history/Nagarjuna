@@ -57,7 +57,7 @@ test('S-b: #s1 で Control+j を押すと popup が見える', async ({ page }) 
   await expect.poll(() => isShown(page, PART.popup), { message: '[measure:S-b]' }).toBe(true);
 });
 
-// 【欄を触ったら閉じる変更】「欄を触ったら閉じる変更」 以前は「開いた状態で欄を click しても popup は開いたまま」
+// 【欄を触ったら閉じる変更】この変更の前は「開いた状態で欄を click しても popup は開いたまま」
 // だった。実機の「focus を戻して入力しても連携しない」「改行するとカーソルが IME の下に回り込む」への
 // 対応で、利用者が欄を click / tap したら閉じる側に変えた ∴ 影の中の欄でも閉じることを測る。
 test('S-c: 開いた状態で #s1 を click すると popup は閉じ、梵ボタンは残る（「欄を触ったら閉じる変更」）', async ({ page }) => {

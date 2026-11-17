@@ -5,12 +5,12 @@
  * テストの順序に意味がある: 最初のテストは <ime-ui> がまだ登録されていない registry で
  * NagaIME だけを import し、NagaIME が naga-ime だけを登録し ime-ui を登録しないことを spy で
  * 確かめる（registry は列挙できず、ui.ts は既登録なら define を飛ばすため、登録後では判定にならない）。
- * NagaIME の部品とスタイルは各 <naga-ime> の影の中にある（§5.2）。
+ * NagaIME の部品とスタイルは各 <naga-ime> の影の中にある。
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 // 辞書（生成済み dictionary.ts）の動的 import を伴うテストは、vitest.config.ts の testTimeout: 1000 では
-// 高負荷時に偽の赤になる（実装レビュー Round 1 Minor-1）。legacy-manager.test.ts と同じく個別に 8000ms を与える。
+// 高負荷時に偽の赤になる。legacy-manager.test.ts と同じく個別に 8000ms を与える。
 const DICTIONARY_TEST_TIMEOUT_MS = 8000;
 
 /**
@@ -130,7 +130,7 @@ describe('legacy <ime-ui> と NagaIME の同一ページ共存', () => {
     for (const s of selectors) {
       expect(s.startsWith('.naga-') || s === ':host' || s.startsWith(':host('), s).toBe(true);
     }
-    // document.head には入れない（§5.2）。各 <naga-ime> の影の中に同じ内容で 1 つ
+    // document.head には入れない。各 <naga-ime> の影の中に同じ内容で 1 つ
     expect(document.head.querySelectorAll('style[data-naga-style]')).toHaveLength(0);
     for (const n of nagas) {
       const styles = Array.from(n.shadowRoot!.querySelectorAll('style[data-naga-style]'));
@@ -175,7 +175,7 @@ describe('legacy <ime-ui> と NagaIME の同一ページ共存', () => {
     expect(document.body.querySelector('ime-ui')).toBeNull();
   }, DICTIONARY_TEST_TIMEOUT_MS);
 
-  describe('対象要素の style.fontFamily（§3.1・同一要素への二重 attach はサポート外だが相互破壊しない）', () => {
+  describe('対象要素の style.fontFamily（同一要素への二重 attach はサポート外だが相互破壊しない）', () => {
     it('legacy → Naga: Naga は既存の inline 値を変えず、detach しても legacy の値を残す', async () => {
       vi.spyOn(console, 'warn').mockImplementation(() => {});
       const { IMEManager, NagaIME } = await loadIme();

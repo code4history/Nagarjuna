@@ -2,7 +2,7 @@
  * NagaIME — トリガー式の特殊文字入力ポップアップ（のちに
  * custom element `<naga-ime>`＋open Shadow DOM に包み直した）。
  *
- * PoC（Playground/NextNaga/js/naga-ime.js）の UX を TypeScript 化したもの。
+ * PoC（JavaScript で書いた試作）の UX を TypeScript 化したもの。
  *  - 常駐しない。対象にフォーカスすると小さな起動ボタンが出るだけ。
  *  - 起動はボタン押下または Ctrl/Cmd+J の明示操作のみ。
  *  - 起動中もシステム IME の変換（composition）には介入しない。
@@ -24,7 +24,7 @@
  *  - 書体は FontLoader で読む。`window.nagaIME` は公開しない（demo 専用だったため）。
  *  - DOM の class はすべて `naga-` 接頭辞、id と aria-controls はインスタンス固有。
  *  - detach / destroy で DOM と listener を片付ける。候補は textContent で描画する。
- *  - 対象の inline fontFamily は空のときだけ設定し、detach では自分の値のままなら空へ戻す（§3.1）。
+ *  - 対象の inline fontFamily は空のときだけ設定し、detach では自分の値のままなら空へ戻す。
  */
 import { DICTIONARY_MAX_CHAR_LENGTH } from '../../data/dictionary-stats';
 import { FontLoader } from '../fonts/loader';
@@ -115,7 +115,7 @@ const ATTRIBUTE_TO_PROPERTY = {
 
 type ObservedAttribute = keyof typeof ATTRIBUTE_TO_PROPERTY;
 
-/** 昇格前に代入されうるプロパティ（upgrade property。§5.3 末尾）。 */
+/** 昇格前に代入されうるプロパティ（upgrade property）。 */
 const UPGRADE_PROPERTIES = [
   'htmlFor',
   'categories',
@@ -279,7 +279,7 @@ export class NagaIME extends HTMLElement {
     return Object.keys(ATTRIBUTE_TO_PROPERTY);
   }
 
-  /* 設定の実効値（§5.3）。公開プロパティは prototype の getter / setter（upgrade property のため） */
+  /* 設定の実効値。公開プロパティは prototype の getter / setter（upgrade property のため） */
   private cfgFor = '';
   private cfgCategories: NagaCategoryId[] = [...ALL_CATEGORIES];
   private cfgTriggerLabel = DEFAULT_TRIGGER_LABEL;
@@ -301,7 +301,7 @@ export class NagaIME extends HTMLElement {
   /** `dictionary` を文字と読みの組で引くための索引。`dictionaryByChar` と同時に作る */
   private dictionaryByCharAndReading: Map<string, NagaCandidate> | null = null;
   private recents: NagaCandidate[] = [];
-  /** recents を localStorage から読んだか（読むのは最初の open まで遅らせる。§5.3 規則 6） */
+  /** recents を localStorage から読んだか（読むのは最初の open まで遅らせる） */
   private recentsLoaded = false;
   private target: NagaTarget | null = null;
   private activeTab: TabId = ALL_CATEGORIES[0];
@@ -312,7 +312,7 @@ export class NagaIME extends HTMLElement {
   private openSeq = 0;
   /** 下部ドッキング中か（`.naga-is-docked` と対。dock 限定の振る舞いの唯一の判定源）。 */
   private docked = false;
-  /** 畳んでいるか（人間の操作でだけ変わる。閉じても・dock でなくなっても保つ。§3.3） */
+  /** 畳んでいるか（人間の操作でだけ変わる。閉じても・dock でなくなっても保つ） */
   private folded = false;
   /**
    * 【欄を触ったら閉じる変更】いま NagaIME 自身が欄へ focus を戻している最中か。
@@ -354,7 +354,7 @@ export class NagaIME extends HTMLElement {
   private popupRaf = 0;
 
   constructor(options: NagaIMEOptions = {}) {
-    // 別の実装が naga-ime を登録済みなら、ブラウザの Illegal constructor に任せず理由を言って投げる（§5.2）
+    // 別の実装が naga-ime を登録済みなら、ブラウザの Illegal constructor に任せず理由を言って投げる
     if (new.target === NagaIME && customElements.get(TAG_NAME) !== NagaIME) throw constructionError();
     super();
     this.uid = `naga-${++instanceSeq}`;
@@ -404,7 +404,7 @@ export class NagaIME extends HTMLElement {
   }
 
   disconnectedCallback(): void {
-    // 同じタスク内の付け替え（appendChild での移動）では作り直さない（§5.4）
+    // 同じタスク内の付け替え（appendChild での移動）では作り直さない
     queueMicrotask(() => {
       if (this.isConnected) return;
       this.pendingForLookup?.();
@@ -414,7 +414,7 @@ export class NagaIME extends HTMLElement {
   }
 
   attributeChangedCallback(name: string, _old: string | null, value: string | null): void {
-    // 同じ値の setAttribute でも呼ばれる。値が変わったときだけに最適化しない（最後に変えた方が効く。§0.3）
+    // 同じ値の setAttribute でも呼ばれる。値が変わったときだけに最適化しない（最後に変えた方が効く）
     switch (name as ObservedAttribute) {
       case 'for':
         this.setFor(value ?? '');
@@ -447,7 +447,7 @@ export class NagaIME extends HTMLElement {
   }
 
   /* ------------------------------------------------------------ *
-   * プロパティ（§5.3。読み出しは実効値。代入は属性を変えない）
+   * プロパティ（読み出しは実効値。代入は属性を変えない）
    * ------------------------------------------------------------ */
 
   /**
@@ -557,7 +557,7 @@ export class NagaIME extends HTMLElement {
     const prev = this.cfgRecentMax;
     this.cfgRecentMax = next;
     if (next === 0) {
-      // 「最近」タブを外し、記憶の中の最近を捨てる（保存された値は消さない。§0.2）
+      // 「最近」タブを外し、記憶の中の最近を捨てる（保存された値は消さない）
       this.recents = [];
       if (this.activeTab === 'recent') this.activeTab = this.cfgCategories[0];
     } else if (prev === 0) {
@@ -622,7 +622,7 @@ export class NagaIME extends HTMLElement {
     fresh.forEach((field) => this.bindField(field, via));
   }
 
-  /** `for` の id を要素の root で引き直す。`for` で付けた欄だけを付け直す（§5.4）。 */
+  /** `for` の id を要素の root で引き直す。`for` で付けた欄だけを付け直す。 */
   private resolveFor(): void {
     const root = this.getRootNode() as Document | ShadowRoot;
     const found: Element[] = [];
@@ -790,7 +790,7 @@ export class NagaIME extends HTMLElement {
     closeBtn.textContent = '×';
     closeBtn.addEventListener('mousedown', (e) => e.preventDefault());
     closeBtn.addEventListener('click', () => this.close({ refocus: true }));
-    // 畳むボタン（dock のときだけ見える。§3.3）。押しても欄・読み欄のフォーカスを奪わない
+    // 畳むボタン（dock のときだけ見える）。押しても欄・読み欄のフォーカスを奪わない
     const foldBtn = document.createElement('button');
     foldBtn.type = 'button';
     foldBtn.className = 'naga-fold';
@@ -862,7 +862,7 @@ export class NagaIME extends HTMLElement {
       if (item) this.commit(this.candidates[Number(item.dataset.index)]);
     });
 
-    // 部品は影の中（§5.2）。document.body には何も入れない
+    // 部品は影の中。document.body には何も入れない
     this.root.append(trigger, popup, caretMark, live);
     this.trigger = trigger;
     this.popup = popup;
@@ -1221,7 +1221,7 @@ export class NagaIME extends HTMLElement {
   }
 
   /* ------------------------------------------------------------ *
-   * 折りたたみ（§3.3）
+   * 折りたたみ
    * ------------------------------------------------------------ */
 
   /** 畳む／開く（人間の操作でだけ呼ぶ）。開くときは読み欄へ戻す（タップの中なのでソフトキーボードが出る）。 */
@@ -1366,7 +1366,7 @@ export class NagaIME extends HTMLElement {
     } else {
       (field as NagaTarget).value += candidate.char;
     }
-    // ネイティブの入力と同じ性質の InputEvent（§5.5）。composed なので影の中の欄でも影の外の
+    // ネイティブの入力と同じ性質の InputEvent。composed なので影の中の欄でも影の外の
     // React / Vue 等に届く
     field.dispatchEvent(
       new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: candidate.char }),

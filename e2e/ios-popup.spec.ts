@@ -95,7 +95,7 @@ function m1CaretBottom(field: Rect): number {
   return field.top + M1.border + M1.paddingTop + M1.lineHeight;
 }
 
-/** popup の上端 − 欄の上端（この差が一定であることが「欄に付いている」の意味。「popup をキャレットの行の下に付ける変更」 も同じ）。 */
+/** popup の上端 − 欄の上端（この差が一定であることが「欄に付いている」の意味。「popup をキャレットの行の下に付ける変更」も同じ）。 */
 async function offsetFromFieldTop(page: Page, id = 'm1'): Promise<number> {
   const field = await fieldRect(page, id);
   const pop = await popupRect(page);

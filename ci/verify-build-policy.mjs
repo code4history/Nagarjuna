@@ -164,7 +164,7 @@ function detectExplicitSection(filePath) {
  * `node_modules/.modules.yaml` の検査（G4）。
  *
  * 重要: pnpm 11.16.0 が書き出す `.modules.yaml` は拡張子に反して実体が JSON である。
- * したがって本モードの parser は `JSON.parse` を使い、§5.1.1 の allowBuilds YAML
+ * したがって本モードの parser は `JSON.parse` を使い、allowBuilds の YAML の
  * strict parser（parseAllowBuildsYaml）を流用してはならない。
  * 両モードは同一ファイルに同居するが入力形式も parser も別物であり、関数を共有しない。
  *

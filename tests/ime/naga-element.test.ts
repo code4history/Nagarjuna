@@ -2,7 +2,7 @@
  * <naga-ime>（custom element）の契約の単体テスト。
  *
  * 属性⇔プロパティ（規則 1〜6）・メソッド・イベントの
- * 表を回す。静的 import で登録済みのクラスを使う（§5.2 の表の 2 行目）。
+ * 表を回す。静的 import で登録済みのクラスを使う。
  * テストの名前の [a]〜[g] は、属性とプロパティの規則の区分の印。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -145,7 +145,7 @@ describe('<naga-ime> の形', () => {
   });
 });
 
-describe('属性⇔プロパティ（§5.3 の表を回す）', () => {
+describe('属性⇔プロパティ（対応表を回す）', () => {
   for (const r of ROWS) {
     it(`[a] ${r.attr}: 付ける・変える・外す（外すと既定値）`, () => {
       const el = create();
@@ -269,7 +269,7 @@ describe('属性⇔プロパティ（§5.3 の表を回す）', () => {
   });
 });
 
-describe('最近使った文字を止める手段（§5.3 規則 6・§0.2）', () => {
+describe('最近使った文字を止める手段', () => {
   it(
     '[d] recentStorageKey = null では localStorage を読みも書きもせず、「最近」タブは要素の中だけで働く',
     async () => {
@@ -377,7 +377,7 @@ describe('最近使った文字を止める手段（§5.3 規則 6・§0.2）', 
   );
 });
 
-describe('起動後の変更（§5.3 の表の「起動後の変更」列）', () => {
+describe('起動後の変更（開いた後に属性を変えたときの反映）', () => {
   it(
     'categories を変えるとタブを作り直し、開いたまま。triggerLabel は起動ボタンの文字を替える',
     async () => {
@@ -416,7 +416,7 @@ describe('起動後の変更（§5.3 の表の「起動後の変更」列）', (
   );
 });
 
-describe('メソッドとイベント（§5.4・§5.5）', () => {
+describe('メソッドとイベント', () => {
   it(
     'open / close / toggle と isOpen、nagaOpen・nagaClose の detail と性質',
     async () => {
@@ -541,7 +541,7 @@ describe('メソッドとイベント（§5.4・§5.5）', () => {
       el.attach(field);
       await el.open(field);
       // 【欄を触ったら閉じる変更】利用者が元の欄を触ったら閉じる（影の中の欄も同じ）。
-      // 「欄を触ったら閉じる変更」 以前は「欄の mousedown では閉じない」だったが、実機の「フォーカスを戻しても連携しない」
+      // 「欄を触ったら閉じる変更」の前は「欄の mousedown では閉じない」だったが、実機の「フォーカスを戻しても連携しない」
       // 「改行するとカーソルが IME の下に回り込む」への対応で閉じる側に変えた
       // 【欄を触ったら閉じる変更の見直し】欄の mousedown だけでは閉じない（iOS で欄の上から始めたスクロールで閉じないため）。
       // 閉じるのは欄へ focus が戻ったとき
@@ -593,7 +593,7 @@ describe('メソッドとイベント（§5.4・§5.5）', () => {
   });
 });
 
-describe('for 属性（§5.3 の htmlFor の行）', () => {
+describe('for 属性（htmlFor プロパティ）', () => {
   it('文書の id で付け、htmlFor の代入で付け直す（for 属性は変えない）。後から足した欄は付かない', () => {
     document.body.insertAdjacentHTML('beforeend', '<input id="fa"><input id="fb"><input id="fc">');
     const fa = document.getElementById('fa') as HTMLInputElement;
@@ -651,7 +651,7 @@ describe('for 属性（§5.3 の htmlFor の行）', () => {
   });
 });
 
-describe('切断と再接続（§5.4）', () => {
+describe('切断と再接続', () => {
   it('同じタスク内の移動では作り直さない。切断のままなら次のマイクロタスクで全部 detach する', async () => {
     document.body.insertAdjacentHTML('beforeend', '<input id="ma"><div id="box"></div>');
     const ma = document.getElementById('ma') as HTMLInputElement;

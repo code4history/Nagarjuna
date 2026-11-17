@@ -81,7 +81,7 @@ push(
 // (c) ./ime subpath — 解決＋静的照合（実 import はしない）。
 // ./ime は読み込み時に window.customElements へ 'ime-ui' と 'naga-ime' を登録する
 // ブラウザ専用モジュールであり、Node で読むと必ず落ちる。実測により
-// Node で読む正当な用途は 0 件である ∴ 上位契約の字句どおり
+// Node で読む正当な用途は 0 件である ∴ 読み込みはせず、
 // 「解決できること」＋「配布物が IMEManager と NagaIME を export すること」を検査する。
 
 // S5c-1: types / import / require の指し先が実在する（現行の判定をそのまま残す）
@@ -118,7 +118,7 @@ try {
 
 // S5c-3: 配布物が IMEManager を export することを静的に照合する（Chokei の S5c と同手法）。
 // 正規表現リテラルを使わない — 本 driver はテンプレートリテラルであり、バックスラッシュが
-// テンプレートリテラルのエスケープとして先に消費されて別の文字になる（罠）。
+// テンプレートリテラルのエスケープとして先に消費され、正規表現に届く前に別の文字になるため。
 try {
   const dtsText = fs.readFileSync(path.join(pkgDir, "dist", "ime.d.ts"), "utf8");
   const esmText = fs.readFileSync(path.join(pkgDir, "dist", "nagarjuna-ime.js"), "utf8");

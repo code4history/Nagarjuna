@@ -122,7 +122,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('NagaIME 挿入位置の縦棒（「挿入位置の縦棒」）', () => {
+describe('NagaIME 挿入位置の縦棒', () => {
   it(
     'popup を開くと縦棒が出て、left/top は measureCaret の座標 ＋ scroll の文書座標・高さは行の高さ',
     async () => {
@@ -269,7 +269,7 @@ describe('NagaIME 挿入位置の縦棒（「挿入位置の縦棒」）', () =>
   );
 });
 
-describe('NagaIME 写しの撤去（「挿入位置の縦棒」）', () => {
+describe('NagaIME 写しの撤去（挿入位置の縦棒への置き換え）', () => {
   it(
     '写し（.naga-copy）の要素は影の中に無い',
     async () => {

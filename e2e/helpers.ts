@@ -18,7 +18,7 @@ export const PART = {
 
 export type PartName = keyof typeof PART;
 
-/** 比べる計算済みスタイル（§3.4 R）。 */
+/** 比べる計算済みスタイル。 */
 export const STYLE_PROPS = [
   'font-size',
   'line-height',

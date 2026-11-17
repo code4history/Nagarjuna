@@ -1,7 +1,7 @@
 /**
  * NagaIME の単体テスト。
  *
- * PoC（Playground/NextNaga/js/naga-ime.js）の UX を TypeScript 化した NagaIME が、
+ * PoC（JavaScript で書いた試作）の UX を TypeScript 化した NagaIME が、
  * bundle 辞書・FontLoader・明示 trigger・keyboard・composition 非介入・setRangeText・
  * bubbles input・recent を満たし、通常入力を妨げないことを確かめる。
  */
@@ -15,7 +15,7 @@ import { DICTIONARY_MAX_CHAR_LENGTH } from '@/data/dictionary-stats';
 vi.mock('@/lib/ime/naga-dictionary', { spy: true });
 
 // 辞書（生成済み dictionary.ts）の動的 import を伴うテストは、vitest.config.ts の testTimeout: 1000 では
-// 高負荷時に偽の赤になる（実装レビュー Round 1 Minor-1）。legacy-manager.test.ts と同じく個別に 8000ms を与える。
+// 高負荷時に偽の赤になる。legacy-manager.test.ts と同じく個別に 8000ms を与える。
 const DICTIONARY_TEST_TIMEOUT_MS = 8000;
 
 function key(type: 'keydown', init: KeyboardEventInit): KeyboardEvent {

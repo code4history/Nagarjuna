@@ -390,7 +390,7 @@ describe('NagaIME モバイル dock', () => {
   );
 
   it(
-    '§7.3: dock 中に候補をタップすると確定し、開いたまま次の候補を続けて入れられる',
+    'dock 中に候補をタップすると確定し、開いたまま次の候補を続けて入れられる',
     async () => {
       stubViewport(PHONE_KEYBOARD);
       ime.attach(field);
@@ -427,7 +427,7 @@ describe('NagaIME モバイル dock', () => {
     expect(NAGA_STYLE_TEXT).toContain('.naga-popup.naga-is-docked .naga-search-label');
     // タブ帯: 背景で候補領域の白と分ける
     expect(NAGA_STYLE_TEXT).toMatch(/\.naga-popup\.naga-is-docked\s+\.naga-titlebar\s*\{[^}]*background/);
-    // 「ふわふわ浮いて」（§1 の 5）: 見た目は欄のすぐ下に付けた板のまま（上端のアクセントの線・上向きの影）。
+    // 「ふわふわ浮いて」: 見た目は欄のすぐ下に付けた板のまま（上端のアクセントの線・上向きの影）。
     // 「popup を欄の下に付ける変更」で位置の決め方だけを変えた（fixed → absolute）∴ 見た目の規則は残す
     expect(NAGA_STYLE_TEXT).toMatch(/\.naga-popup\.naga-is-docked\s*\{[^}]*border-top:\s*2px solid var\(--naga-accent\)/);
     expect(NAGA_STYLE_TEXT).toMatch(/\.naga-popup\.naga-is-docked\s*\{[^}]*box-shadow:\s*0 -4px 16px/);

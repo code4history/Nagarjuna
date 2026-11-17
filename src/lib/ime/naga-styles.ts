@@ -8,7 +8,7 @@
  * - 寸法は px で書く（rem・em を使わない。ページの `html { font-size }` に引きずられないため）。
  * - 書体は FontLoader が読む family（NINJAL Hentaigana / Noto Sans Siddham / Noto Sans JP）を使う。
  *   @font-face は FontLoader 側が注入するため、ここでは宣言しない。
- * - 見た目は PoC（Playground/NextNaga/css/naga-ime.css）に合わせる。PoC の状態 class
+ * - 見た目は PoC（JavaScript で書いた試作）に合わせる。PoC の状態 class
  *   `is-active` / `is-selected` は接頭辞規則のため `naga-is-active` / `naga-is-selected` に改めた。
  */
 export const NAGA_STYLE_TEXT = `

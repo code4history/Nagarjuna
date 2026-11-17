@@ -46,7 +46,7 @@ test('P-2: trigger の click で popup が #f1 の下に dock せずに出て、
   expect(pop2.rect.left).toBeGreaterThanOrEqual(f1.left + 8 + 32);
 });
 
-// 【欄を触ったら閉じる変更】「欄を触ったら閉じる変更」 以前は「欄へ focus を戻して Control+j で閉じる」だった。
+// 【欄を触ったら閉じる変更】この変更の前は「欄へ focus を戻して Control+j で閉じる」だった。
 // いまは利用者が欄へ focus を戻した時点で popup が閉じる（実機の「戻しても連携しない」への対応）∴
 // 欄へ戻すと閉じ、閉じたあとの Control+j は開く、という順序で測る（toggle 自体は trigger と単体テストが見る）。
 test('P-3: Control+j で開き、欄へ focus を戻すと閉じ、もう一度 Control+j で開く（「欄を触ったら閉じる変更」）', async ({ page }) => {

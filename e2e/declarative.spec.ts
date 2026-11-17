@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { PART, deepHandle, gotoFixture, isShown } from './helpers';
 
 // 宣言的な利用（F-DECL）。各 expect に測りの印 [measure:<ID>] を付ける。
-// t2 の実装が辞書の読込を待つ時間を見込み、判定は expect.poll で待つ。
+// 部品を影の中へ移す変更の実装が辞書の読込を待つ時間を見込み、判定は expect.poll で待つ。
 
 async function visibleTabs(page: Page): Promise<string[]> {
   const tabs = await deepHandle(page, '.naga-tabs');

@@ -1,6 +1,6 @@
 /**
- * 同一ページでの legacy <ime-ui> と NagaIME の共存（oct26-m7-t1 設計 v4 §3.1・AC6、
- * nov26-m3-t2 でマイルストーン設計 §5.7-9 の形へ追随）。
+ * 同一ページでの legacy <ime-ui> と NagaIME の共存（のちに
+ * <naga-ime> の形へ追随）。
  *
  * テストの順序に意味がある: 最初のテストは <ime-ui> がまだ登録されていない registry で
  * NagaIME だけを import し、NagaIME が naga-ime だけを登録し ime-ui を登録しないことを spy で
@@ -28,7 +28,7 @@ async function loadIme(): Promise<{
 /** CSS テキストから規則のセレクタを取り出す（@media 等の at-rule の prelude は除く）。 */
 function selectorsOf(cssText: string): string[] {
   let noComments = cssText.replace(/\/\*[\s\S]*?\*\//g, '');
-  // 【0437】@keyframes の中の `0%, 50% { … }` は selector ではない ∴ ブロックごと落とす
+  // 【挿入位置の縦棒】@keyframes の中の `0%, 50% { … }` は selector ではない ∴ ブロックごと落とす
   // （この検査は「ページの要素に当たりうる selector が .naga- か :host だけか」を見る）。
   noComments = noComments.replace(/@keyframes\s+[^{]+\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, '');
   const selectors: string[] = [];
@@ -55,7 +55,7 @@ function nagaPart(naga: Element, selector: string): HTMLElement | null {
   return (naga.shadowRoot?.querySelector(selector) as HTMLElement | null) ?? null;
 }
 
-describe('legacy <ime-ui> と NagaIME の同一ページ共存（AC6）', () => {
+describe('legacy <ime-ui> と NagaIME の同一ページ共存', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     document.body.innerHTML = '';

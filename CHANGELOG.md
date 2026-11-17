@@ -43,9 +43,9 @@ The stable release with the same content as 1.1.0-rc.3 (version number only). Se
 
 ## [1.1.0-rc.3] - 2026-10-01
 
-1.1.0 の位置づけを変更しました。**正式な IME は従来どおり `IMEManager` / `<ime-ui>` です。** 新しい IME UI（`NagaIME`）は次のトレインで公開する予定で、1.1.0 ではデモ上のプレビューとしてのみ提供します（API は公開しません）。1.1.0-rc.1 に記載した内容のうち、`NagaIME` の追加（「追加」）と legacy IME の非推奨化（「非推奨」）は、この版で取り消しました。1.1.0-rc.2 は npm に公開していません（欠番）。
+1.1.0 の位置づけを変更しました。**正式な IME は従来どおり `IMEManager` / `<ime-ui>` です。** 新しい IME UI（`NagaIME`）は次のリリースで公開する予定で、1.1.0 ではデモ上のプレビューとしてのみ提供します（API は公開しません）。1.1.0-rc.1 に記載した内容のうち、`NagaIME` の追加（「追加」）と legacy IME の非推奨化（「非推奨」）は、この版で取り消しました。1.1.0-rc.2 は npm に公開していません（欠番）。
 
-The positioning of 1.1.0 has changed. **The official IME remains `IMEManager` / `<ime-ui>`.** The new IME UI (`NagaIME`) is planned for the next release train; in 1.1.0 it is offered only as a preview in the demo, and its API is not public. Of the items listed under 1.1.0-rc.1, the addition of `NagaIME` ("Added") and the deprecation of the legacy IME ("Deprecated") are reverted in this version. 1.1.0-rc.2 was not published to npm (skipped).
+The positioning of 1.1.0 has changed. **The official IME remains `IMEManager` / `<ime-ui>`.** The new IME UI (`NagaIME`) is planned for the next release; in 1.1.0 it is offered only as a preview in the demo, and its API is not public. Of the items listed under 1.1.0-rc.1, the addition of `NagaIME` ("Added") and the deprecation of the legacy IME ("Deprecated") are reverted in this version. 1.1.0-rc.2 was not published to npm (skipped).
 
 ### 取り消し / Reverted (1.1.0-rc.1)
 
@@ -54,7 +54,7 @@ The positioning of 1.1.0 has changed. **The official IME remains `IMEManager` / 
 
 ### 追加 / Added
 
-- 次のトレインで公開予定の新しい IME UI（NagaIME）のプレビューを、デモの `naga.html` に置きました。API は公開されておらず、変更される可能性があります。 / Added a preview of the new IME UI (NagaIME) planned for the next release train to the demo as `naga.html`. Its API is not public and may change.
+- 次のリリースで公開予定の新しい IME UI（NagaIME）のプレビューを、デモの `naga.html` に置きました。API は公開されておらず、変更される可能性があります。 / Added a preview of the new IME UI (NagaIME) planned for the next release to the demo as `naga.html`. Its API is not public and may change.
 
 ### 変更 / Changed
 

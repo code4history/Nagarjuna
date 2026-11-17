@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// nov26-m3-t1: NagaIME の e2e の土台（前例: Weiwudi の playwright.config.js）。
+// NagaIME の e2e の土台（前例: Weiwudi の playwright.config.js）。
 // - e2e は tests/（vitest の領分）ではなく e2e/ に置く（vitest.config.ts の exclude で拾わせない）
 // - dev server は pnpm を経由せず tsx＋vite を直に起こす（clone の workspace 設定の有無に左右されない）
 // - ポート 4179 は他リポジトリの dev server（5173）と衝突させないため。--strictPort で黙って移らない
@@ -23,15 +23,15 @@ export default defineConfig({
       testIgnore: /mobile\.spec\.ts|ios-trigger\.spec\.ts|ios-popup\.spec\.ts/,
     },
     {
-      // nov26-m3-t3 §3.7: スマートフォンの見え方（M-1〜M-5）。viewport は spec の describe ごとに与える
+      // スマートフォンの見え方（M-1〜M-5）。viewport は spec の describe ごとに与える
       name: 'chromium-mobile',
       use: { ...devices['Pixel 5'], isMobile: true, hasTouch: true },
       testMatch: /mobile\.spec\.ts/,
     },
     {
-      // 【NOV26-IM-NAGA-IOS-TRIGGER-0426】iOS は Safari・Edge とも WebKit。起動ボタンの置き直しを
+      // 【起動ボタンの fixed 配置】iOS は Safari・Edge とも WebKit。起動ボタンの置き直しを
       // WebKit に iPhone を模した端末で測る（chromium の模擬では再現しない。実機は測れない）
-      // 【NOV26-IM-NAGA-POPUP-ANCHOR-0432】同じ端末で popup の置き場所（ios-popup.spec.ts）も測る
+      // 【popup を欄の下に付ける変更】同じ端末で popup の置き場所（ios-popup.spec.ts）も測る
       name: 'webkit-iphone',
       use: { ...devices['iPhone 15'] },
       testMatch: /ios-(trigger|popup)\.spec\.ts/,

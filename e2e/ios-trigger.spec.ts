@@ -1,15 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
 import { PART, fieldRect, gotoFixture, isShown, partInfo, waitShown, type Rect } from './helpers';
 
-// 【NOV26-IM-NAGA-TRIGGER-ABSOLUTE-0430】起動ボタン「梵」の置き場所の回帰試験（iOS のキーボードとスクロール）。
+// 【起動ボタンの absolute 配置】起動ボタン「梵」の置き場所の回帰試験（iOS のキーボードとスクロール）。
 //
 // 実機の iPhone は測れない。ここで測るのは **WebKit に iPhone を模した端末（devices['iPhone 15']）**。
 // project webkit-iphone でだけ走る（playwright.config.ts）。
 //
-// 0426 の実装はボタンを position: fixed（layout viewport 基準）で置き、scroll のたびに置き直していた。
+// 「起動ボタンの fixed 配置」の実装はボタンを position: fixed（layout viewport 基準）で置き、scroll のたびに置き直していた。
 // 実機の iPhone では、キーボードを出したままスクロールすると visual viewport の offset とページの
 // スクロールが混ざってボタンが「明後日の場所」に出て欄とは違う速さで通り過ぎ、欄が画面外に出ると
-// 可視域の端に貼り付いた。0430 でボタンを文書の座標（position: absolute）に置き直し、スクロールでの
+// 可視域の端に貼り付いた。「起動ボタンの absolute 配置」でボタンを文書の座標（position: absolute）に置き直し、スクロールでの
 // 置き直しをやめた ∴ ここでは「rect が本文と一緒に動くこと（欄との差が一定）」を測る。
 // WebKit を Playwright で動かすかぎり本当のソフトキーボードは出ない ∴ visualViewport のパンは
 // 読み取り値を差し替えて模す（getter を上書きする。実物の VisualViewport のままなのでイベントは
@@ -189,7 +189,7 @@ test('I-5: 欄から離れる（blur）と梵ボタンは消え、置き直し�
 test('I-6: スクロールコンテナ（overflow: auto）の中の欄では、その要素をスクロールしても梵ボタンが欄に付いてくる', async ({
   page,
 }) => {
-  // 【NOV26-IR-NAGA-TRIGGER-ABSOLUTE-0431 MAJOR-1】#m1 は #scroller の中にある
+  // 【起動ボタンの absolute 配置の見直し】#m1 は #scroller の中にある
   await focusM1(page);
   const gaps: number[] = [];
   for (const y of [0, 15, 30]) {

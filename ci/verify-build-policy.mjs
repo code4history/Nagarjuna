@@ -151,7 +151,7 @@ function stripAnsi(text) {
 
 /**
  * `pnpm ignored-builds` の raw stdout に区分Bヘッダが1行以上あるかを判定する（G3）。
- * ANSI 装飾を除去したうえで、行頭からの完全一致で判定する（設計 §5.1.2.5）。
+ * ANSI 装飾を除去したうえで、行頭からの完全一致で判定する。
  */
 function detectExplicitSection(filePath) {
   const raw = readFileUtf8(filePath);
@@ -165,11 +165,11 @@ function detectExplicitSection(filePath) {
  *
  * 重要: pnpm 11.16.0 が書き出す `.modules.yaml` は拡張子に反して実体が JSON である。
  * したがって本モードの parser は `JSON.parse` を使い、§5.1.1 の allowBuilds YAML
- * strict parser（parseAllowBuildsYaml）を流用してはならない（設計 §5.1.2.5 / §9.1）。
+ * strict parser（parseAllowBuildsYaml）を流用してはならない。
  * 両モードは同一ファイルに同居するが入力形式も parser も別物であり、関数を共有しない。
  *
  * また本モードは検査対象キーだけを読み、それ以外のキー（hoistedDependencies 等）の
- * 存在を失敗にしない（設計 §5.1.2.5・未知キーの扱い）。
+ * 存在を失敗にしない（未知キーの扱い）。
  */
 function runModulesManifest(manifestPath, explicitSectionPath) {
   let text;

@@ -1,7 +1,7 @@
 /**
- * 【NOV26-IM-NAGA-TRIGGER-ABSOLUTE-0430】起動ボタン「梵」の置き場所の単体テスト。
+ * 【起動ボタンの absolute 配置】起動ボタン「梵」の置き場所の単体テスト。
  *
- * 以前（0426）はボタンを `position: fixed` で置き、window と visualViewport の scroll・resize のたびに
+ * 以前（「起動ボタンの fixed 配置」）はボタンを `position: fixed` で置き、window と visualViewport の scroll・resize のたびに
  * 置き直していた。実機の iPhone ではキーボードを出したままスクロールすると、visualViewport の offset と
  * ページのスクロールが混ざってボタンが欄から離れ、欄が画面外に出ると可視域の端に貼り付いた。
  * いまは文書の座標（`position: absolute`）で置く ∴ ページのスクロールではブラウザが本文と一緒に動かし、

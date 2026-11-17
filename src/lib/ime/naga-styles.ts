@@ -1,8 +1,8 @@
 /**
- * NagaIME 専用の style（oct26-m7-t1 設計 §3.2-3・nov26-m3-t2 で Shadow DOM へ移した）。
+ * NagaIME 専用の style（のちに Shadow DOM へ移した）。
  *
  * - `<naga-ime>` の影の中に閉じる（`<style data-naga-style>` を影の中に 1 つ置く。document.head には入れない）。
- *   selector は `.naga-` か `:host` で始める（legacy の `ime-*` / 利用者の CSS と衝突させない・AC6）。
+ *   selector は `.naga-` か `:host` で始める（legacy の `ime-*` / 利用者の CSS と衝突させない）。
  * - 影の中の最上位 `.naga-root` に `all: initial` を当て、ページの継承性質を断つ。`all` は `direction` と
  *   custom property を戻さないので `direction` は明示し、`--naga-*` は popup / trigger の要素上で宣言する。
  * - 寸法は px で書く（rem・em を使わない。ページの `html { font-size }` に引きずられないため）。
@@ -40,7 +40,7 @@ export const NAGA_STYLE_TEXT = `
 }
 
 /* 起動ボタンは文書の座標で置く（positionTrigger が top/left に文書座標を書く）。
-   fixed ＋ JS 追随は iOS の visual viewport とずれる（NOV26-IM-NAGA-TRIGGER-ABSOLUTE-0430）。
+   fixed ＋ JS 追随は iOS の visual viewport とずれる（起動ボタンの absolute 配置）。
    host と .naga-root が display: contents なので、position を持つ祖先が無ければ包含ブロックは文書になる。 */
 .naga-trigger {
   position: absolute;
@@ -67,7 +67,7 @@ export const NAGA_STYLE_TEXT = `
 
 /* popup も文書の座標で置く（positionPopup が top/left に文書座標を書く）。
    狭幅は欄のすぐ下、広幅はキャレットの行の下。fixed ＋ visualViewport の offset は iOS のキーボードで
-   ずれる（NOV26-IM-NAGA-POPUP-ANCHOR-0432）。包含ブロックは .naga-root が display: contents なので、
+   ずれる（popup を欄の下に付ける変更）。包含ブロックは .naga-root が display: contents なので、
    position を持つ祖先が無ければ文書になる。 */
 .naga-popup {
   position: absolute;
@@ -130,7 +130,7 @@ export const NAGA_STYLE_TEXT = `
 }
 
 /*
- * 非 dock（PC）で隠す・構造の selector は base に置く（nov26-m3-t3 タスク設計 §1 の 4-2 の定め直し）。
+ * 非 dock（PC）で隠す・構造の selector は base に置く。
  * dock 専用の見た目は下の .naga-popup.naga-is-docked スコープに置く。
  */
 .naga-fold {
@@ -147,7 +147,7 @@ export const NAGA_STYLE_TEXT = `
 }
 
 /*
- * 【NOV26-IM-NAGA-CARET-MARK-0437】挿入位置の縦棒。
+ * 【挿入位置の縦棒】挿入位置の縦棒。
  * popup を開くと focus が読み欄へ移り、元の欄のキャレットが見えなくなる ∴ 元の欄の挿入位置に
  * 縦棒を出す（人間の提案「IME の表示中はキャレットを目立つように変える」）。
  * 位置は positionPopup() と同じ文書の座標（placeCaretMark が top/left に書く）。
@@ -180,7 +180,7 @@ export const NAGA_STYLE_TEXT = `
 }
 
 /*
- * 確定した文字だけを読み上げる live region（0437）。写し（.naga-copy）に付いていた aria-live の
+ * 確定した文字だけを読み上げる live region（「挿入位置の縦棒」）。写し（.naga-copy）に付いていた aria-live の
  * 最小の代替で、見た目には出さない（visually-hidden。レイアウトにも場所を取らせない）。
  */
 .naga-live {
@@ -197,8 +197,8 @@ export const NAGA_STYLE_TEXT = `
 }
 
 /*
- * 読み入力欄の行（是正設計 v2 §5「区別の付け方」）。
- * 行は flex（nov26-m3-t3: a11y の木から要素を落としうる contents の箱をやめた）。PC では input が
+ * 読み入力欄の行。
+ * 行は flex（a11y の木から要素を落としうる contents の箱をやめた）。PC では input が
  * 行いっぱいに広がり、外余白 8px で従来と同じ位置に来る（e2e の P-8）。ラベルは PC では出さない。
  */
 .naga-search-row {
@@ -297,12 +297,12 @@ export const NAGA_STYLE_TEXT = `
 }
 
 /*
- * モバイル dock（是正設計 v2 §3・§4 案 A・§5、nov26-m3-t3 タスク設計 §3.1〜§3.3）。
+ * モバイル dock。
  * ここから下の規則はすべて .naga-popup.naga-is-docked スコープに閉じる（PC 非影響）。
  * 高さの静的な viewport 比指定（旧 dock ルールの vh 値）は使わない。--naga-dock-max は
  * positionPopup() が visualViewport の実測から毎回設定する（未設定時のみ既定 204px）。
  * 各行の高さは naga-ime.ts の DOCK_*_PX と一致させる（タイトル 34・読み欄 36・候補 44・枠 2）。
- * 【0437】挿入先の写し（行の高さ 22px）は広幅・狭幅とも撤去した ∴ 高さの計算にも入れない。
+ * 【挿入位置の縦棒】挿入先の写し（行の高さ 22px）は広幅・狭幅とも撤去した ∴ 高さの計算にも入れない。
  */
 .naga-popup.naga-is-docked {
   /* 画面の下に据え付けた板（「ふわふわ浮いて」への対応）: 左右いっぱい・上端のアクセントの線・上向きの影 */
@@ -310,7 +310,7 @@ export const NAGA_STYLE_TEXT = `
   border-top: 2px solid var(--naga-accent);
   border-radius: 0;
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.18);
-  max-height: var(--naga-dock-max, 204px); /* 未設定時の既定（0436 で写しの行を外して 204。0437 で写し自体を撤去） */
+  max-height: var(--naga-dock-max, 204px); /* 未設定時の既定（「欄を触ったら閉じる変更」で写しの行を外して 204。「挿入位置の縦棒」で写し自体を撤去） */
 }
 /* 縮むのは内側の list だけ（タイトル行・読み欄は潰さない） */
 .naga-popup.naga-is-docked .naga-list {
@@ -343,7 +343,7 @@ export const NAGA_STYLE_TEXT = `
   display: block;
 }
 /*
- * 【NOV26-IM-NAGA-CARET-MARK-0437】挿入先の写し（欄の中身を ↵ で 1 行に詰めた文脈の表示）は
+ * 【挿入位置の縦棒】挿入先の写し（欄の中身を ↵ で 1 行に詰めた文脈の表示）は
  * 広幅・狭幅とも撤去した（実機の「元フォームと IME の間にわかりにくい文字列が表示され、狭いのに
  * 場所を取る」への対応）。挿入位置は .naga-caret-mark の縦棒で示す ∴ ここに写しの規則は無い。
  */

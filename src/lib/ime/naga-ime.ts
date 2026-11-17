@@ -1,6 +1,6 @@
 /**
- * NagaIME — トリガー式の特殊文字入力ポップアップ（oct26-m7-t1 設計 §3.2-1、
- * nov26-m3-t2 で custom element `<naga-ime>`＋open Shadow DOM に包み直した）。
+ * NagaIME — トリガー式の特殊文字入力ポップアップ（のちに
+ * custom element `<naga-ime>`＋open Shadow DOM に包み直した）。
  *
  * PoC（Playground/NextNaga/js/naga-ime.js）の UX を TypeScript 化したもの。
  *  - 常駐しない。対象にフォーカスすると小さな起動ボタンが出るだけ。
@@ -12,7 +12,7 @@
  *  - 直近使用を localStorage に保持し、次回は「最近」タブから開く。
  *  - PC はキャレットの少し下（viewport 基準の fixed）、狭い viewport では画面下部へドッキングする。
  *
- * 要素の形（マイルストーン設計 nov26-m3 §5）:
+ * 要素の形:
  *  - `new NagaIME(options)` でも `<naga-ime>` でも同じものができる。モジュールの評価で `naga-ime` を登録する。
  *    別の実装が登録済みなら上書きせず何も出さない。そのときこのクラスの `new` は TypeError を投げる。
  *  - trigger・popup・スタイルは影の中に置く。document.head に `<style>` を入れない。
@@ -52,26 +52,26 @@ const RECENT_SHORT = '近';
 const TRIGGER_SIZE_PX = 26;
 /** 起動ボタンと欄の間隔（上下とも）。 */
 const TRIGGER_GAP_PX = 4;
-/** 起動ボタンが横にはみ出すときに、可視域の左端から空ける余白（0430: 縦の clamp はしない）。 */
+/** 起動ボタンが横にはみ出すときに、可視域の左端から空ける余白（「起動ボタンの absolute 配置」: 縦の clamp はしない）。 */
 const TRIGGER_MARGIN_PX = 4;
-/** 狭幅の popup を欄のすぐ下に付けるときの間隔（0432。キャレットを測れない欄のときだけ使う）。 */
+/** 狭幅の popup を欄のすぐ下に付けるときの間隔（「popup を欄の下に付ける変更」。キャレットを測れない欄のときだけ使う）。 */
 const POPUP_GAP_PX = 4;
-/** キャレットの行の下端と popup の上端の間隔（0434。広幅の PC と同じ 2px）。 */
+/** キャレットの行の下端と popup の上端の間隔（「popup をキャレットの行の下に付ける変更」。広幅の PC と同じ 2px）。 */
 const POPUP_CARET_GAP_PX = 2;
 const FONT_SETTINGS: FontSettings = { hentaigana: true, siddham: true, itaiji: true };
 const ALL_CATEGORIES: readonly NagaCategoryId[] = NAGA_CATEGORIES.map((c) => c.id);
 const CATEGORY_IDS = new Set<string>(ALL_CATEGORIES);
 
 /*
- * モバイル dock の割り付け（nov26-m3-t3 タスク設計 §3.1）。下の定数が「dock 時の寸法」の唯一の出どころである
+ * モバイル dock の割り付け。下の定数が「dock 時の寸法」の唯一の出どころである
  * （CSS 側には --naga-dock-max 未設定時のフォールバックしか置かない）。静的な vh には依存しない。
- * 位置は文書の座標（キャレットの行のすぐ下。0434。キャレットを測れない欄では欄のすぐ下。0432）。
+ * 位置は文書の座標（キャレットの行のすぐ下。「popup をキャレットの行の下に付ける変更」。キャレットを測れない欄では欄のすぐ下。「popup を欄の下に付ける変更」）。
  *   visibleBottom = vv.offsetTop + vv.height（viewport の座標。vv が無ければ innerHeight）
  *   room          = visibleBottom − popup の上端（viewport） − DOCK_GAP_PX
  *   popupMax      = min(DOCK_POPUP_MAX_PX, room)
  *   room < DOCK_MIN_PX なら popupMax = DOCK_MIN_PX                     // 候補 1 行を優先（開いた直後に 1 回だけページを寄せる）
- * 0436: 挿入先の写しの行（22px）は狭幅では出さない ∴ 固定部分にも入れない。
- * 0437: 写しそのものを撤去した（挿入位置は .naga-caret-mark の縦棒で示す）。
+ * 「欄を触ったら閉じる変更」: 挿入先の写しの行（22px）は狭幅では出さない ∴ 固定部分にも入れない。
+ * 「挿入位置の縦棒」: 写しそのものを撤去した（挿入位置は .naga-caret-mark の縦棒で示す）。
  *   畳んでいるときは min(DOCK_FOLDED_PX, popupMax)
  */
 /** タイトル行（タブ・畳むボタン・閉じるボタン）。 */
@@ -88,9 +88,9 @@ const DOCK_BORDER_PX = 2;
 const DOCK_GAP_PX = 8;
 /**
  * 畳んでも残る固定部分 ＋ 読み欄 = 72px。
- * 【NOV26-IM-NAGA-POPUP-REFOCUS-0436】0434 までは挿入先の写しの行（22px）を足した 94px だったが、
+ * 【欄を触ったら閉じる変更】「popup をキャレットの行の下に付ける変更」までは挿入先の写しの行（22px）を足した 94px だったが、
  * 狭幅では写しを出さないことにした ∴ 高さの計算からも外す（実機の「狭いのに場所を取る」への対応）。
- * 【0437】写しは広幅・狭幅とも撤去した ∴ どの幅でもこの値のまま。
+ * 【挿入位置の縦棒】写しは広幅・狭幅とも撤去した ∴ どの幅でもこの値のまま。
  */
 const DOCK_FIXED_PX = DOCK_TITLE_PX + DOCK_SEARCH_PX + DOCK_BORDER_PX;
 /** 候補が 1 行まるごと見える下限 = 116px。 */
@@ -187,7 +187,7 @@ function tabLabelOf(id: TabId): string {
   return NAGA_CATEGORIES.find((c) => c.id === id)?.label ?? id;
 }
 
-/** タブの一文字表記（dock 時の非選択タブ。設計 §4 案 A）。 */
+/** タブの一文字表記（dock 時の非選択タブ）。 */
 function tabShortLabelOf(id: TabId): string {
   if (id === 'recent') return RECENT_SHORT;
   return NAGA_CATEGORIES.find((c) => c.id === id)?.short ?? tabLabelOf(id).charAt(0);
@@ -310,12 +310,12 @@ export class NagaIME extends HTMLElement {
   private composing = false;
   private openState = false;
   private openSeq = 0;
-  /** 下部ドッキング中か（`.naga-is-docked` と対。dock 限定の振る舞いの唯一の判定源・設計 §6.2-3）。 */
+  /** 下部ドッキング中か（`.naga-is-docked` と対。dock 限定の振る舞いの唯一の判定源）。 */
   private docked = false;
   /** 畳んでいるか（人間の操作でだけ変わる。閉じても・dock でなくなっても保つ。§3.3） */
   private folded = false;
   /**
-   * 【NOV26-IM-NAGA-POPUP-REFOCUS-0436】いま NagaIME 自身が欄へ focus を戻している最中か。
+   * 【欄を触ったら閉じる変更】いま NagaIME 自身が欄へ focus を戻している最中か。
    *
    * popup を開いたまま欄へ focus が戻ったら popup を閉じる（実機の「フォーカスを戻して入力すると
    * 連携しない」「改行するとカーソルが IME の下に回り込む」への対応）。ただし NagaIME 自身が
@@ -326,7 +326,7 @@ export class NagaIME extends HTMLElement {
    * 立てて降ろせば足りる（タイマーは使わない）。
    */
   private selfFocus = false;
-  /** この open で「可視域に収めるための 1 回のスクロール」を済ませたか（0434。開くたびに戻す）。 */
+  /** この open で「可視域に収めるための 1 回のスクロール」を済ませたか（「popup をキャレットの行の下に付ける変更」。開くたびに戻す）。 */
   private dockScrollDone = false;
   /** 初回の connectedCallback を終えたか（昇格中の attributeChangedCallback で for を引かない） */
   private initialized = false;
@@ -338,9 +338,9 @@ export class NagaIME extends HTMLElement {
   private searchEl: HTMLInputElement | null = null;
   private listEl: HTMLDivElement | null = null;
   private searchRowEl: HTMLDivElement | null = null;
-  /** 挿入位置の縦棒（0437。popup を開いている間だけ見える）。 */
+  /** 挿入位置の縦棒（「挿入位置の縦棒」。popup を開いている間だけ見える）。 */
   private caretMarkEl: HTMLDivElement | null = null;
-  /** 確定した文字だけを読み上げる visually-hidden の live region（0437。写しの aria-live の代替）。 */
+  /** 確定した文字だけを読み上げる visually-hidden の live region（「挿入位置の縦棒」。写しの aria-live の代替）。 */
   private liveEl: HTMLDivElement | null = null;
   private foldEl: HTMLButtonElement | null = null;
   private globalCleanup: (() => void) | null = null;
@@ -348,9 +348,9 @@ export class NagaIME extends HTMLElement {
   private triggerCleanup: (() => void) | null = null;
   /** 置き直しを間引く rAF の id（0 は予約していない）。 */
   private triggerRaf = 0;
-  /** popup の置き直しの購読を外す関数（開いていないときは null）。0432 */
+  /** popup の置き直しの購読を外す関数（開いていないときは null）。「popup を欄の下に付ける変更」 */
   private popupCleanup: (() => void) | null = null;
-  /** popup の置き直しを間引く rAF の id（0 は予約していない）。0432 */
+  /** popup の置き直しを間引く rAF の id（0 は予約していない）。「popup を欄の下に付ける変更」 */
   private popupRaf = 0;
 
   constructor(options: NagaIMEOptions = {}) {
@@ -689,18 +689,18 @@ export class NagaIME extends HTMLElement {
     this.trigger?.setAttribute('aria-expanded', 'true');
     this.searchEl.value = '';
     this.selectedIndex = 0;
-    // 【0437】確定文字の読み上げ（写しの aria-live の代替）を空から始める
+    // 【挿入位置の縦棒】確定文字の読み上げ（写しの aria-live の代替）を空から始める
     if (this.liveEl) this.liveEl.textContent = '';
     if (this.recents.length) this.activeTab = 'recent';
     else if (this.activeTab === 'recent') this.activeTab = this.cfgCategories[0];
     this.renderTabs();
     this.refresh();
-    // 0434: 可視域に収めるためのスクロールの例外は「開いた直後の 1 回」だけ ∴ 開くたびに戻す
+    // 「popup をキャレットの行の下に付ける変更」: 可視域に収めるためのスクロールの例外は「開いた直後の 1 回」だけ ∴ 開くたびに戻す
     this.dockScrollDone = false;
     this.positionPopup();
-    // 置き直しの購読を張り、レイアウトが落ち着いてから 1 回置き直す（0432）
+    // 置き直しの購読を張り、レイアウトが落ち着いてから 1 回置き直す（「popup を欄の下に付ける変更」）
     this.syncPopupTracking();
-    // NagaIME はページも欄もスクロールしない（M-1）。focus の暗黙のスクロールも止める（MIN-1）
+    // NagaIME はページも欄もスクロールしない（M-1）。focus の暗黙のスクロールも止める
     this.searchEl.focus({ preventScroll: true });
     this.emit('nagaOpen', { field });
   }
@@ -711,7 +711,7 @@ export class NagaIME extends HTMLElement {
     this.openState = false;
     this.composing = false;
     if (this.popup) this.popup.hidden = true;
-    // 【0437】挿入位置の縦棒は popup と一緒に消す（Escape・×・欄のタップ・detach・teardown のすべて）
+    // 【挿入位置の縦棒】挿入位置の縦棒は popup と一緒に消す（Escape・×・欄のタップ・detach・teardown のすべて）
     if (this.caretMarkEl) this.caretMarkEl.hidden = true;
     this.trigger?.setAttribute('aria-expanded', 'false');
     if (refocus && this.target) this.focusFieldSelf(this.target);
@@ -724,7 +724,7 @@ export class NagaIME extends HTMLElement {
   }
 
   /**
-   * 【0436】NagaIME 自身の都合で欄へ focus を戻す（利用者の操作と区別する印を立てる）。
+   * 【欄を触ったら閉じる変更】NagaIME 自身の都合で欄へ focus を戻す（利用者の操作と区別する印を立てる）。
    * focus イベントはこの呼び出しの中で同期的に届くので、戻った時点で印を降ろす。
    */
   private focusFieldSelf(field: NagaTarget): void {
@@ -810,7 +810,7 @@ export class NagaIME extends HTMLElement {
     search.setAttribute('aria-controls', listId);
     search.setAttribute('aria-label', SEARCH_ARIA_LABEL);
 
-    // 読み入力欄の行（設計 §5）。行は flex（nov26-m3-t3 で display: contents をやめた）。PC では
+    // 読み入力欄の行。行は flex（display: contents をやめた）。PC では
     // ラベルを隠し、input が行いっぱいに広がる（見た目は不変・e2e の P-8）。
     // dock 時だけラベルとアクセント縦線が出て、本体の入力欄と見分けられる。
     const searchRow = document.createElement('div');
@@ -830,13 +830,13 @@ export class NagaIME extends HTMLElement {
     hint.className = 'naga-hint';
     hint.textContent = '↑↓:選択 Enter:確定（連続入力可） 1-9:直接選択 Esc:閉じる';
 
-    // 【0437】確定した文字だけを読み上げる（写しに付いていた aria-live の最小の代替）
+    // 【挿入位置の縦棒】確定した文字だけを読み上げる（写しに付いていた aria-live の最小の代替）
     const live = document.createElement('div');
     live.className = 'naga-live';
     live.setAttribute('aria-live', 'polite');
     live.setAttribute('aria-atomic', 'true');
 
-    // 【0437】挿入位置の縦棒。popup を開いている間だけ、元の欄のキャレットの位置に出す
+    // 【挿入位置の縦棒】挿入位置の縦棒。popup を開いている間だけ、元の欄のキャレットの位置に出す
     const caretMark = document.createElement('div');
     caretMark.className = 'naga-caret-mark';
     caretMark.hidden = true;
@@ -886,7 +886,7 @@ export class NagaIME extends HTMLElement {
     const onResize = () => {
       if (this.openState) this.positionPopup();
     };
-    // 【NOV26-IM-NAGA-POPUP-ANCHOR-0432】popup は文書の座標で置く ∴ ページのスクロールでは置き直さない
+    // 【popup を欄の下に付ける変更】popup は文書の座標で置く ∴ ページのスクロールでは置き直さない
     // （ブラウザが本文と一緒に動かす）。開いている間の置き直しは syncPopupTracking() が受け持つ
     // （スクロールコンテナ要素の scroll と、開いた直後の 1 回）。resize はここで拾う。
     const vv = window.visualViewport;
@@ -915,7 +915,7 @@ export class NagaIME extends HTMLElement {
       b.dataset.category = id;
       // 初期値は正式名称。dock 時の一文字表記は applyTabLabels() が一手に引き受ける。
       b.textContent = tabLabelOf(id);
-      // 一文字表記でも何のタブか分かるよう、正式名称は常に取れるようにしておく（設計 §6.1 ③）。
+      // 一文字表記でも何のタブか分かるよう、正式名称は常に取れるようにしておく。
       b.title = tabLabelOf(id);
       b.setAttribute('aria-label', tabLabelOf(id));
       b.setAttribute('role', 'tab');
@@ -975,13 +975,13 @@ export class NagaIME extends HTMLElement {
     const addedClass = !field.classList.contains('naga-enabled');
     field.classList.add('naga-enabled');
 
-    // 【0436】利用者が欄へ focus を戻したら popup を閉じる（開いたまま連携しないなら閉じる方が良い、
+    // 【欄を触ったら閉じる変更】利用者が欄へ focus を戻したら popup を閉じる（開いたまま連携しないなら閉じる方が良い、
     // という実機の判断）。NagaIME 自身の focus 戻し（focusFieldSelf）では閉じない
     const onFocus = () => {
       if (this.openState && !this.selfFocus) this.close();
       this.showTrigger(field);
     };
-    // 【NOV26-IR-NAGA-REFOCUS-CARET-0438 MAJOR-1】欄の pointerdown／touchstart／mousedown では閉じない。
+    // 【欄を触ったら閉じる変更の見直し】欄の pointerdown／touchstart／mousedown では閉じない。
     // iOS では欄の上から指でページをスクロールし始めただけでも touchstart が来て popup が閉じてしまう。
     // 開いている間は「読み」欄が focus を持つので、欄をタップ／クリック／Tab で戻れば必ず focus が起き、
     // 上の onFocus だけで「欄へ戻ったら閉じる」が成り立つ。
@@ -1051,7 +1051,7 @@ export class NagaIME extends HTMLElement {
    * `position: fixed` の祖先の中に置かれた場合は対象外（そのときは要素も画面に固定され、
    * ページのスクロールには追随しない）。
    *
-   * 【NOV26-IM-NAGA-TRIGGER-ABSOLUTE-0430】で起動ボタンのために書き、【0432】で popup と共通にした。
+   * 【起動ボタンの absolute 配置】で起動ボタンのために書き、【popup を欄の下に付ける変更】で popup と共通にした。
    */
   private containingBlockOffset(el: HTMLElement): { top: number; left: number } {
     const op = el.offsetParent as HTMLElement | null;
@@ -1073,7 +1073,7 @@ export class NagaIME extends HTMLElement {
     el.style.left = `${left - origin.left}px`;
   }
 
-  /** 文書の可視幅（初期包含ブロックの幅。スクロールバーの分は含めない）。0432 */
+  /** 文書の可視幅（初期包含ブロックの幅。スクロールバーの分は含めない）。「popup を欄の下に付ける変更」 */
   private documentWidth(): number {
     return document.documentElement.clientWidth || window.innerWidth;
   }
@@ -1081,14 +1081,14 @@ export class NagaIME extends HTMLElement {
   /**
    * 起動ボタンを欄の右上に置く（`position: absolute`。top/left は文書の座標）。
    *
-   * 【NOV26-IM-NAGA-TRIGGER-ABSOLUTE-0430】0426 では fixed（layout viewport 基準）で置き、
+   * 【起動ボタンの absolute 配置】「起動ボタンの fixed 配置」では fixed（layout viewport 基準）で置き、
    * scroll のたびに座標を計算し直していた。実機の iPhone では、キーボードを出したままスクロールすると
    * ボタンが欄から離れて「明後日の場所」に出て、欄とは違う速さで通り過ぎ、欄が画面外に出ると
    * 可視域の端に貼り付いた（fixed を JS で visual viewport に追随させるかぎり、iOS の可視域とはずれる）。
    * ∴ ボタンは文書の座標で置く。ページのスクロールはブラウザが本文と一緒に動かすので、
    * スクロールでの置き直しは要らず、`visualViewport` の offset は位置に使わない。
    *
-   * 包含ブロックの補正は `containingBlockOffset()`（0432 で popup と共通にした）。
+   * 包含ブロックの補正は `containingBlockOffset()`（「popup を欄の下に付ける変更」で popup と共通にした）。
    *
    * 欄の上が文書の先頭より上（top < 0）になるなら欄のすぐ下へ回す。それ以外の clamp はしない
    * （可視域の端へ貼り付けない）。横に溢れる（欄の右端が画面より左）ときだけ、左端を可視域の
@@ -1114,7 +1114,7 @@ export class NagaIME extends HTMLElement {
   }
 
   /**
-   * 【NOV26-IM-NAGA-TRIGGER-ABSOLUTE-0430】起動ボタンが見えている間だけ、置き直しの購読を張る（見えなければ外す）。
+   * 【起動ボタンの absolute 配置】起動ボタンが見えている間だけ、置き直しの購読を張る（見えなければ外す）。
    *
    * ボタンは文書の座標で置くので、ページのスクロール（window・visualViewport とも）では置き直さない
    * —— ブラウザが本文と一緒に動かす。欄の位置が変わるのは resize（キーボードの出入り・回転・窓の大きさ）
@@ -1132,7 +1132,7 @@ export class NagaIME extends HTMLElement {
       return;
     }
     const request = () => this.requestTriggerPosition();
-    // 【NOV26-IR-NAGA-TRIGGER-ABSOLUTE-0431 MAJOR-1】欄が overflow のスクロールコンテナの中にあると、
+    // 【起動ボタンの absolute 配置の見直し】欄が overflow のスクロールコンテナの中にあると、
     // その要素のスクロールでは文書座標のボタンが付いてこない。要素のスクロールだけを capture で拾い、
     // ページ（document）のスクロールは無視する（ページではボタンが本文と一緒に動くので置き直さない）。
     const onElementScroll = (e: Event) => {
@@ -1198,7 +1198,7 @@ export class NagaIME extends HTMLElement {
   }
 
   /**
-   * タブの表示名を `docked` と `activeTab` から冪等に決める（設計 §6.1 ②）。
+   * タブの表示名を `docked` と `activeTab` から冪等に決める。
    * dock 時は非選択タブを一文字にして、タブ帯を 1 行に収める（案 A）。
    * PC（non-docked）は常に正式名称で、既存の見た目を変えない。
    * 呼び出し元は renderTabs()（選択が変わるとき）と setDocked()（dock 遷移のとき）の 2 つだけ。
@@ -1297,7 +1297,7 @@ export class NagaIME extends HTMLElement {
   }
 
   /**
-   * 選んだ候補が一覧の見える範囲に入るよう、一覧（this.listEl）の scrollTop だけを動かす（M-1・MIN-1）。
+   * 選んだ候補が一覧の見える範囲に入るよう、一覧（this.listEl）の scrollTop だけを動かす（M-1）。
    * 要素を画面へ寄せる DOM の API は使わない（スクロールできる祖先すべて＝ページの viewport も動かしうる）。
    */
   private revealInList(item: HTMLElement): void {
@@ -1374,7 +1374,7 @@ export class NagaIME extends HTMLElement {
     this.emit('nagaCommit', { field, candidate: copyCandidate(candidate) });
 
     // 連続入力: 開いたまま検索語だけクリアする（dock はページも欄も動かさない。M-1）。
-    // 【0437】確定で欄の値・selectionStart が変わった ∴ 挿入位置の縦棒を置き直す（positionPopup が
+    // 【挿入位置の縦棒】確定で欄の値・selectionStart が変わった ∴ 挿入位置の縦棒を置き直す（positionPopup が
     // キャレットを測り直し、その中で縦棒も置き直す）。確定文字は live region で読み上げる。
     if (this.liveEl) this.liveEl.textContent = candidate.char;
     if (this.searchEl) this.searchEl.value = '';
@@ -1391,12 +1391,12 @@ export class NagaIME extends HTMLElement {
   /**
    * popup を文書の座標で置く。
    *
-   * 【NOV26-IM-NAGA-POPUP-ANCHOR-0432】0431 まで狭幅（dock）は `position: fixed` で画面の下に据え付け、
+   * 【popup を欄の下に付ける変更】「起動ボタンの absolute 配置の見直し」まで狭幅（dock）は `position: fixed` で画面の下に据え付け、
    * `bottom` を visualViewport の offset から計算し、ページのスクロールのたびに置き直していた。実機の
    * iPhone ではキーボード表示中は fixed が visual viewport とずれ、スクロールやキーボードの出入りで
    * popup が欄と無関係に「ふわふわ」動いた（起動ボタンと同じ種類の不具合）。
    * ∴ 起動ボタンと同じく文書の座標（`position: absolute`）で置く。
-   * - 狭幅: キャレットの行のすぐ下（0434。キャレットを測れない欄では欄のすぐ下 ＋ 4。0432）、横は文書の
+   * - 狭幅: キャレットの行のすぐ下（「popup をキャレットの行の下に付ける変更」。キャレットを測れない欄では欄のすぐ下 ＋ 4。「popup を欄の下に付ける変更」）、横は文書の
    *   可視幅いっぱい。ページのスクロールはブラウザが本文と一緒に動かすので置き直さない。
    *   読み欄に focus が移ると iOS がその欄をキーボードの上へスクロールして見せる ∴ 画面の下に
    *   据え付ける必要は無い。高さの上限は「キャレットの行の下からキーボードの上まで」。
@@ -1425,7 +1425,7 @@ export class NagaIME extends HTMLElement {
       style.right = '';
       style.bottom = '';
       style.width = `${this.documentWidth()}px`;
-      // 【NOV26-IM-NAGA-POPUP-CARET-0434】0432 は欄の下端のすぐ下（`top = 欄の下端 ＋ 4`）に置いていた ∴
+      // 【popup をキャレットの行の下に付ける変更】「popup を欄の下に付ける変更」は欄の下端のすぐ下（`top = 欄の下端 ＋ 4`）に置いていた ∴
       // 複数行の欄ではキャレット（1〜2 行目）から遠く、欄の下に出ていた。広幅（PC）と同じく
       // `measureCaret()` のキャレットの行のすぐ下に置く（measureCaret は viewport の座標を返す）。
       // 測れない欄（mirror を置けない等）では従来どおり欄の下端のすぐ下に落とす。
@@ -1438,7 +1438,7 @@ export class NagaIME extends HTMLElement {
       const topViewport = anchor
         ? anchor.y + anchor.lineHeight + POPUP_CARET_GAP_PX
         : r.bottom + POPUP_GAP_PX;
-      // 高さの上限は「popup の上端からキーボードの上（可視域の下端）まで」（0434）。0432 は
+      // 高さの上限は「popup の上端からキーボードの上（可視域の下端）まで」（「popup をキャレットの行の下に付ける変更」）。「popup を欄の下に付ける変更」は
       // `vv.height − 8 − 欄の高さ` だった ∴ 高い欄（textarea の高さ 200 等）ほど上限が不要に縮み、
       // しかも popup の上端（キャレットの行の下）とも無関係だった ∴ 欄の高さは引かない。
       const vvAvail = vv ? vv.height : window.innerHeight;
@@ -1453,8 +1453,8 @@ export class NagaIME extends HTMLElement {
       style.setProperty('--naga-dock-avail', `${vvAvail}px`);
       // 縦はキャレットの行のすぐ下（文書の座標）、横は文書の可視域の左端
       this.placeInDocument(pop, topViewport + scrollY, scrollX);
-      // 【例外・0434】可視域に残る高さが DOCK_MIN_PX に満たないときだけ、popup の下端が
-      // キーボードの上に入るようページを寄せる。0432 の約束「NagaIME はページをスクロールしない」の
+      // 【例外・「popup をキャレットの行の下に付ける変更」】可視域に残る高さが DOCK_MIN_PX に満たないときだけ、popup の下端が
+      // キーボードの上に入るようページを寄せる。「popup を欄の下に付ける変更」の約束「NagaIME はページをスクロールしない」の
       // 例外である理由: 寄せないと候補の行が 1 行も見えない（実機の複数行の欄で発生。前回レビューの
       // MAJOR-1）。ページのスクロールで popup を置き直さない方針は変えない ∴ 寄せるのは開いた直後の
       // 1 回だけ（resize や確定では寄せない）。位置は文書の座標のままなので、寄せても欄との差は変わらない。
@@ -1511,7 +1511,7 @@ export class NagaIME extends HTMLElement {
   }
 
   /**
-   * 【NOV26-IM-NAGA-CARET-MARK-0437】popup を開いている間、元の欄の挿入位置に縦棒を置く。
+   * 【挿入位置の縦棒】popup を開いている間、元の欄の挿入位置に縦棒を置く。
    *
    * popup を開くと focus が読み欄へ移り、元の欄のキャレットが見えなくなる（人間の提案
    * 「IME の表示中はキャレットを目立つように変える」）。縦棒は popup・梵ボタンと同じく
@@ -1543,7 +1543,7 @@ export class NagaIME extends HTMLElement {
   }
 
   /**
-   * 【NOV26-IM-NAGA-POPUP-ANCHOR-0432】popup を開いている間だけ、置き直しの購読を張る（閉じたら外す）。
+   * 【popup を欄の下に付ける変更】popup を開いている間だけ、置き直しの購読を張る（閉じたら外す）。
    *
    * popup は起動ボタンと同じく文書の座標で置くので、ページのスクロール（window・visualViewport とも）では
    * 置き直さない —— ブラウザが本文と一緒に動かす。欄や popup の位置が変わるのは
@@ -1596,7 +1596,7 @@ export class NagaIME extends HTMLElement {
   /**
    * キャレット座標の計測（ミラー要素方式・viewport の座標）。ミラーは影の中の `.naga-root`
    * （継承を断った箱）に置く。document.body に置くとページの CSS（`text-align` の継承・
-   * `div { all: unset }` 等）に写した値を上書きされる（nov26-m3-t1 の R-popup の dx）。
+   * `div { all: unset }` 等）に写した値を上書きされる（e2e の R-popup の dx）。
    */
   private measureCaret(field: NagaTarget): { x: number; y: number; lineHeight: number } {
     const rect = field.getBoundingClientRect();

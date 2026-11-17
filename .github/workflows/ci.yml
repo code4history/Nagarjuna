@@ -1,6 +1,6 @@
 name: Nagarjuna CI
 
-# Cycle 2 m1-t5（設計 §6.2）で新設した。既存の deploy.yml（m1-t3 の確定契約）は変更しない。
+# CI 成果物の検査のために新設した。既存の deploy.yml は変更しない。
 # step 構成は Chokei の ci.yml と同型である。
 
 on:
@@ -49,34 +49,34 @@ jobs:
       - name: Test
         run: pnpm run test
       # @vitest/coverage-v8 は vitest の従属依存であり versions.json の6項目に収まらない。
-      # coverage を CI で走らせることで、major の追随漏れがここで落ちる（outer rule-0018）。
+      # coverage を CI で走らせることで、major の追随漏れがここで落ちる。
       - name: Coverage
         run: pnpm run coverage
       - name: Build
         run: pnpm run build
-      # ---- Cycle 2 m1-t5: CI artifact 契約（設計 §6.2 の P1〜P5）----
+      # ---- CI artifact 契約 ----
       # upload と download を同一 job で行う。∴ どの runtime で作られた配布物かと
-      # どの runtime で検証したかが 1 対 1 で対応する（outer rule-0014）。
+      # どの runtime で検証したかが 1 対 1 で対応する（「手元でビルドして動いた」は CI 成果物の検証にならない、という規則）。
       - name: Pack
         run: pnpm pack --pack-destination ci-artifact
       - name: Upload package artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: cycle2-nagarjuna-package-node-${{ matrix.node }}
+          name: ci-nagarjuna-package-node-${{ matrix.node }}
           path: ci-artifact/
       - name: Download package artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: cycle2-nagarjuna-package-node-${{ matrix.node }}
+          name: ci-nagarjuna-package-node-${{ matrix.node }}
           path: ci-artifact-smoke/
       - name: Artifact smoke
         run: pnpm exec node ci/verify-artifact-smoke.mjs --artifact-dir=ci-artifact-smoke --report=ci-evidence/artifact-smoke-node-${{ matrix.node }}.txt
       - name: Upload smoke report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: cycle2-nagarjuna-artifact-smoke-node-${{ matrix.node }}
+          name: ci-nagarjuna-artifact-smoke-node-${{ matrix.node }}
           path: ci-evidence/artifact-smoke-node-${{ matrix.node }}.txt
-  # ---- nov26-m3-t1: NagaIME の e2e（Playwright・chromium）----
+  # ---- NagaIME の e2e（Playwright・chromium）----
   # 前例は Weiwudi の ci.yml。verify（Node 22・24 の matrix）とは別の job にし、verify の行は変えない。
   # 辞書の生成は playwright.config.ts の webServer.command の中で行う。
   e2e:

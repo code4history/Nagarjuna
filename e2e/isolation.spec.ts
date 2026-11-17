@@ -1,10 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import { PART, STYLE_PROPS, fieldRect, fillAndFocus, gotoFixture, partInfo, waitShown, type PartName } from './helpers';
 
-// nov26-m3-t1 §3.4 R: ページ側 CSS の影響（F-CLEAN と F-RESET の比較）。
+// ページ側 CSS の影響（F-CLEAN と F-RESET の比較）。
 // 各 expect には測りの印 [measure:<ID>] を付ける。t1 では origin/master で落ちることを、最初のエラーに
-// 自分の印（test の題の先頭の ID と同じ）が入っていることで機械的に確かめた（t1/AC6 (b)）。
-// nov26-m3-t2 で部品を <naga-ime> の影の中へ入れ、失敗を期待する印を外した（緑であることが基準）。
+// 自分の印（test の題の先頭の ID と同じ）が入っていることで機械的に確かめた。
+// 部品を <naga-ime> の影の中へ入れたときに、失敗を期待する印を外した（緑であることが基準）。
 
 interface Measured {
   w: number;

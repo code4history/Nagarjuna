@@ -1,12 +1,11 @@
 /**
- * <naga-ime> の登録の 3 つの場合（nov26-m3-t2 タスク設計 §3.6・マイルストーン設計 §5.2 の表・
- * orchestrator 決定 OD-M3-R2-MIN-1）。
+ * <naga-ime> の登録の 3 つの場合。
  *
  * **テストの順に意味がある。** vitest はファイルごとに環境（registry を含む）を分けるので、
  * このファイルでは 1 の `await import` が naga-ime モジュールの最初の評価になる。
  *   1. 未登録 → 自分のクラスを登録する（昇格前の代入を取り込む）
  *   2. 自分のクラスで new → attach → open → 確定 → detach しても console.warn 0 回
- *      （oct26 の naga-ime.test.ts 398〜416 行から移した。意図と期待値 0 は変えない）
+ *      （以前の naga-ime.test.ts 398〜416 行から移した。意図と期待値 0 は変えない）
  *   3. もう一度 import（再評価しない）→ 同じクラス・define は増えない・new できる
  *   4. vi.resetModules() 後の再 import（別のクラス）→ 上書きしない・警告 0 回・new は TypeError
  */

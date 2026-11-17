@@ -1,7 +1,7 @@
 import type { ElementHandle, Page } from '@playwright/test';
 
 /**
- * nov26-m3-t1 §3.3: 部品の取り出し。
+ * 部品の取り出し。
  *
  * origin/master では部品が document.body 直下にあり、t2 の後は <naga-ime> の影の中に入る。
  * spec を t1 と t2 で書き直さずに済むよう、開いた shadow root を深さ優先で辿り、

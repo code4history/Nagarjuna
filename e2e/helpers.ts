@@ -3,10 +3,10 @@ import type { ElementHandle, Page } from '@playwright/test';
 /**
  * 部品の取り出し。
  *
- * origin/master では部品が document.body 直下にあり、t2 の後は <naga-ime> の影の中に入る。
- * spec を t1 と t2 で書き直さずに済むよう、開いた shadow root を深さ優先で辿り、
+ * 部品を影の中へ移す変更の前は部品が document.body 直下にあり、その後は <naga-ime> の影の中に入る。
+ * spec をその変更の前と後で書き直さずに済むよう、開いた shadow root を深さ優先で辿り、
  * 最初に一致した要素を返す。class 名は公開の契約ではない（内部の実装を見る試験として使う）。
- * t2 以後に class を変える場合は、その変更と同じ commit で本ファイルを直す。
+ * これより後に class を変える場合は、その変更と同じ commit で本ファイルを直す。
  */
 export const PART = {
   trigger: '.naga-trigger',

@@ -122,7 +122,7 @@ test('P-7: #f1 の下に 100px しか残らない viewport で開くと popup �
 
 test('P-8: PC の読み欄は popup の枠の内側から左右 8px・タイトル行の下端から 8px・一覧の上端まで 8px', async ({ page }) => {
   // .naga-search-row の display: contents → flex で PC の見え方が変わらないことの陽性対照。
-  // t2 の head（display: contents）で緑であることを先に確かめてから CSS を変えた。
+  // 部品を影の中へ移す変更の時点（display: contents）で緑であることを先に確かめてから CSS を変えた。
   await page.focus('#f1');
   await openWithShortcut(page);
   const pop = (await deepHandle(page, PART.popup))!;

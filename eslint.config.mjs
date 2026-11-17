@@ -1,14 +1,14 @@
-// ESLint の設定（nov26-m8-t2・NayutaProducts#33）。形は m8 設計の C-m8-1
+// ESLint の設定。
 import js from "@eslint/js";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
 import prettier from "eslint-config-prettier"; // 書式の規則は prettier に任せる。no-unexpected-multiline 等の書式の規則を off にする
 
 export default [
-  // 全体の除外は ignores だけを持つ要素に書く（他のキーと同居させると全体の除外にならない。C-m8-1 (b)）
+  // 全体の除外は ignores だけを持つ要素に書く（他のキーと同居させると全体の除外にならない）
   { ignores: ["dist/**", "node_modules/**", "coverage/**", "src/data/dictionary.ts"] }, // 生成物（scripts/build-dictionary.ts が作る。.gitignore 済み）。生成元の scripts/build-dictionary.ts を lint する
   { linterOptions: { reportUnusedDisableDirectives: true } },
-  // recommended は独立した要素に置き、files を付けない（lint する全ファイルに当てる。C-m8-1 (a)）
+  // recommended は独立した要素に置き、files を付けない（lint する全ファイルに当てる）
   js.configs.recommended,
   {
     files: ["**/*.{ts,tsx,mts,cts}"],

@@ -1,20 +1,19 @@
 /**
- * NagaIME モバイル dock の機械判定（oct26-m7-t1 是正設計 v2 §7.2 AC10 / §7.3、
- * nov26-m3-t3 タスク設計 §3.6 で書き直した）。
+ * NagaIME モバイル dock の機械判定。
  *
  * dock の popup の高さは、ソフトキーボード表示中の残り可視高（visualViewport.height）から逆算する。
  * jsdom は layout を持たないため、ここで測るのは「レイアウトの実物」ではなく
  * 「仕組み」（style へ書かれる値・class・textContent・hidden・focus の引数）である。実の矩形は e2e の M-1〜M-5 が見る。
  *
- * 割り付け（nov26-m3-t3 タスク設計 §3.1・0432 で高さの式だけ変更・0434 で位置と式を変更・
- * 0436 で写しの行 22px を外した・0437 で写しそのものを撤去した）:
+ * 割り付け（「popup を欄の下に付ける変更」で高さの式だけ変更・「popup をキャレットの行の下に付ける変更」で位置と式を変更・
+ * 「欄を触ったら閉じる変更」で写しの行 22px を外した・「挿入位置の縦棒」で写しそのものを撤去した）:
  * タイトル行 34 ＋ 読み欄 36 ＋ 枠 2 ＝ 固定部分 72、候補 1 行 44、上限 3 行。
  * キーボード上端（可視域の下端）との間 8。
  *   room     = (vv.offsetTop + vv.height) − popup の上端（viewport） − 8
  *   popupMax = min(204, room)。116（固定部分＋候補 1 行）未満なら 116（開いた直後に 1 回だけページを寄せる）
  * 畳んだ高さは 36（タイトル行＋枠）。
- * 位置は 0434 から文書の座標でキャレットの行のすぐ下（キャレットを測れない欄では欄のすぐ下）。
- * 【0437】挿入位置の縦棒（.naga-caret-mark）の単体テストは tests/ime/naga-caret-mark.test.ts にある。
+ * 位置は 「popup をキャレットの行の下に付ける変更」から文書の座標でキャレットの行のすぐ下（キャレットを測れない欄では欄のすぐ下）。
+ * 【挿入位置の縦棒】挿入位置の縦棒（.naga-caret-mark）の単体テストは tests/ime/naga-caret-mark.test.ts にある。
  * tests/ime/naga-popup-position.test.ts がキャレットの計測を含む置き場所を、ここは高さの上限と
  * dock かどうかの見た目を測る。
  */
@@ -26,7 +25,7 @@ import { NAGA_CATEGORIES } from '@/lib/ime/naga-dictionary';
 /** 辞書（生成済み dictionary.ts）の動的 import を伴うので既存テストと同じ猶予を与える。 */
 const DICTIONARY_TEST_TIMEOUT_MS = 8000;
 
-/** 設計 §3.1 の割り付け（実装の private const と一致していることを外から確かめる値）。 */
+/** 割り付け（実装の private const と一致していることを外から確かめる値）。 */
 const DOCK_GAP = 8;
 const DOCK_MIN = 116;
 const DOCK_MAX = 204;
@@ -63,7 +62,7 @@ function restoreViewport(): void {
   if (originalInnerHeight) Object.defineProperty(window, 'innerHeight', originalInnerHeight);
 }
 
-/** nov26-m3-t2: popup は <naga-ime>（describe の ime）の影の中にある。 */
+/** popup は <naga-ime>（describe の ime）の影の中にある。 */
 let ime: NagaIME;
 
 function popupOf(): HTMLElement {
@@ -82,7 +81,7 @@ function itemsOf(): HTMLElement[] {
   return Array.from(popupOf().querySelectorAll('.naga-item')) as HTMLElement[];
 }
 
-/** 欄の getBoundingClientRect を決め打ちにする（jsdom の矩形はすべて 0 のため。0432）。 */
+/** 欄の getBoundingClientRect を決め打ちにする（jsdom の矩形はすべて 0 のため。「popup を欄の下に付ける変更」）。 */
 function stubRect(el: Element, rect: { top: number; right: number; bottom: number; left: number }): void {
   el.getBoundingClientRect = () =>
     ({
@@ -97,7 +96,7 @@ function stubRect(el: Element, rect: { top: number; right: number; bottom: numbe
 
 /**
  * キャレットの計測を stub する（jsdom は layout を持たない）。null は「測れない」＝ 例外。
- * 【0434】狭幅もキャレットの行のすぐ下に置くようになった ∴ 欄の下端を基準にする経路（測れないときの
+ * 【popup をキャレットの行の下に付ける変更】狭幅もキャレットの行のすぐ下に置くようになった ∴ 欄の下端を基準にする経路（測れないときの
  * 落とし所）は、この stub で明示したときだけ通る。高さの上限は欄の位置に依る ∴ ここでは欄の下端に固定する。
  */
 function stubCaret(anchor: { x: number; y: number; lineHeight: number } | null): void {
@@ -110,17 +109,17 @@ function stubCaret(anchor: { x: number; y: number; lineHeight: number } | null):
   });
 }
 
-/** 可視域に収めるための 1 回のスクロール（0434 の例外）を数える。jsdom の scrollBy は空振りするので差し替える。 */
+/** 可視域に収めるための 1 回のスクロール（「popup をキャレットの行の下に付ける変更」の例外）を数える。jsdom の scrollBy は空振りするので差し替える。 */
 let scrollBySpy: ReturnType<typeof vi.spyOn>;
 
-/** 欄の下端（0432: キャレットを測れないときの落とし所）。 */
+/** 欄の下端（「popup を欄の下に付ける変更」: キャレットを測れないときの落とし所）。 */
 const FIELD_BOTTOM = 232;
 /** キャレットを測れないときの欄のすぐ下に付ける間隔（実装の POPUP_GAP_PX）。 */
 const POPUP_GAP = 4;
 /** キャレットを測れないときの popup の上端（viewport）。 */
 const POPUP_TOP = FIELD_BOTTOM + POPUP_GAP;
 
-/** dock の高さの上限（0434）: 可視域の下端（vv.offsetTop + vv.height）− popup の上端 − 余白。 */
+/** dock の高さの上限（「popup をキャレットの行の下に付ける変更」）: 可視域の下端（vv.offsetTop + vv.height）− popup の上端 − 余白。 */
 function expectedDockMax(visibleBottom: number, popupTopViewport: number, folded = false): number {
   const room = visibleBottom - popupTopViewport - DOCK_GAP;
   let max = Math.min(DOCK_MAX, Math.max(0, room));
@@ -134,7 +133,7 @@ const PHONE_KEYBOARD = { width: 390, height: 480, offsetTop: 0, innerHeight: 844
 /** 10 月の HV の実測（使える高さ 188px）。 */
 const PHONE_SMALL = { width: 375, height: 188, offsetTop: 0, innerHeight: 844 };
 
-describe('NagaIME モバイル dock（AC10）', () => {
+describe('NagaIME モバイル dock', () => {
   let field: HTMLInputElement;
 
   beforeEach(() => {
@@ -142,7 +141,7 @@ describe('NagaIME モバイル dock（AC10）', () => {
     field = document.createElement('input');
     field.type = 'text';
     document.body.append(field);
-    // 0434: 高さの上限は「キャレットの行の下から可視域の下端まで」 ∴ 欄とキャレットの位置を決め打ちにする。
+    // 「popup をキャレットの行の下に付ける変更」: 高さの上限は「キャレットの行の下から可視域の下端まで」 ∴ 欄とキャレットの位置を決め打ちにする。
     // ここではキャレットを測れない欄（欄の下端 232 のすぐ下に置く経路）として測る
     stubRect(field, { top: 200, right: 376, bottom: FIELD_BOTTOM, left: 16 });
     ime = new NagaIME({ loadFonts: false });
@@ -157,7 +156,7 @@ describe('NagaIME モバイル dock（AC10）', () => {
     vi.restoreAllMocks();
   });
 
-  it('AC10-a: 静的な 45vh / 30vh を持たず、dock の高さは JS 設定（var）と flex に依る', () => {
+  it('静的な 45vh / 30vh を持たず、dock の高さは JS 設定（var）と flex に依る', () => {
     expect(NAGA_STYLE_TEXT).not.toContain('45vh');
     expect(NAGA_STYLE_TEXT).not.toContain('30vh');
     expect(NAGA_STYLE_TEXT).toContain('.naga-popup.naga-is-docked');
@@ -170,13 +169,13 @@ describe('NagaIME モバイル dock（AC10）', () => {
     expect(NAGA_STYLE_TEXT).toMatch(/\.naga-list\s*\{[^}]*max-height:\s*260px/);
   });
 
-  describe('AC10-c: 候補 1 行を優先し、上限は「キャレットの行の下から可視域の下端まで」（4-1・4-4。0434 で式を変更）', () => {
+  describe('候補 1 行を優先し、上限は「キャレットの行の下から可視域の下端まで」（4-1・4-4。「popup をキャレットの行の下に付ける変更」で式を変更）', () => {
     // popup の上端（viewport）は欄の下端 232 ＋ 4 = 236（キャレットを測れない欄の経路）
     //   room = 可視域の下端 − 236 − 余白 8
     const cases = [
       { vvAvail: 852, popupMax: DOCK_MAX }, // room 608（キーボードなし）
       { vvAvail: 480, popupMax: DOCK_MAX }, // room 236
-      { vvAvail: 460, popupMax: DOCK_MAX }, // room 216（0436 で上限が 204 になった）
+      { vvAvail: 460, popupMax: DOCK_MAX }, // room 216（「欄を触ったら閉じる変更」で上限が 204 になった）
       { vvAvail: 400, popupMax: 156 }, // room 156
       { vvAvail: 380, popupMax: 136 }, // room 136 ≥ 116 → そのまま（下端はまだ見えている）
       { vvAvail: 300, popupMax: DOCK_MIN }, // room 56 < 116 → 上限 DOCK_MIN ＋ 開いた直後に 1 回寄せる
@@ -190,12 +189,12 @@ describe('NagaIME モバイル dock（AC10）', () => {
           await ime.open(field);
           const pop = popupOf();
           expect(pop.classList.contains('naga-is-docked')).toBe(true);
-          // 0434: fixed ではなく absolute（文書の座標）で、キャレットの行のすぐ下に付ける
+          // 「popup をキャレットの行の下に付ける変更」: fixed ではなく absolute（文書の座標）で、キャレットの行のすぐ下に付ける
           expect(pop.style.position).toBe('absolute');
           expect(pop.style.top).toBe(`${POPUP_TOP}px`);
           expect(pop.style.bottom, 'bottom は使わない').toBe('');
           expect(pop.style.maxHeight).toBe(`${c.popupMax}px`);
-          // 上限は「可視域の下端 − popup の上端 − 余白」。0432 のように欄の高さを引かない
+          // 上限は「可視域の下端 − popup の上端 − 余白」。「popup を欄の下に付ける変更」のように欄の高さを引かない
           expect(pop.style.maxHeight).toBe(`${expectedDockMax(c.vvAvail, POPUP_TOP)}px`);
           expect(pop.style.getPropertyValue('--naga-dock-max')).toBe(`${c.popupMax}px`);
           expect(pop.style.getPropertyValue('--naga-dock-avail')).toBe(`${c.vvAvail}px`);
@@ -215,7 +214,7 @@ describe('NagaIME モバイル dock（AC10）', () => {
     it(
       '高い欄（textarea の高さ 200）でも、キャレットの行の下から可視域の下端までで上限が決まる',
       async () => {
-        // 同じキャレット・同じ下端で、欄の高さだけを 32 → 200 に変える（0432 の式は欄の高さを引いていた）
+        // 同じキャレット・同じ下端で、欄の高さだけを 32 → 200 に変える（「popup を欄の下に付ける変更」の式は欄の高さを引いていた）
         stubRect(field, { top: 32, right: 376, bottom: FIELD_BOTTOM, left: 16 });
         stubViewport({ width: 375, height: 400, offsetTop: 0, innerHeight: 844 });
         ime.attach(field);
@@ -252,7 +251,7 @@ describe('NagaIME モバイル dock（AC10）', () => {
     }
 
     it(
-      'visualViewport の offsetTop は位置には使わず、可視域の下端（大きさ）にだけ使う（0434）',
+      'visualViewport の offsetTop は位置には使わず、可視域の下端（大きさ）にだけ使う（「popup をキャレットの行の下に付ける変更」）',
       async () => {
         stubViewport({ width: 375, height: 216, offsetTop: 30, innerHeight: 844 });
         ime.attach(field);
@@ -269,7 +268,7 @@ describe('NagaIME モバイル dock（AC10）', () => {
   });
 
   it(
-    'AC10-c: キーボード開閉（visualViewport の変化）に追従して max-height を測り直す',
+    'キーボード開閉（visualViewport の変化）に追従して max-height を測り直す',
     async () => {
       stubViewport(PHONE_KEYBOARD);
       ime.attach(field);
@@ -281,7 +280,7 @@ describe('NagaIME モバイル dock（AC10）', () => {
       window.dispatchEvent(new Event('resize'));
       const pop = popupOf();
       expect(pop.style.maxHeight).toBe(`${DOCK_MAX}px`);
-      // 0434: 位置はキャレットの行のすぐ下のまま（キーボードの開閉で動かない）
+      // 「popup をキャレットの行の下に付ける変更」: 位置はキャレットの行のすぐ下のまま（キーボードの開閉で動かない）
       expect(pop.style.top).toBe(`${POPUP_TOP}px`);
 
       // より大きなキーボード（可視域の下端 240 → room 240 − 236 − 8 = −4 < 116 ∴ 上限 DOCK_MIN）
@@ -297,7 +296,7 @@ describe('NagaIME モバイル dock（AC10）', () => {
   );
 
   it(
-    'AC10-b: dock 時は非選択タブが一文字・選択タブだけ正式名称',
+    'dock 時は非選択タブが一文字・選択タブだけ正式名称',
     async () => {
       stubViewport(PHONE_KEYBOARD);
       ime.attach(field);
@@ -318,7 +317,7 @@ describe('NagaIME モバイル dock（AC10）', () => {
   );
 
   it(
-    'AC10-b: dock ↔ PC の遷移でタブ表示名が戻る（PC は常に正式名称）',
+    'dock ↔ PC の遷移でタブ表示名が戻る（PC は常に正式名称）',
     async () => {
       stubViewport(PHONE_KEYBOARD);
       ime.attach(field);
@@ -362,7 +361,7 @@ describe('NagaIME モバイル dock（AC10）', () => {
   });
 
   it(
-    'AC10-d: PC では dock 用の値を残さない（dock から戻ると消す）',
+    'PC では dock 用の値を残さない（dock から戻ると消す）',
     async () => {
       stubViewport({ width: 1024, height: 768, offsetTop: 0, innerHeight: 768 });
       ime.attach(field);
@@ -370,7 +369,7 @@ describe('NagaIME モバイル dock（AC10）', () => {
 
       const pop = popupOf();
       expect(pop.classList.contains('naga-is-docked')).toBe(false);
-      // 0432: PC も文書の座標（absolute）。キャレットの行の下に出る見え方の非後退は e2e の P-1〜P-8 が見る
+      // 「popup を欄の下に付ける変更」: PC も文書の座標（absolute）。キャレットの行の下に出る見え方の非後退は e2e の P-1〜P-8 が見る
       expect(pop.style.position).toBe('absolute');
       expect(pop.style.maxHeight).toBe('');
       expect(pop.style.getPropertyValue('--naga-dock-max')).toBe('');
@@ -391,7 +390,7 @@ describe('NagaIME モバイル dock（AC10）', () => {
   );
 
   it(
-    '§7.3: dock 中に候補をタップすると確定し、開いたまま次の候補を続けて入れられる',
+    'dock 中に候補をタップすると確定し、開いたまま次の候補を続けて入れられる',
     async () => {
       stubViewport(PHONE_KEYBOARD);
       ime.attach(field);
@@ -422,14 +421,14 @@ describe('NagaIME モバイル dock（AC10）', () => {
     for (const c of NAGA_CATEGORIES) expect(c.short.length).toBe(1);
   });
 
-  it('区別の付け方（設計 §5）は dock スコープの CSS で足りている', () => {
+  it('区別の付け方は dock スコープの CSS で足りている', () => {
     // 読み入力欄: アクセント縦線と「読み」ラベル
     expect(NAGA_STYLE_TEXT).toContain('.naga-popup.naga-is-docked .naga-search-row');
     expect(NAGA_STYLE_TEXT).toContain('.naga-popup.naga-is-docked .naga-search-label');
     // タブ帯: 背景で候補領域の白と分ける
     expect(NAGA_STYLE_TEXT).toMatch(/\.naga-popup\.naga-is-docked\s+\.naga-titlebar\s*\{[^}]*background/);
-    // 「ふわふわ浮いて」（§1 の 5）: 見た目は欄のすぐ下に付けた板のまま（上端のアクセントの線・上向きの影）。
-    // 0432 で位置の決め方だけを変えた（fixed → absolute）∴ 見た目の規則は残す
+    // 「ふわふわ浮いて」: 見た目は欄のすぐ下に付けた板のまま（上端のアクセントの線・上向きの影）。
+    // 「popup を欄の下に付ける変更」で位置の決め方だけを変えた（fixed → absolute）∴ 見た目の規則は残す
     expect(NAGA_STYLE_TEXT).toMatch(/\.naga-popup\.naga-is-docked\s*\{[^}]*border-top:\s*2px solid var\(--naga-accent\)/);
     expect(NAGA_STYLE_TEXT).toMatch(/\.naga-popup\.naga-is-docked\s*\{[^}]*box-shadow:\s*0 -4px 16px/);
   });
@@ -464,7 +463,7 @@ describe('NagaIME モバイル dock（AC10）', () => {
       await ime.open(field);
       const pop = popupOf();
       expect(pop.style.left, '文書の可視域の左端').toBe('0px');
-      expect(pop.style.right, '0432: right は使わない').toBe('');
+      expect(pop.style.right, '「popup を欄の下に付ける変更」: right は使わない').toBe('');
       // jsdom は layout を持たない ∴ documentElement.clientWidth は 0。実装はそのとき innerWidth に落ちる
       expect(pop.style.width).toBe(`${document.documentElement.clientWidth || window.innerWidth}px`);
     },
@@ -472,7 +471,7 @@ describe('NagaIME モバイル dock（AC10）', () => {
   );
 });
 
-describe('NagaIME 折りたたみ（§3.3・t3/AC4）', () => {
+describe('NagaIME 折りたたみ', () => {
   let field: HTMLInputElement;
 
   beforeEach(() => {
@@ -480,7 +479,7 @@ describe('NagaIME 折りたたみ（§3.3・t3/AC4）', () => {
     field = document.createElement('input');
     field.type = 'text';
     document.body.append(field);
-    // 0434: 高さの上限は「キャレットの行の下から可視域の下端まで」 ∴ 欄の位置を決め打ちにする
+    // 「popup をキャレットの行の下に付ける変更」: 高さの上限は「キャレットの行の下から可視域の下端まで」 ∴ 欄の位置を決め打ちにする
     stubRect(field, { top: 200, right: 376, bottom: FIELD_BOTTOM, left: 16 });
     ime = new NagaIME({ loadFonts: false });
     stubCaret(null);
@@ -535,7 +534,7 @@ describe('NagaIME 折りたたみ（§3.3・t3/AC4）', () => {
       expect(fold.textContent).toBe('▴');
       expect(pop.classList.contains('naga-is-folded')).toBe(true);
       expect(focusSpy).not.toHaveBeenCalled();
-      // 0434: 上端はキャレットの行のすぐ下のまま（帯ではなく高さが縮む）
+      // 「popup をキャレットの行の下に付ける変更」: 上端はキャレットの行のすぐ下のまま（帯ではなく高さが縮む）
       expect(pop.style.top).toBe(`${POPUP_TOP}px`);
       expect(pop.style.maxHeight).toBe(`${expectedDockMax(188, POPUP_TOP, true)}px`);
     },
@@ -558,7 +557,7 @@ describe('NagaIME 折りたたみ（§3.3・t3/AC4）', () => {
       const focusSpy = vi.spyOn(search, 'focus');
       part<HTMLButtonElement>('.naga-fold').click();
       expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true });
-      // 0434: 可視域の下端 188 − popup の上端 236 − 余白 8 < 0 ∴ 上限 DOCK_MIN(116)
+      // 「popup をキャレットの行の下に付ける変更」: 可視域の下端 188 − popup の上端 236 − 余白 8 < 0 ∴ 上限 DOCK_MIN(116)
       expect(popupOf().style.maxHeight).toBe(`${DOCK_MIN}px`);
       expect(part('.naga-search-row').hidden).toBe(false);
       expect(part('.naga-list').hidden).toBe(false);
@@ -591,15 +590,15 @@ describe('NagaIME 折りたたみ（§3.3・t3/AC4）', () => {
     DICTIONARY_TEST_TIMEOUT_MS,
   );
 
-  it('畳むボタンは dock のときだけ見え、文脈の表示（写し）は残っていない（0437）', () => {
+  it('畳むボタンは dock のときだけ見え、文脈の表示（写し）は残っていない（「挿入位置の縦棒」）', () => {
     expect(NAGA_STYLE_TEXT).toMatch(/\.naga-fold\s*\{[^}]*display:\s*none/);
     expect(NAGA_STYLE_TEXT).toMatch(/\.naga-popup\.naga-is-docked\s+\.naga-fold\s*\{[^}]*display:\s*(block|flex|inline-block)/);
-    // 【0437】写し（.naga-copy）は広幅・狭幅とも撤去した ∴ CSS の規則も無い
+    // 【挿入位置の縦棒】写し（.naga-copy）は広幅・狭幅とも撤去した ∴ CSS の規則も無い
     expect(NAGA_STYLE_TEXT).not.toMatch(/\.naga-copy\s*\{/);
   });
 });
 
-describe('NagaIME はページも欄もスクロールしない（M-1・MIN-1・t3/AC1。0434 の例外は 1 回だけ）', () => {
+describe('NagaIME はページも欄もスクロールしない（M-1。「popup をキャレットの行の下に付ける変更」の例外は 1 回だけ）', () => {
   let field: HTMLInputElement;
 
   beforeEach(() => {
@@ -619,7 +618,7 @@ describe('NagaIME はページも欄もスクロールしない（M-1・MIN-1・
   });
 
   it(
-    '可視域に残る高さが DOCK_MIN に満たないときだけ、開いた直後に 1 回 scrollBy する（0434 の例外）',
+    '可視域に残る高さが DOCK_MIN に満たないときだけ、開いた直後に 1 回 scrollBy する（「popup をキャレットの行の下に付ける変更」の例外）',
     async () => {
       stubRect(field, { top: 200, right: 376, bottom: FIELD_BOTTOM, left: 16 });
       stubCaret(null);
@@ -698,7 +697,7 @@ describe('NagaIME はページも欄もスクロールしない（M-1・MIN-1・
 });
 
 /**
- * 【NOV26-IM-NAGA-POPUP-REFOCUS-0436】popup を開いている間に、利用者が元の欄（または他の NagaIME
+ * 【欄を触ったら閉じる変更】popup を開いている間に、利用者が元の欄（または他の NagaIME
  * 対象の欄）へ focus を戻したら popup を閉じる。実機の報告:
  *  - 「IME から一旦元フォームにフォーカスを戻して入力すると、当該の謎文字のところは更新されない」
  *  - 「一旦元フォームに戻って改行した場合、カーソルが IME の下に回り込む」
@@ -706,7 +705,7 @@ describe('NagaIME はページも欄もスクロールしない（M-1・MIN-1・
  * focus）だけ。NagaIME 自身が focus を戻す経路（close({ refocus: true }) 等）では閉じない
  * （閉じると連続入力が壊れる）。梵ボタンは欄の右上に残り、開き直せる。
  */
-describe('NagaIME popup を開いたまま欄へ Focus を戻したら閉じる（0436）', () => {
+describe('NagaIME popup を開いたまま欄へ Focus を戻したら閉じる（「欄を触ったら閉じる変更」）', () => {
   let field: HTMLInputElement;
   let second: HTMLInputElement;
 
@@ -754,7 +753,7 @@ describe('NagaIME popup を開いたまま欄へ Focus を戻したら閉じる�
   );
 
   it(
-    'touchstart・pointerdown・mousedown だけでは閉じない（欄の上から始めたスクロールで閉じない・0438 MAJOR-1）',
+    'touchstart・pointerdown・mousedown だけでは閉じない（欄の上から始めたスクロールで閉じない・「欄を触ったら閉じる変更の見直し」）',
     async () => {
       await openOn();
       for (const type of ['touchstart', 'pointerdown', 'mousedown']) {

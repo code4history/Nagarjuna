@@ -1,9 +1,9 @@
 /**
- * <naga-ime>（custom element）の契約の単体テスト（nov26-m3-t2 タスク設計 §3.6・§7 t2/AC2・AC3）。
+ * <naga-ime>（custom element）の契約の単体テスト。
  *
- * マイルストーン設計 §5.3（属性⇔プロパティ・規則 1〜6）・§5.4（メソッド）・§5.5（イベント）の
- * 表を回す。静的 import で登録済みのクラスを使う（§5.2 の表の 2 行目）。
- * テストの名前の [AC2-x] は、タスク設計 §7.1 の (AC2-mark) が機械で照合する印。
+ * 属性⇔プロパティ（規則 1〜6）・メソッド・イベントの
+ * 表を回す。静的 import で登録済みのクラスを使う。
+ * テストの名前の [a]〜[g] は、属性とプロパティの規則の区分の印。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NagaIME } from '@/lib/ime/naga-ime';
@@ -145,9 +145,9 @@ describe('<naga-ime> の形', () => {
   });
 });
 
-describe('属性⇔プロパティ（§5.3 の表を回す）', () => {
+describe('属性⇔プロパティ（対応表を回す）', () => {
   for (const r of ROWS) {
-    it(`[AC2-a] ${r.attr}: 付ける・変える・外す（外すと既定値）`, () => {
+    it(`[a] ${r.attr}: 付ける・変える・外す（外すと既定値）`, () => {
       const el = create();
       expect(get(el, r.prop)).toEqual(r.def);
       el.setAttribute(r.attr, r.a1[0]);
@@ -158,7 +158,7 @@ describe('属性⇔プロパティ（§5.3 の表を回す）', () => {
       expect(get(el, r.prop)).toEqual(r.def);
     });
 
-    it(`[AC2-b] ${r.prop}: 代入の前後で getAttribute('${r.attr}') が変わらない`, () => {
+    it(`[b] ${r.prop}: 代入の前後で getAttribute('${r.attr}') が変わらない`, () => {
       const el = create();
       expect(el.getAttribute(r.attr)).toBeNull();
       set(el, r.prop, r.p);
@@ -169,7 +169,7 @@ describe('属性⇔プロパティ（§5.3 の表を回す）', () => {
       expect(get(el, r.prop)).toEqual(r.p);
     });
 
-    it(`[AC2-c] ${r.attr}: 属性 → 代入 → 属性の順で、最後に変えた方の値`, () => {
+    it(`[c] ${r.attr}: 属性 → 代入 → 属性の順で、最後に変えた方の値`, () => {
       const el = create();
       el.setAttribute(r.attr, r.a1[0]);
       expect(get(el, r.prop)).toEqual(r.a1[1]);
@@ -179,7 +179,7 @@ describe('属性⇔プロパティ（§5.3 の表を回す）', () => {
       expect(get(el, r.prop)).toEqual(r.a2[1]);
     });
 
-    it(`[AC2-c'] ${r.attr}: 代入の後に前と同じ値で setAttribute すると属性の値へ戻る`, () => {
+    it(`[c'] ${r.attr}: 代入の後に前と同じ値で setAttribute すると属性の値へ戻る`, () => {
       const el = create();
       el.setAttribute(r.attr, r.a1[0]);
       set(el, r.prop, r.p);
@@ -189,7 +189,7 @@ describe('属性⇔プロパティ（§5.3 の表を回す）', () => {
     });
   }
 
-  it('[AC2-f] categories の実効値（[]・未知だけ・重複・属性の bogus bogus）と読み出しの複製', () => {
+  it('[f] categories の実効値（[]・未知だけ・重複・属性の bogus bogus）と読み出しの複製', () => {
     const el = create();
     el.categories = [];
     expect(el.categories).toEqual(ALL);
@@ -210,7 +210,7 @@ describe('属性⇔プロパティ（§5.3 の表を回す）', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
-  it('[AC2-g] 不正な属性値と代入は黙って既定値（console.warn 0 回・例外なし）', () => {
+  it('[g] 不正な属性値と代入は黙って既定値（console.warn 0 回・例外なし）', () => {
     const el = create();
     const attrCases: Array<[string, string, Prop, unknown]> = [
       ['shortcut', 'yes', 'shortcut', true],
@@ -269,9 +269,9 @@ describe('属性⇔プロパティ（§5.3 の表を回す）', () => {
   });
 });
 
-describe('最近使った文字を止める手段（§5.3 規則 6・§0.2）', () => {
+describe('最近使った文字を止める手段', () => {
   it(
-    '[AC2-d] recentStorageKey = null では localStorage を読みも書きもせず、「最近」タブは要素の中だけで働く',
+    '[d] recentStorageKey = null では localStorage を読みも書きもせず、「最近」タブは要素の中だけで働く',
     async () => {
       localStorage.setItem(RECENT_KEY, JSON.stringify([{ char: 'ゟ', reading: 'より', description: '', category: 'kumimoji' }]));
       const getItem = vi.spyOn(Storage.prototype, 'getItem');
@@ -300,7 +300,7 @@ describe('最近使った文字を止める手段（§5.3 規則 6・§0.2）', 
   );
 
   it(
-    '[AC2-e] 属性 recent-max="0" では localStorage を読み書きせず、「最近」タブが無く、開くタブは直前のカテゴリ',
+    '[e] 属性 recent-max="0" では localStorage を読み書きせず、「最近」タブが無く、開くタブは直前のカテゴリ',
     async () => {
       localStorage.setItem(RECENT_KEY, JSON.stringify([{ char: 'ゟ', reading: 'より', description: '', category: 'kumimoji' }]));
       const getItem = vi.spyOn(Storage.prototype, 'getItem');
@@ -330,7 +330,7 @@ describe('最近使った文字を止める手段（§5.3 規則 6・§0.2）', 
   );
 
   it(
-    '[AC2-e] プロパティ recentMax = 0 でも同じ。起動後に 0 へ／0 から戻す遷移',
+    '[e] プロパティ recentMax = 0 でも同じ。起動後に 0 へ／0 から戻す遷移',
     async () => {
       const stored: NagaCandidate[] = [{ char: 'ゟ', reading: 'より', description: '', category: 'kumimoji' }];
       localStorage.setItem(RECENT_KEY, JSON.stringify(stored));
@@ -377,7 +377,7 @@ describe('最近使った文字を止める手段（§5.3 規則 6・§0.2）', 
   );
 });
 
-describe('起動後の変更（§5.3 の表の「起動後の変更」列）', () => {
+describe('起動後の変更（開いた後に属性を変えたときの反映）', () => {
   it(
     'categories を変えるとタブを作り直し、開いたまま。triggerLabel は起動ボタンの文字を替える',
     async () => {
@@ -416,7 +416,7 @@ describe('起動後の変更（§5.3 の表の「起動後の変更」列）', (
   );
 });
 
-describe('メソッドとイベント（§5.4・§5.5）', () => {
+describe('メソッドとイベント', () => {
   it(
     'open / close / toggle と isOpen、nagaOpen・nagaClose の detail と性質',
     async () => {
@@ -530,7 +530,7 @@ describe('メソッドとイベント（§5.4・§5.5）', () => {
   });
 
   it(
-    '外側の mousedown で閉じる。自分の部品の mousedown では閉じない。影の中の欄へ focus が戻ると閉じ、欄の mousedown だけでは閉じない（0436・0438）',
+    '外側の mousedown で閉じる。自分の部品の mousedown では閉じない。影の中の欄へ focus が戻ると閉じ、欄の mousedown だけでは閉じない（「欄を触ったら閉じる変更」・「欄を触ったら閉じる変更の見直し」）',
     async () => {
       const host = document.createElement('div');
       document.body.appendChild(host);
@@ -540,10 +540,10 @@ describe('メソッドとイベント（§5.4・§5.5）', () => {
       const el = new NagaIME({ loadFonts: false });
       el.attach(field);
       await el.open(field);
-      // 【NOV26-IM-NAGA-POPUP-REFOCUS-0436】利用者が元の欄を触ったら閉じる（影の中の欄も同じ）。
-      // 0436 以前は「欄の mousedown では閉じない」だったが、実機の「フォーカスを戻しても連携しない」
+      // 【欄を触ったら閉じる変更】利用者が元の欄を触ったら閉じる（影の中の欄も同じ）。
+      // 「欄を触ったら閉じる変更」の前は「欄の mousedown では閉じない」だったが、実機の「フォーカスを戻しても連携しない」
       // 「改行するとカーソルが IME の下に回り込む」への対応で閉じる側に変えた
-      // 【0438 MAJOR-1】欄の mousedown だけでは閉じない（iOS で欄の上から始めたスクロールで閉じないため）。
+      // 【欄を触ったら閉じる変更の見直し】欄の mousedown だけでは閉じない（iOS で欄の上から始めたスクロールで閉じないため）。
       // 閉じるのは欄へ focus が戻ったとき
       field.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true, cancelable: true }));
       expect(el.isOpen).toBe(true);
@@ -593,7 +593,7 @@ describe('メソッドとイベント（§5.4・§5.5）', () => {
   });
 });
 
-describe('for 属性（§5.3 の htmlFor の行）', () => {
+describe('for 属性（htmlFor プロパティ）', () => {
   it('文書の id で付け、htmlFor の代入で付け直す（for 属性は変えない）。後から足した欄は付かない', () => {
     document.body.insertAdjacentHTML('beforeend', '<input id="fa"><input id="fb"><input id="fc">');
     const fa = document.getElementById('fa') as HTMLInputElement;
@@ -651,7 +651,7 @@ describe('for 属性（§5.3 の htmlFor の行）', () => {
   });
 });
 
-describe('切断と再接続（§5.4）', () => {
+describe('切断と再接続', () => {
   it('同じタスク内の移動では作り直さない。切断のままなら次のマイクロタスクで全部 detach する', async () => {
     document.body.insertAdjacentHTML('beforeend', '<input id="ma"><div id="box"></div>');
     const ma = document.getElementById('ma') as HTMLInputElement;

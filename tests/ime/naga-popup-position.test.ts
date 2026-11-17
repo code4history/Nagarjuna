@@ -1,13 +1,13 @@
 /**
- * 【NOV26-IM-NAGA-POPUP-ANCHOR-0432】popup の置き場所の単体テスト。
+ * 【popup を欄の下に付ける変更】popup の置き場所の単体テスト。
  *
- * 0431 まで狭幅（dock）の popup は `position: fixed` で画面の下に据え付け、visualViewport の offset から
+ * 「起動ボタンの absolute 配置の見直し」まで狭幅（dock）の popup は `position: fixed` で画面の下に据え付け、visualViewport の offset から
  * `bottom` を計算し、ページのスクロールのたびに置き直していた。実機の iPhone では、キーボード表示中は
  * fixed が visual viewport とずれ、スクロールやキーボードの出入りで popup が欄と無関係に動いた
  * （起動ボタンと同じ種類の不具合）。
  * いまは起動ボタンと同じく文書の座標（`position: absolute`）で置く ∴ ページのスクロールではブラウザが
  * 本文と一緒に動かし、置き直しの購読は resize と「スクロールコンテナ要素の scroll」だけになる。
- * 【NOV26-IM-NAGA-POPUP-CARET-0434】0432 は狭幅だけ欄の下端のすぐ下に置いていた ∴ 複数行の欄では
+ * 【popup をキャレットの行の下に付ける変更】「popup を欄の下に付ける変更」は狭幅だけ欄の下端のすぐ下に置いていた ∴ 複数行の欄では
  * キャレットの行から遠く、高さの上限も欄の高さに縮んでいた。狭幅も広幅と同じくキャレットの行のすぐ下に
  * 置き、上限は「popup の上端から可視域の下端（キーボードの上）まで」で決める。可視域に DOCK_MIN が
  * 残らないときだけ、開いた直後に 1 回だけページを寄せる（例外）。
@@ -38,7 +38,7 @@ class FakeVisualViewport extends EventTarget {
 const GAP_TO_FIELD = 4;
 const CARET_GAP = 2;
 const DOCK_GAP = 8;
-// 【0436】狭幅では文脈の表示（写しの行 22px）を出さない ∴ 固定部分は 72px（3 行上限 204・下限 116・畳み 36）
+// 【欄を触ったら閉じる変更】狭幅では文脈の表示（写しの行 22px）を出さない ∴ 固定部分は 72px（3 行上限 204・下限 116・畳み 36）
 const DOCK_MIN = 116;
 const DOCK_MAX = 204;
 const DOCK_FOLDED = 36;
@@ -107,7 +107,7 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
 
   /**
    * キャレットの計測を stub する（jsdom は layout を持たない）。null は「測れない」＝ 例外。
-   * 【NOV26-IM-NAGA-POPUP-CARET-0434】狭幅もキャレットの行のすぐ下に置くようになった ∴ 欄の下端を
+   * 【popup をキャレットの行の下に付ける変更】狭幅もキャレットの行のすぐ下に置くようになった ∴ 欄の下端を
    * 基準にする経路（測れないときの落とし所）は、この stub で明示したときだけ通る。
    */
   function stubCaret(anchor: { x: number; y: number; lineHeight: number } | null): (next: typeof anchor) => void {
@@ -137,7 +137,7 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
     vv = new FakeVisualViewport();
     Object.defineProperty(window, 'visualViewport', { configurable: true, writable: true, value: vv });
     runFrames = useManualFrames();
-    // 【0434】可視域に収めるための 1 回のスクロール（例外）を数える。jsdom の scrollBy は空振りするので差し替える
+    // 【popup をキャレットの行の下に付ける変更】可視域に収めるための 1 回のスクロール（例外）を数える。jsdom の scrollBy は空振りするので差し替える
     scrollBySpy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
     stubScroll(0, 0);
     stubInnerHeight(852);
@@ -157,7 +157,7 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
   });
 
   /* ---------------------------------------------------------- *
-   * 狭幅（dock）: キャレットの行のすぐ下に付ける（0434）
+   * 狭幅（dock）: キャレットの行のすぐ下に付ける（「popup をキャレットの行の下に付ける変更」）
    * ---------------------------------------------------------- */
 
   it(
@@ -243,7 +243,7 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
       stubCaret({ x: 16, y: 110, lineHeight: 20 });
       ime.attach(field);
       await ime.open(field);
-      // 852 − 132 − 8 = 712 → 上限 204（0432 の式は 400 − 8 − 欄 400 = 0 まで縮んでいた）
+      // 852 − 132 − 8 = 712 → 上限 204（「popup を欄の下に付ける変更」の式は 400 − 8 − 欄 400 = 0 まで縮んでいた）
       expect(popupOf().style.maxHeight).toBe(`${DOCK_MAX}px`);
 
       // 可視域の下端が 300 まで縮んだ → 300 − 132 − 8 = 160（欄の高さ 400 でも 0 にならない）
@@ -532,7 +532,7 @@ describe('popup の置き場所（文書の座標・position: absolute）', () =
       expect(popupOf().classList.contains('naga-is-docked')).toBe(false);
 
       useNarrow();
-      setCaret({ x: 20, y: 60, lineHeight: 20 }); // 狭幅はキャレットの行のすぐ下（0434）
+      setCaret({ x: 20, y: 60, lineHeight: 20 }); // 狭幅はキャレットの行のすぐ下（「popup をキャレットの行の下に付ける変更」）
       window.dispatchEvent(new Event('resize'));
       expect(popupOf().classList.contains('naga-is-docked')).toBe(true);
       expect(popupOf().style.top).toBe(`${60 + 20 + CARET_GAP}px`);

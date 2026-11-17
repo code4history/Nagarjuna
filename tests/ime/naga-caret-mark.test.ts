@@ -1,5 +1,5 @@
 /**
- * 【NOV26-IM-NAGA-CARET-MARK-0437】挿入位置の縦棒（.naga-caret-mark）の単体テスト。
+ * 【挿入位置の縦棒】挿入位置の縦棒（.naga-caret-mark）の単体テスト。
  *
  * popup を開いている間、元の欄の挿入位置（selectionStart。measureCaret(field) の viewport 座標）に
  * 縦棒を出す。popup を開くと focus が読み欄へ移り、元の欄のキャレットが見えなくなるため
@@ -9,7 +9,7 @@
  * 決め打ちにし、style へ書かれる値・hidden・aria-live の中身だけを測る。実の矩形は e2e の
  * ios-popup.spec.ts（webkit-iphone）と pc-baseline.spec.ts（PC）が見る。
  *
- * あわせて、0436 まであった写し（.naga-copy。欄の直前 12 文字を ↵ で詰めた行）が要素にも CSS にも
+ * あわせて、「欄を触ったら閉じる変更」まであった写し（.naga-copy。欄の直前 12 文字を ↵ で詰めた行）が要素にも CSS にも
  * 残っていないことを確かめる。写しに付いていた aria-live の告知は、確定文字だけを入れる
  * visually-hidden の live region（.naga-live）に置き換えた。
  */
@@ -122,7 +122,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('NagaIME 挿入位置の縦棒（0437）', () => {
+describe('NagaIME 挿入位置の縦棒', () => {
   it(
     'popup を開くと縦棒が出て、left/top は measureCaret の座標 ＋ scroll の文書座標・高さは行の高さ',
     async () => {
@@ -269,7 +269,7 @@ describe('NagaIME 挿入位置の縦棒（0437）', () => {
   );
 });
 
-describe('NagaIME 写しの撤去（0437）', () => {
+describe('NagaIME 写しの撤去（挿入位置の縦棒への置き換え）', () => {
   it(
     '写し（.naga-copy）の要素は影の中に無い',
     async () => {

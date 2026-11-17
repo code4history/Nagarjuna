@@ -1,7 +1,7 @@
 /**
- * NagaIME の単体テスト（oct26-m7-t1 設計 v4 §5.3.2 AC4 ③・AC5）。
+ * NagaIME の単体テスト。
  *
- * PoC（Playground/NextNaga/js/naga-ime.js）の UX を TypeScript 化した NagaIME が、
+ * PoC（JavaScript で書いた試作）の UX を TypeScript 化した NagaIME が、
  * bundle 辞書・FontLoader・明示 trigger・keyboard・composition 非介入・setRangeText・
  * bubbles input・recent を満たし、通常入力を妨げないことを確かめる。
  */
@@ -15,7 +15,7 @@ import { DICTIONARY_MAX_CHAR_LENGTH } from '@/data/dictionary-stats';
 vi.mock('@/lib/ime/naga-dictionary', { spy: true });
 
 // 辞書（生成済み dictionary.ts）の動的 import を伴うテストは、vitest.config.ts の testTimeout: 1000 では
-// 高負荷時に偽の赤になる（実装レビュー Round 1 Minor-1）。legacy-manager.test.ts と同じく個別に 8000ms を与える。
+// 高負荷時に偽の赤になる。legacy-manager.test.ts と同じく個別に 8000ms を与える。
 const DICTIONARY_TEST_TIMEOUT_MS = 8000;
 
 function key(type: 'keydown', init: KeyboardEventInit): KeyboardEvent {
@@ -23,7 +23,7 @@ function key(type: 'keydown', init: KeyboardEventInit): KeyboardEvent {
 }
 
 /**
- * nov26-m3-t2: 部品は <naga-ime> の影の中にある。文書の <naga-ime> の影を順に見て、
+ * 部品は <naga-ime> の影の中にある。文書の <naga-ime> の影を順に見て、
  * 最初に見つかった部品を返す（各テストで文書に入っている <naga-ime> は 1 つ）。
  */
 function partOf(selector: string): HTMLElement {
@@ -85,7 +85,7 @@ describe('NagaIME', () => {
     vi.restoreAllMocks();
   });
 
-  it('bundle 辞書を使い fetch を呼ばない。辞書のカテゴリと説明文で検索できる（AC5）', async () => {
+  it('bundle 辞書を使い fetch を呼ばない。辞書のカテゴリと説明文で検索できる', async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
     try {
@@ -123,7 +123,7 @@ describe('NagaIME', () => {
     }
   }, DICTIONARY_TEST_TIMEOUT_MS);
 
-  it('FontLoader で特殊文字フォントを読み、対象の inline fontFamily が空なら特殊フォントを足す（AC5）', () => {
+  it('FontLoader で特殊文字フォントを読み、対象の inline fontFamily が空なら特殊フォントを足す', () => {
     const load = vi.spyOn(FontLoader.prototype, 'loadFonts');
     const local = new NagaIME();
     local.attach(field);
@@ -135,7 +135,7 @@ describe('NagaIME', () => {
     expect(field.style.fontFamily).toBe('');
   });
 
-  it('focus で trigger だけを出し、trigger の mousedown と Ctrl/Cmd+J で開閉する（AC5）', async () => {
+  it('focus で trigger だけを出し、trigger の mousedown と Ctrl/Cmd+J で開閉する', async () => {
     ime.attach(field);
     const trigger = partOf('.naga-trigger') as HTMLButtonElement;
     expect(trigger.hidden).toBe(true);
@@ -167,7 +167,7 @@ describe('NagaIME', () => {
     await vi.waitFor(() => expect(ime.isOpen).toBe(false));
   }, DICTIONARY_TEST_TIMEOUT_MS);
 
-  it('閉じている間は通常入力の keydown / input を preventDefault しない（AC5）', () => {
+  it('閉じている間は通常入力の keydown / input を preventDefault しない', () => {
     ime.attach(field);
     field.focus();
     for (const k of ['a', 'あ', 'Enter', 'Tab', 'Escape', '1', 'ArrowDown', 'j']) {
@@ -223,7 +223,7 @@ describe('NagaIME', () => {
     other.remove();
   }, DICTIONARY_TEST_TIMEOUT_MS);
 
-  it('検索欄の composition 中の keydown（Enter / 数字）を消費せず、確定もしない（AC5）', async () => {
+  it('検索欄の composition 中の keydown（Enter / 数字）を消費せず、確定もしない', async () => {
     ime.attach(field);
     await ime.open(field);
     selectTab('kumimoji');
@@ -256,7 +256,7 @@ describe('NagaIME', () => {
     expect(field.value).toBe('ヿ');
   }, DICTIONARY_TEST_TIMEOUT_MS);
 
-  it('確定は setRangeText でキャレット位置へ 1 回挿入し、bubbles な input を 1 回発火する。連続入力のため開いたまま（AC5）', async () => {
+  it('確定は setRangeText でキャレット位置へ 1 回挿入し、bubbles な input を 1 回発火する。連続入力のため開いたまま', async () => {
     const wrapper = document.createElement('div');
     document.body.appendChild(wrapper);
     wrapper.appendChild(textarea);
@@ -281,7 +281,7 @@ describe('NagaIME', () => {
     expect(bubbled).toHaveLength(1);
     expect(bubbled[0].bubbles).toBe(true);
     expect(bubbled[0].target).toBe(textarea);
-    // nov26-m3-t2（§5.5）: ネイティブの入力と同じ性質の InputEvent（影の外のフレームワークに届く）
+    // ネイティブの入力と同じ性質の InputEvent（影の外のフレームワークに届く）
     expect(bubbled[0]).toBeInstanceOf(InputEvent);
     expect(bubbled[0].composed).toBe(true);
     expect((bubbled[0] as InputEvent).inputType).toBe('insertText');
@@ -324,7 +324,7 @@ describe('NagaIME', () => {
     expect(field.value).toBe(expected);
   }, DICTIONARY_TEST_TIMEOUT_MS);
 
-  it('Esc で閉じて対象へフォーカスを戻す。× ボタンと外側クリックでも閉じる（AC5）', async () => {
+  it('Esc で閉じて対象へフォーカスを戻す。× ボタンと外側クリックでも閉じる', async () => {
     ime.attach(field);
     await ime.open(field);
     const esc = key('keydown', { key: 'Escape' });
@@ -346,7 +346,7 @@ describe('NagaIME', () => {
     outside.remove();
   }, DICTIONARY_TEST_TIMEOUT_MS);
 
-  it('recent は新しい順に並び、localStorage に保存され、次の起動は最近タブから開く（AC5）', async () => {
+  it('recent は新しい順に並び、localStorage に保存され、次の起動は最近タブから開く', async () => {
     ime.attach(field);
     await ime.open(field);
     selectTab('kumimoji');
@@ -488,12 +488,12 @@ describe('NagaIME', () => {
     }, DICTIONARY_TEST_TIMEOUT_MS);
   });
 
-  it('detach / destroy で trigger・popup・class・listener を片付け、再 attach できる（AC5・AC6 cleanup）', async () => {
+  it('detach / destroy で trigger・popup・class・listener を片付け、再 attach できる（cleanup）', async () => {
     ime.attach(field);
     expect(field.classList.contains('naga-enabled')).toBe(true);
     expect(partsOf('.naga-popup')).toHaveLength(1);
     expect(partsOf('.naga-trigger')).toHaveLength(1);
-    // 影の外（document.body の直下・文書の木）に NagaIME の部品は無い（t2/AC4）
+    // 影の外（document.body の直下・文書の木）に NagaIME の部品は無い
     expect(document.body.querySelectorAll('.naga-popup, .naga-trigger')).toHaveLength(0);
     await ime.open(field);
 
@@ -536,6 +536,6 @@ describe('NagaIME', () => {
   }, DICTIONARY_TEST_TIMEOUT_MS);
 });
 
-// oct26 の「NagaIME だけの利用では console.warn を出さない（AC4 ③）」は nov26-m3-t2 で
+// 以前の「NagaIME だけの利用では console.warn を出さない」は <naga-ime> の導入で
 // tests/ime/naga-registration.test.ts の 2 へ移した（再評価したクラスの new は TypeError になるため。
 // 意図と期待値 0 は変えない）。

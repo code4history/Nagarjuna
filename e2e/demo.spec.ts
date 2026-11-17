@@ -2,7 +2,7 @@ import { expect, test, type ConsoleMessage, type Page } from '@playwright/test';
 import { PART, isShown } from './helpers';
 
 /**
- * nov26-m3-t4 §3.8: デモの入れ替え（トップ＝NagaIME・legacy.html＝旧 IME・naga.html＝転送）と、
+ * デモの入れ替え（トップ＝NagaIME・legacy.html＝旧 IME・naga.html＝転送）と、
  * 非推奨の警告が新しいデモでは出ないこと。各 expect に測りの印 [measure:T-n] を付ける。
  * 対象は Pages と同じ 3 ページ（開発サーバが index.html / legacy.html / public/naga.html を返す）。
  */

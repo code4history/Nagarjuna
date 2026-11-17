@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { PART, deepActiveId, deepHandle, fieldRect, fillAndFocus, gotoFixture, isShown, nagaIsOpen, partInfo, waitShown } from './helpers';
 
-// nov26-m3-t1 §3.5: PC の振る舞いの基準（F-CLEAN・1280×800）。origin/master の実装で緑。
-// 失敗を期待する印（test の fail 指定）を付けない。t2・t3・t4 はこの spec を緑のまま保つ（マイルストーン設計 M-6）。
+// PC の振る舞いの基準（F-CLEAN・1280×800）。origin/master の実装で緑。
+// 失敗を期待する印（test の fail 指定）を付けない。後の変更もこの spec を緑のまま保つ。
 
 async function openWithShortcut(page: Page): Promise<void> {
   await page.keyboard.press('Control+j');
@@ -37,7 +37,7 @@ test('P-2: trigger の click で popup が #f1 の下に dock せずに出て、
   expect(pop.rect.left).toBeGreaterThanOrEqual(f1.left - 1);
   expect(pop.rect.left).toBeLessThanOrEqual(f1.right);
 
-  // T1-MIN-2: キャレットへの横の追従。あいう＋末尾キャレットで開くと、左端が padding＋全角 2 文字分より右
+  // キャレットへの横の追従。あいう＋末尾キャレットで開くと、左端が padding＋全角 2 文字分より右
   await page.keyboard.press('Escape');
   await expect.poll(() => nagaIsOpen(page)).toBe(false);
   await fillAndFocus(page, 'f1', 'あいう');
@@ -46,10 +46,10 @@ test('P-2: trigger の click で popup が #f1 の下に dock せずに出て、
   expect(pop2.rect.left).toBeGreaterThanOrEqual(f1.left + 8 + 32);
 });
 
-// 【NOV26-IM-NAGA-POPUP-REFOCUS-0436】0436 以前は「欄へ focus を戻して Control+j で閉じる」だった。
+// 【欄を触ったら閉じる変更】この変更の前は「欄へ focus を戻して Control+j で閉じる」だった。
 // いまは利用者が欄へ focus を戻した時点で popup が閉じる（実機の「戻しても連携しない」への対応）∴
 // 欄へ戻すと閉じ、閉じたあとの Control+j は開く、という順序で測る（toggle 自体は trigger と単体テストが見る）。
-test('P-3: Control+j で開き、欄へ focus を戻すと閉じ、もう一度 Control+j で開く（0436）', async ({ page }) => {
+test('P-3: Control+j で開き、欄へ focus を戻すと閉じ、もう一度 Control+j で開く（「欄を触ったら閉じる変更」）', async ({ page }) => {
   await page.focus('#f1');
   await openWithShortcut(page);
   expect(await nagaIsOpen(page)).toBe(true);
@@ -72,7 +72,7 @@ test('P-4: 読み → Enter を 2 回で #f1 に 2 文字入り、popup は開�
   await page.keyboard.type('こと');
   await page.keyboard.press('Enter');
   const value = await page.evaluate(() => (document.getElementById('f1') as HTMLInputElement).value);
-  // M3T1-MIN-1（nov26-m3-t2 で拾った）: 文字数だけでなく中身を見る（組文字の「より」「こと」）
+  // 文字数だけでなく中身を見る（組文字の「より」「こと」）
   expect(value).toBe('ゟヿ');
   expect(await nagaIsOpen(page)).toBe(true);
   expect(await isShown(page, PART.popup)).toBe(true);
@@ -101,7 +101,7 @@ test('P-6: 開いた状態でスクロールしても popup の #f1 からの相
 });
 
 test('P-7: #f1 の下に 100px しか残らない viewport で開くと popup は #f1 の上に出る', async ({ page }) => {
-  // 設計 §3.5 は window.scrollTo で #f1 を viewport の下端近くへ動かすとしたが、#f1 は文書の上端近く
+  // 当初は window.scrollTo で #f1 を viewport の下端近くへ動かすとしたが、#f1 は文書の上端近く
   // （top 120px）に固定してあり、スクロールでは下端へ動かせない（scrollY は 0 未満にならない）。
   // ∴ viewport の高さを「#f1 の下端 ＋ 100px」に縮めて同じ状況を作る（幅 1280 のまま ∴ dock しない）。
   const f1 = await fieldRect(page, 'f1');
@@ -121,7 +121,7 @@ test('P-7: #f1 の下に 100px しか残らない viewport で開くと popup �
 });
 
 test('P-8: PC の読み欄は popup の枠の内側から左右 8px・タイトル行の下端から 8px・一覧の上端まで 8px', async ({ page }) => {
-  // nov26-m3-t3 §3.7: .naga-search-row の display: contents → flex で PC の見え方が変わらないことの陽性対照。
+  // .naga-search-row の display: contents → flex で PC の見え方が変わらないことの陽性対照。
   // t2 の head（display: contents）で緑であることを先に確かめてから CSS を変えた。
   await page.focus('#f1');
   await openWithShortcut(page);
@@ -148,7 +148,7 @@ test('P-8: PC の読み欄は popup の枠の内側から左右 8px・タイト�
 });
 
 /**
- * 【NOV26-IM-NAGA-CARET-MARK-0437】PC でも挿入位置の縦棒（.naga-caret-mark）を出す。
+ * 【挿入位置の縦棒】PC でも挿入位置の縦棒（.naga-caret-mark）を出す。
  *
  * 写し（.naga-copy）は広幅・狭幅とも撤去した。popup を開くと focus が読み欄へ移り、元の欄の
  * キャレットが見えなくなる ∴ 元の欄の挿入位置に縦棒を出す（狭幅と同じ扱い）。
@@ -157,7 +157,7 @@ test('P-8: PC の読み欄は popup の枠の内側から左右 8px・タイト�
  * - Escape で消える
  * - ページをスクロールしても欄との相対位置が一定
  */
-test('P-9: textarea の 2 行目に縦棒が出て、確定で右へ進み、Escape で消える（0437）', async ({ page }) => {
+test('P-9: textarea の 2 行目に縦棒が出て、確定で右へ進み、Escape で消える（「挿入位置の縦棒」）', async ({ page }) => {
   /** #f2 の組版（f-clean.html の CSS で宣言している値）。 */
   const F2 = { border: 1, paddingTop: 4, lineHeight: 22 } as const;
 

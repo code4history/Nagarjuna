@@ -1,16 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
 import { fieldRect, gotoFixture, isShown, nagaIsOpen, partInfo, PART, waitShown, type Rect } from './helpers';
 
-// 【NOV26-IM-NAGA-POPUP-ANCHOR-0432】popup の置き場所の回帰試験（iOS のキーボードとスクロール）。
+// 【popup を欄の下に付ける変更】popup の置き場所の回帰試験（iOS のキーボードとスクロール）。
 //
 // 実機の iPhone は測れない。ここで測るのは **WebKit に iPhone を模した端末（devices['iPhone 15']・393×852）**。
 // project webkit-iphone でだけ走る（playwright.config.ts）。幅 393 < dockBreakpoint 560 ∴ dock 側を測る。
 //
-// 0431 まで狭幅の popup は position: fixed で画面の下に据え付け、visualViewport の offset から bottom を
+// 「起動ボタンの absolute 配置の見直し」まで狭幅の popup は position: fixed で画面の下に据え付け、visualViewport の offset から bottom を
 // 計算し、ページのスクロールのたびに置き直していた。実機の iPhone ではキーボード表示中に fixed が
-// visual viewport とずれ、popup が欄と無関係に動いて「ふわふわ」していた。0432 で梵ボタンと同じく
+// visual viewport とずれ、popup が欄と無関係に動いて「ふわふわ」していた。「popup を欄の下に付ける変更」で梵ボタンと同じく
 // 文書の座標（position: absolute）で欄のすぐ下に置き、ページのスクロールでは置き直さない。
-// 【NOV26-IM-NAGA-POPUP-CARET-0434】0432 の「欄のすぐ下」は複数行の欄（textarea）でキャレットの行から
+// 【popup をキャレットの行の下に付ける変更】「popup を欄の下に付ける変更」の「欄のすぐ下」は複数行の欄（textarea）でキャレットの行から
 // 遠すぎ、高さの上限も欄の高さに縮んで候補の行がキーボードの下に欠けた ∴ 狭幅もキャレットの行のすぐ下に
 // 置き、上限は「popup の上端から可視域の下端（キーボードの上）まで」で決める。
 // ∴ ここでは X-1〜X-3 で「popup の上端とキャレットの行・欄との差が、どのスクロール位置・どの visual
@@ -23,7 +23,7 @@ import { fieldRect, gotoFixture, isShown, nagaIsOpen, partInfo, PART, waitShown,
 const M1 = { border: 1, paddingTop: 4, lineHeight: 22 } as const;
 /** f-mobile の #m2 の組版（textarea・8 行）。 */
 const M2 = { border: 1, paddingTop: 2, lineHeight: 20 } as const;
-/** キャレットの行の下端と popup の上端の間隔（0434 の POPUP_CARET_GAP_PX）。 */
+/** キャレットの行の下端と popup の上端の間隔（「popup をキャレットの行の下に付ける変更」の POPUP_CARET_GAP_PX）。 */
 const CARET_GAP = 2;
 
 /** visual viewport の offset を上書きして「キーボードで可視域が縮んでパンした」状態を模す。 */
@@ -95,7 +95,7 @@ function m1CaretBottom(field: Rect): number {
   return field.top + M1.border + M1.paddingTop + M1.lineHeight;
 }
 
-/** popup の上端 − 欄の上端（この差が一定であることが「欄に付いている」の意味。0434 も同じ）。 */
+/** popup の上端 − 欄の上端（この差が一定であることが「欄に付いている」の意味。「popup をキャレットの行の下に付ける変更」も同じ）。 */
 async function offsetFromFieldTop(page: Page, id = 'm1'): Promise<number> {
   const field = await fieldRect(page, id);
   const pop = await popupRect(page);
@@ -197,7 +197,7 @@ test('X-4: popup の横は文書の可視幅いっぱい（left 0・width は可
 });
 
 /**
- * 【NOV26-IM-NAGA-POPUP-CARET-0434】複数行の欄（#m2 textarea）の 3 行目にキャレットを置いて開く。
+ * 【popup をキャレットの行の下に付ける変更】複数行の欄（#m2 textarea）の 3 行目にキャレットを置いて開く。
  * - popup の上端がキャレットの行の下端の近く（±4px）で、欄の下端より上
  * - 候補の 1 行目が可視域（模擬した visualViewport の下端）の中
  */
@@ -266,9 +266,9 @@ test('X-5: textarea の 3 行目では、キャレットの行のすぐ下に開
 });
 
 /**
- * 【NOV26-IM-NAGA-CARET-MARK-0437】挿入位置の縦棒（.naga-caret-mark）の回帰試験。
+ * 【挿入位置の縦棒】挿入位置の縦棒（.naga-caret-mark）の回帰試験。
  *
- * 写し（.naga-copy。欄の直前 12 文字を ↵ で詰めた行）は意図が分かりにくく場所を取る ∴ 0437 で撤去した
+ * 写し（.naga-copy。欄の直前 12 文字を ↵ で詰めた行）は意図が分かりにくく場所を取る ∴ 「挿入位置の縦棒」で撤去した
  * （人間の提案「IME の表示中はキャレットを目立つように変える」）。popup を開くと focus が読み欄へ移り、
  * 元の欄のキャレットが見えなくなる ∴ 元の欄の挿入位置に縦棒を出す。
  * - textarea（#m2）の 2 行目にキャレットを置いて開くと、縦棒がその行に重なる

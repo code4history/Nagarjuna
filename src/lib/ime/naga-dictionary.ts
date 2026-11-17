@@ -1,5 +1,5 @@
 /**
- * NagaIME 用の辞書アクセス（oct26-m7-t1 設計 §3.2-2）。
+ * NagaIME 用の辞書アクセス。
  *
  * package に bundle された生成辞書（scripts/build-dictionary.ts → src/data/dictionary.ts）から
  * カテゴリ別の候補を導出する。HTTP fetch・PoC の baseUrl は持たない（offline / CSP / file:// の
@@ -11,7 +11,7 @@ export interface NagaCategoryDef {
   id: NagaCategoryId;
   label: string;
   /**
-   * 幅の無いモバイル dock で使う一文字表記（是正設計 v2 §4 案 A・§6.1 ②）。
+   * 幅の無いモバイル dock で使う一文字表記。
    * `label` の先頭文字で導出せず明示する（'組文字'→'組' は成立するが 'recent'→'近' は
    * 先頭文字では作れず、導出と明示が混在すると出どころが二つになるため）。
    */

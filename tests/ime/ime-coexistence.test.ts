@@ -1,16 +1,16 @@
 /**
- * 同一ページでの legacy <ime-ui> と NagaIME の共存（oct26-m7-t1 設計 v4 §3.1・AC6、
- * nov26-m3-t2 でマイルストーン設計 §5.7-9 の形へ追随）。
+ * 同一ページでの legacy <ime-ui> と NagaIME の共存（のちに
+ * <naga-ime> の形へ追随）。
  *
  * テストの順序に意味がある: 最初のテストは <ime-ui> がまだ登録されていない registry で
  * NagaIME だけを import し、NagaIME が naga-ime だけを登録し ime-ui を登録しないことを spy で
  * 確かめる（registry は列挙できず、ui.ts は既登録なら define を飛ばすため、登録後では判定にならない）。
- * NagaIME の部品とスタイルは各 <naga-ime> の影の中にある（§5.2）。
+ * NagaIME の部品とスタイルは各 <naga-ime> の影の中にある。
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 // 辞書（生成済み dictionary.ts）の動的 import を伴うテストは、vitest.config.ts の testTimeout: 1000 では
-// 高負荷時に偽の赤になる（実装レビュー Round 1 Minor-1）。legacy-manager.test.ts と同じく個別に 8000ms を与える。
+// 高負荷時に偽の赤になる。legacy-manager.test.ts と同じく個別に 8000ms を与える。
 const DICTIONARY_TEST_TIMEOUT_MS = 8000;
 
 /**
@@ -28,7 +28,7 @@ async function loadIme(): Promise<{
 /** CSS テキストから規則のセレクタを取り出す（@media 等の at-rule の prelude は除く）。 */
 function selectorsOf(cssText: string): string[] {
   let noComments = cssText.replace(/\/\*[\s\S]*?\*\//g, '');
-  // 【0437】@keyframes の中の `0%, 50% { … }` は selector ではない ∴ ブロックごと落とす
+  // 【挿入位置の縦棒】@keyframes の中の `0%, 50% { … }` は selector ではない ∴ ブロックごと落とす
   // （この検査は「ページの要素に当たりうる selector が .naga- か :host だけか」を見る）。
   noComments = noComments.replace(/@keyframes\s+[^{]+\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, '');
   const selectors: string[] = [];
@@ -55,7 +55,7 @@ function nagaPart(naga: Element, selector: string): HTMLElement | null {
   return (naga.shadowRoot?.querySelector(selector) as HTMLElement | null) ?? null;
 }
 
-describe('legacy <ime-ui> と NagaIME の同一ページ共存（AC6）', () => {
+describe('legacy <ime-ui> と NagaIME の同一ページ共存', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     document.body.innerHTML = '';
@@ -130,7 +130,7 @@ describe('legacy <ime-ui> と NagaIME の同一ページ共存（AC6）', () => 
     for (const s of selectors) {
       expect(s.startsWith('.naga-') || s === ':host' || s.startsWith(':host('), s).toBe(true);
     }
-    // document.head には入れない（§5.2）。各 <naga-ime> の影の中に同じ内容で 1 つ
+    // document.head には入れない。各 <naga-ime> の影の中に同じ内容で 1 つ
     expect(document.head.querySelectorAll('style[data-naga-style]')).toHaveLength(0);
     for (const n of nagas) {
       const styles = Array.from(n.shadowRoot!.querySelectorAll('style[data-naga-style]'));
@@ -175,7 +175,7 @@ describe('legacy <ime-ui> と NagaIME の同一ページ共存（AC6）', () => 
     expect(document.body.querySelector('ime-ui')).toBeNull();
   }, DICTIONARY_TEST_TIMEOUT_MS);
 
-  describe('対象要素の style.fontFamily（§3.1・同一要素への二重 attach はサポート外だが相互破壊しない）', () => {
+  describe('対象要素の style.fontFamily（同一要素への二重 attach はサポート外だが相互破壊しない）', () => {
     it('legacy → Naga: Naga は既存の inline 値を変えず、detach しても legacy の値を残す', async () => {
       vi.spyOn(console, 'warn').mockImplementation(() => {});
       const { IMEManager, NagaIME } = await loadIme();

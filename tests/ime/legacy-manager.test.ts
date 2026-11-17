@@ -1,7 +1,7 @@
 /**
  * legacy IME（IMEManager / IMEOptions / onChange / updateOptions / <ime-ui>）の契約テスト。
  *
- * oct26-m7-t1（設計 v4 §5.3.2 AC1・AC3-d）。動作契約は 1.0.0 のまま維持する。
+ * 旧 IME の動作契約は 1.0.0 のまま維持する。
  * 1.2.0 で IMEManager / <ime-ui> を非推奨にした（2.0.0 で維持・3.0.0 で削除予定）∴
  * `DEPRECATED:` の警告が同一モジュールにつき 1 回出ることも検査する。
  * src/demo.ts と同じ呼出し順（resetInstance → getInstance →
@@ -14,7 +14,7 @@ import * as imeEntry from '@/ime';
 import { IMEManager } from '@/ime';
 import type { IMEOptions, IMEAttachOptions, IIMEManager } from '@/ime';
 
-/** メッセージの `[...]` を package.json の name と照合する（名前はビルド時に埋める。AC7）。 */
+/** メッセージの `[...]` を package.json の name と照合する（名前はビルド時に埋める）。 */
 const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8')) as { name: string };
 
 type LegacyUI = HTMLElement & { updatePosition?: unknown; updateOptions?: unknown };
@@ -46,7 +46,7 @@ describe('legacy IMEManager の契約（1.0.0 と同じ動作）', () => {
     vi.restoreAllMocks();
   });
 
-  it('旧 export と型が @/ime から得られる（AC1）', () => {
+  it('旧 export と型が @/ime から得られる', () => {
     const options: IMEOptions = { enabledTypes: { hentaigana: true } };
     const attachOptions: IMEAttachOptions = { options, position: 'bottom' };
     const asInterface: (m: IMEManager) => IIMEManager = (m) => m;
@@ -64,7 +64,7 @@ describe('legacy IMEManager の契約（1.0.0 と同じ動作）', () => {
   });
 
   it(
-    'demo と同じ順序で attach / updateOptions / onChange / detach が動き、<ime-ui> が昇格し、DEPRECATED: の警告は 1 回（AC3-d）',
+    'demo と同じ順序で attach / updateOptions / onChange / detach が動き、<ime-ui> が昇格し、DEPRECATED: の警告は 1 回',
     async () => {
       const warn = vi.spyOn(console, 'warn');
       vi.spyOn(console, 'log').mockImplementation(() => {});

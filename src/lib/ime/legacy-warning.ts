@@ -1,7 +1,7 @@
 /**
  * legacy IME（IMEManager / <ime-ui>）の実行時非推奨警告。
  *
- * 形式（oct26-m7-t1 設計 §3.2-6。ファミリーの前例として固定）:
+ * 形式（ファミリーの前例として固定）:
  *   関数名は warn<対象>Once()、メッセージは
  *   `[<package名>] DEPRECATED: <対象> is deprecated since <minor版> and will be removed in <削除予定Major>. Use <代替> instead.`
  *
